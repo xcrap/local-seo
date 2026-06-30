@@ -67,26 +67,26 @@ export const api = {
     }),
   saveKeywords: (body: any) =>
     request<any>("/api/keywords/save", { method: "POST", body: JSON.stringify(body) }),
-  savedKeywords: (projectId: string) => request<any[]>(`/api/projects/${projectId}/keywords`),
-  querySavedKeywords: (projectId: string, body: any) =>
-    request<any>(`/api/projects/${projectId}/keywords/query`, { method: "POST", body: JSON.stringify(body) }),
-  keywordTags: (projectId: string) => request<any[]>(`/api/projects/${projectId}/keyword-tags`),
-  updateKeywordTags: (projectId: string, body: any) =>
-    request<any>(`/api/projects/${projectId}/keywords/tags`, { method: "POST", body: JSON.stringify(body) }),
-  updateKeywordTag: (projectId: string, tagId: string, body: any) =>
-    request<any>(`/api/projects/${projectId}/keyword-tags/${tagId}`, { method: "PUT", body: JSON.stringify(body) }),
-  deleteKeywordTag: (projectId: string, tagId: string) =>
-    request<any>(`/api/projects/${projectId}/keyword-tags/${tagId}`, { method: "DELETE" }),
-  removeSavedKeywords: (projectId: string, savedKeywordIds: string[]) =>
-    request<any>(`/api/projects/${projectId}/keywords/remove`, {
+  savedKeywords: (siteId: string) => request<any[]>(`/api/sites/${siteId}/keywords`),
+  querySavedKeywords: (siteId: string, body: any) =>
+    request<any>(`/api/sites/${siteId}/keywords/query`, { method: "POST", body: JSON.stringify(body) }),
+  keywordTags: (siteId: string) => request<any[]>(`/api/sites/${siteId}/keyword-tags`),
+  updateKeywordTags: (siteId: string, body: any) =>
+    request<any>(`/api/sites/${siteId}/keywords/tags`, { method: "POST", body: JSON.stringify(body) }),
+  updateKeywordTag: (siteId: string, tagId: string, body: any) =>
+    request<any>(`/api/sites/${siteId}/keyword-tags/${tagId}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteKeywordTag: (siteId: string, tagId: string) =>
+    request<any>(`/api/sites/${siteId}/keyword-tags/${tagId}`, { method: "DELETE" }),
+  removeSavedKeywords: (siteId: string, savedKeywordIds: string[]) =>
+    request<any>(`/api/sites/${siteId}/keywords/remove`, {
       method: "POST",
       body: JSON.stringify({ savedKeywordIds }),
     }),
-  savedKeywordsCsvUrl: (projectId: string) => `/api/projects/${projectId}/keywords.csv`,
-  serpRuns: (projectId: string) => request<any[]>(`/api/projects/${projectId}/serp`),
+  savedKeywordsCsvUrl: (siteId: string) => `/api/sites/${siteId}/keywords.csv`,
+  serpRuns: (siteId: string) => request<any[]>(`/api/sites/${siteId}/serp`),
   analyzeSerp: (body: any) =>
     request<any>("/api/serp/analyze", { method: "POST", body: JSON.stringify(body) }),
-  rankTrackers: (projectId: string) => request<any[]>(`/api/projects/${projectId}/rank-trackers`),
+  rankTrackers: (siteId: string) => request<any[]>(`/api/sites/${siteId}/rank-trackers`),
   createRankTracker: (body: any) =>
     request<any>("/api/rank-trackers", { method: "POST", body: JSON.stringify(body) }),
   addRankKeywords: (trackerId: string, keywords: string[]) =>
@@ -108,7 +108,7 @@ export const api = {
     request<any>(`/api/rank-trackers/${trackerId}/check`, { method: "POST" }),
   domainOverview: (body: any) =>
     request<any>("/api/domain/overview", { method: "POST", body: JSON.stringify(body) }),
-  domainSnapshots: (projectId: string) => request<any[]>(`/api/projects/${projectId}/domain-snapshots`),
+  domainSnapshots: (siteId: string) => request<any[]>(`/api/sites/${siteId}/domain-snapshots`),
   domainKeywordSuggestions: (body: any) =>
     request<any>("/api/domain/keyword-suggestions", { method: "POST", body: JSON.stringify(body) }),
   domainKeywords: (body: any) =>
@@ -117,13 +117,13 @@ export const api = {
     request<any>("/api/domain/pages", { method: "POST", body: JSON.stringify(body) }),
   backlinksOverview: (body: any) =>
     request<any>("/api/backlinks/overview", { method: "POST", body: JSON.stringify(body) }),
-  backlinkSnapshots: (projectId: string) => request<any[]>(`/api/projects/${projectId}/backlink-snapshots`),
+  backlinkSnapshots: (siteId: string) => request<any[]>(`/api/sites/${siteId}/backlink-snapshots`),
   backlinksProfile: (body: any) =>
     request<any>("/api/backlinks/profile", { method: "POST", body: JSON.stringify(body) }),
-  brandLookupRuns: (projectId: string) => request<any[]>(`/api/projects/${projectId}/brand-lookup`),
+  brandLookupRuns: (siteId: string) => request<any[]>(`/api/sites/${siteId}/brand-lookup`),
   brandLookup: (body: any) =>
     request<any>("/api/brand-lookup", { method: "POST", body: JSON.stringify(body) }),
-  promptExplorerRuns: (projectId: string) => request<any[]>(`/api/projects/${projectId}/prompt-explorer`),
+  promptExplorerRuns: (siteId: string) => request<any[]>(`/api/sites/${siteId}/prompt-explorer`),
   promptExplorer: (body: any) =>
     request<any>("/api/prompt-explorer", { method: "POST", body: JSON.stringify(body) }),
   audits: (projectId: string) => request<any[]>(`/api/sites/${projectId}/audits`),

@@ -307,16 +307,34 @@ app.get(
   "/api/projects/:id/keywords",
   safe((c) => c.json(listSavedKeywords(c.req.param("id")))),
 );
+app.get(
+  "/api/sites/:id/keywords",
+  safe((c) => c.json(listSavedKeywords(c.req.param("id")))),
+);
 app.post(
   "/api/projects/:id/keywords/query",
+  safe(async (c) => c.json(querySavedKeywords({ projectId: c.req.param("id"), ...(await readJson(c)) }))),
+);
+app.post(
+  "/api/sites/:id/keywords/query",
   safe(async (c) => c.json(querySavedKeywords({ projectId: c.req.param("id"), ...(await readJson(c)) }))),
 );
 app.get(
   "/api/projects/:id/keyword-tags",
   safe((c) => c.json(listSavedKeywordTags(c.req.param("id")))),
 );
+app.get(
+  "/api/sites/:id/keyword-tags",
+  safe((c) => c.json(listSavedKeywordTags(c.req.param("id")))),
+);
 app.post(
   "/api/projects/:id/keywords/tags",
+  safe(async (c) =>
+    c.json(updateSavedKeywordTags({ projectId: c.req.param("id"), ...(await readJson(c)) } as any)),
+  ),
+);
+app.post(
+  "/api/sites/:id/keywords/tags",
   safe(async (c) =>
     c.json(updateSavedKeywordTags({ projectId: c.req.param("id"), ...(await readJson(c)) } as any)),
   ),
@@ -327,8 +345,18 @@ app.put(
     c.json(updateSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId"), ...(await readJson(c)) })),
   ),
 );
+app.put(
+  "/api/sites/:id/keyword-tags/:tagId",
+  safe(async (c) =>
+    c.json(updateSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId"), ...(await readJson(c)) })),
+  ),
+);
 app.delete(
   "/api/projects/:id/keyword-tags/:tagId",
+  safe((c) => c.json(deleteSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId") }))),
+);
+app.delete(
+  "/api/sites/:id/keyword-tags/:tagId",
   safe((c) => c.json(deleteSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId") }))),
 );
 app.post(
@@ -338,8 +366,27 @@ app.post(
     return c.json(removeSavedKeywords(c.req.param("id"), body.savedKeywordIds || body.ids || []));
   }),
 );
+app.post(
+  "/api/sites/:id/keywords/remove",
+  safe(async (c) => {
+    const body = await readJson(c);
+    return c.json(removeSavedKeywords(c.req.param("id"), body.savedKeywordIds || body.ids || []));
+  }),
+);
 app.get(
   "/api/projects/:id/keywords.csv",
+  safe((c) => {
+    const csv = exportSavedKeywordsCsv(c.req.param("id"));
+    return new Response(csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="local-seo-keywords-${c.req.param("id")}.csv"`,
+      },
+    });
+  }),
+);
+app.get(
+  "/api/sites/:id/keywords.csv",
   safe((c) => {
     const csv = exportSavedKeywordsCsv(c.req.param("id"));
     return new Response(csv, {
@@ -358,6 +405,10 @@ app.get(
   "/api/projects/:id/serp",
   safe((c) => c.json(listSerpRuns(c.req.param("id")))),
 );
+app.get(
+  "/api/sites/:id/serp",
+  safe((c) => c.json(listSerpRuns(c.req.param("id")))),
+);
 app.post(
   "/api/serp/analyze",
   safe(async (c) => c.json(await getSerpAnalysis((await readJson(c)) as any))),
@@ -365,6 +416,10 @@ app.post(
 
 app.get(
   "/api/projects/:id/rank-trackers",
+  safe((c) => c.json(listRankTrackers(c.req.param("id")))),
+);
+app.get(
+  "/api/sites/:id/rank-trackers",
   safe((c) => c.json(listRankTrackers(c.req.param("id")))),
 );
 app.post(
@@ -416,6 +471,10 @@ app.get(
   "/api/projects/:id/domain-snapshots",
   safe((c) => c.json(listDomainSnapshots(c.req.param("id")))),
 );
+app.get(
+  "/api/sites/:id/domain-snapshots",
+  safe((c) => c.json(listDomainSnapshots(c.req.param("id")))),
+);
 app.post(
   "/api/domain/keyword-suggestions",
   safe(async (c) => c.json(await getDomainKeywordSuggestions((await readJson(c)) as any))),
@@ -436,6 +495,10 @@ app.get(
   "/api/projects/:id/backlink-snapshots",
   safe((c) => c.json(listBacklinkSnapshots(c.req.param("id")))),
 );
+app.get(
+  "/api/sites/:id/backlink-snapshots",
+  safe((c) => c.json(listBacklinkSnapshots(c.req.param("id")))),
+);
 app.post(
   "/api/backlinks/profile",
   safe(async (c) => c.json(await getBacklinksProfile((await readJson(c)) as any))),
@@ -444,12 +507,20 @@ app.get(
   "/api/projects/:id/brand-lookup",
   safe((c) => c.json(listBrandLookupRuns(c.req.param("id")))),
 );
+app.get(
+  "/api/sites/:id/brand-lookup",
+  safe((c) => c.json(listBrandLookupRuns(c.req.param("id")))),
+);
 app.post(
   "/api/brand-lookup",
   safe(async (c) => c.json(await brandLookup((await readJson(c)) as any))),
 );
 app.get(
   "/api/projects/:id/prompt-explorer",
+  safe((c) => c.json(listPromptExplorerRuns(c.req.param("id")))),
+);
+app.get(
+  "/api/sites/:id/prompt-explorer",
   safe((c) => c.json(listPromptExplorerRuns(c.req.param("id")))),
 );
 app.post(

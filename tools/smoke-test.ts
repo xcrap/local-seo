@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Database } from "bun:sqlite";
@@ -229,6 +229,10 @@ try {
   if (initialSites.length !== 0) {
     throw new Error(`Fresh setup should keep the site list empty until the user adds a real site: ${JSON.stringify(initialSites)}`);
   }
+  const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
+  if (webApiClient.includes("/api/projects")) {
+    throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");
+  }
   const project = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),
@@ -403,12 +407,12 @@ try {
       source: "smoke",
     }),
   });
-  const saved = await request(`/api/projects/${project.id}/keywords/query`, {
+  const saved = await request(`/api/sites/${project.id}/keywords/query`, {
     method: "POST",
     body: JSON.stringify({ tagNames: ["smoke"], pageSize: 50 }),
   });
   if (!saved.rows?.length || !saved.tags?.length) throw new Error("Saved keyword assertions failed.");
-  await request(`/api/projects/${project.id}/keywords/tags`, {
+  await request(`/api/sites/${project.id}/keywords/tags`, {
     method: "POST",
     body: JSON.stringify({ savedKeywordIds: [saved.rows[0].id], addTags: ["priority"] }),
   });
