@@ -45,26 +45,9 @@ const tools = [
     inputSchema: { type: "object", properties: {} },
   },
   {
-    name: "list_projects",
-    description: "Legacy alias: list local SEO site workspaces.",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
     name: "list_sites",
     description: "List local SEO sites.",
     inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "create_project",
-    description: "Legacy alias: create a local SEO site workspace.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        domain: { type: "string" },
-      },
-      required: ["name"],
-    },
   },
   {
     name: "create_site",
@@ -76,15 +59,6 @@ const tools = [
         domain: { type: "string" },
       },
       required: ["name"],
-    },
-  },
-  {
-    name: "get_project_summary",
-    description: "Legacy alias: get saved keywords, trackers, audits, and snapshots for a site.",
-    inputSchema: {
-      type: "object",
-      properties: { projectId: { type: "string" } },
-      required: ["projectId"],
     },
   },
   {

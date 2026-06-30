@@ -5923,15 +5923,14 @@ function McpPage() {
     api.mcpTools().then((data) => setTools(data.tools || [])).catch(console.error);
   }, []);
   const endpoint = `${window.location.origin}/mcp`;
-  const visibleTools = useMemo(() => tools.filter((tool) => !mcpLegacyAlias(tool.name, tool.description)), [tools]);
   const groupedTools = useMemo(() => {
-    return visibleTools.reduce<Record<string, any[]>>((acc, tool) => {
+    return tools.reduce<Record<string, any[]>>((acc, tool) => {
       const group = mcpToolGroup(tool.name);
       acc[group] = acc[group] || [];
       acc[group].push(tool);
       return acc;
     }, {});
-  }, [visibleTools]);
+  }, [tools]);
   const examples = [
     {
       title: "List tools",
@@ -5952,7 +5951,7 @@ function McpPage() {
         eyebrow="Agents"
         title="MCP"
         description="Local JSON-RPC tools for sites, scans, keywords, rank tracking, Search Console, AI jobs, and reports."
-        action={<Badge variant="good">{formatNumber(visibleTools.length)} tools</Badge>}
+        action={<Badge variant="good">{formatNumber(tools.length)} tools</Badge>}
       />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
         <div className="space-y-4">
@@ -6014,12 +6013,8 @@ function McpToolTable({ rows }: { rows: any[] }) {
   );
 }
 
-function mcpLegacyAlias(name: string, description?: string) {
-  return /^Legacy alias:/i.test(description || "") || ["list_projects", "create_project", "get_project_summary"].includes(name);
-}
-
 function mcpToolGroup(name: string) {
-  if (/site|project|whoami/.test(name)) return "Sites";
+  if (/site|whoami/.test(name)) return "Sites";
   if (/keyword|serp|rank/.test(name)) return "Keywords and ranks";
   if (/audit|scan/.test(name)) return "Audits";
   if (/domain|backlink/.test(name)) return "Competitive data";

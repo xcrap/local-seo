@@ -585,17 +585,24 @@ try {
   if (!scanSiteTool?.inputSchema?.required?.includes("siteId")) {
     throw new Error("MCP scan_site should expose siteId as the required site identifier.");
   }
-  const visibleMcpTools = (mcp.result?.tools || []).filter((tool: any) => {
-    const name = String(tool.name || "");
-    return !/^Legacy alias:/i.test(tool.description || "") && !["list_projects", "create_project", "get_project_summary"].includes(name);
-  });
-  const projectRequiredTool = visibleMcpTools.find((tool: any) => tool.inputSchema?.required?.includes("projectId"));
-  if (projectRequiredTool) {
-    throw new Error(`Visible MCP tool still requires projectId: ${projectRequiredTool.name}`);
+  for (const legacyName of ["list_projects", "create_project", "get_project_summary"]) {
+    if (toolNames.has(legacyName)) {
+      throw new Error(`MCP tools/list should not advertise legacy alias ${legacyName}.`);
+    }
   }
-  const projectPropertyTool = visibleMcpTools.find((tool: any) => tool.inputSchema?.properties?.projectId);
+  const legacyDescriptionTool = (mcp.result?.tools || []).find((tool: any) =>
+    /^Legacy alias:/i.test(tool.description || "") || /workspace/i.test(tool.description || ""),
+  );
+  if (legacyDescriptionTool) {
+    throw new Error(`MCP tools/list should not advertise legacy project/workspace copy: ${legacyDescriptionTool.name}`);
+  }
+  const projectRequiredTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.required?.includes("projectId"));
+  if (projectRequiredTool) {
+    throw new Error(`MCP tools/list still requires projectId: ${projectRequiredTool.name}`);
+  }
+  const projectPropertyTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.properties?.projectId);
   if (projectPropertyTool) {
-    throw new Error(`Visible MCP tool still exposes projectId: ${projectPropertyTool.name}`);
+    throw new Error(`MCP tools/list still exposes projectId: ${projectPropertyTool.name}`);
   }
   const mcpGsc = await request("/mcp", {
     method: "POST",
