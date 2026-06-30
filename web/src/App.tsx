@@ -655,6 +655,12 @@ type AuditCheckRowModel = {
   types?: string[];
 };
 
+type AuditCheckSectionModel = {
+  title: string;
+  text: string;
+  rows: AuditCheckRowModel[];
+};
+
 function pageIssueTypeCount(page: any, type: string) {
   return (page.issues || []).filter((issue: any) => issue.type === type).length;
 }
@@ -4407,11 +4413,10 @@ function AuditCheckMatrix({
   onSelectCheck: (row: AuditCheckRowModel) => void;
 }) {
   const byCategory = summary.byCategory || {};
-  const sections = [
+  const sections: AuditCheckSectionModel[] = [
     {
       title: "Metadata",
       text: "Titles, descriptions, snippets",
-      icon: FileText,
       rows: [
         { label: "Missing titles", value: summary.missingTitles, problem: true, severity: "bad", category: "metadata", types: ["title-missing"] },
         { label: "Title length", value: summary.titleLengthIssues, problem: true, severity: "warn", category: "metadata", types: ["title-length"] },
@@ -4427,7 +4432,6 @@ function AuditCheckMatrix({
     {
       title: "Content",
       text: "Headings, body copy, duplication",
-      icon: ListChecks,
       rows: [
         { label: "H1 problems", value: issueTypeCount(issues, "h1-count"), problem: true, severity: "warn", category: "headings", types: ["h1-count"] },
         { label: "Empty headings", value: issueTypesCount(issues, ["h1-empty", "heading-empty"]), problem: true, severity: "warn", category: "headings", types: ["h1-empty", "heading-empty"] },
@@ -4441,7 +4445,6 @@ function AuditCheckMatrix({
     {
       title: "Images",
       text: "Tags, alts, sources, files",
-      icon: Image,
       rows: [
         { label: "Image tags", value: coverage.imageTags },
         { label: "Checked image URLs", value: coverage.checkedImages },
@@ -4468,7 +4471,6 @@ function AuditCheckMatrix({
     {
       title: "Links",
       text: "Targets, anchors, redirects",
-      icon: Network,
       rows: [
         { label: "Links found", value: coverage.linkTags },
         { label: "Checked links", value: coverage.checkedLinks },
@@ -4486,7 +4488,6 @@ function AuditCheckMatrix({
     {
       title: "Indexability",
       text: "Robots, canonicals, language",
-      icon: ShieldCheck,
       rows: [
         { label: "Noindex pages", value: issueTypeCount(issues, "noindex"), problem: true, severity: "bad", category: "indexability", types: ["noindex"] },
         { label: "Page nofollow", value: issueTypeCount(issues, "meta-robots-nofollow"), problem: true, severity: "warn", category: "indexability", types: ["meta-robots-nofollow"] },
@@ -4500,7 +4501,6 @@ function AuditCheckMatrix({
     {
       title: "Crawl",
       text: "Sitemap, robots, discovery",
-      icon: Globe2,
       rows: [
         { label: "Pages crawled", value: coverage.pages },
         { label: "Page crawl failures", value: issueTypesCount(issues, ["crawl-failed", "page-http-error", "non-html-page"]), problem: true, severity: "bad", category: "crawl", types: ["crawl-failed", "page-http-error", "non-html-page"] },
@@ -4519,7 +4519,6 @@ function AuditCheckMatrix({
     {
       title: "Speed",
       text: "Performance and CSS/JS",
-      icon: Zap,
       rows: [
         { label: "Slow pages", value: issueTypesCount(issues, ["slow-page", "page-response-slow"]), problem: true, severity: "warn", category: "performance", types: ["slow-page", "page-response-slow"] },
         { label: "Viewport issues", value: issueTypesCount(issues, ["viewport-missing", "viewport-not-responsive"]), problem: true, severity: "warn", category: "performance", types: ["viewport-missing", "viewport-not-responsive"] },
@@ -4534,7 +4533,6 @@ function AuditCheckMatrix({
     {
       title: "Structured",
       text: "Schema, social tags, sharing",
-      icon: Tags,
       rows: [
         { label: "Schema issues", value: summary.schemaIssues, problem: true, severity: "warn", category: "structured-data", types: ["structured-data-missing", "structured-data-invalid"] },
         { label: "Open Graph issues", value: issueTypesCount(issues, ["open-graph-incomplete", "open-graph-image-missing", "open-graph-image-invalid"]), problem: true, severity: "warn", category: "social", types: ["open-graph-incomplete", "open-graph-image-missing", "open-graph-image-invalid"] },
@@ -4543,52 +4541,65 @@ function AuditCheckMatrix({
       ],
     },
   ];
+  const rows = sections.flatMap((section) => section.rows.map((row) => ({ ...row, area: section.title, areaText: section.text })));
 
   return (
-    <div className="space-y-4">
-      {sections.map((section) => {
-        const Icon = section.icon;
-        return (
-          <div key={section.title} className="grid gap-5 rounded-md border bg-background p-5 xl:grid-cols-[260px_1fr]">
-            <div className="flex items-start gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Icon className="size-5" />
-              </div>
-              <div>
-                <div className="font-semibold">{section.title}</div>
-                <p className="mt-1 text-sm text-muted-foreground">{section.text}</p>
-              </div>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
-              {section.rows.map((row) => <AuditCheckRow key={row.label} row={row} onSelect={onSelectCheck} />)}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+    <ReportSection title="Audit checks" description="Every local check grouped into one readable table. Use Review to jump to matching issues.">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Area</TableHead>
+            <TableHead>Check</TableHead>
+            <TableHead>Count</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Issue types</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => <AuditCheckRow key={`${row.area}:${row.label}`} row={row} onSelect={onSelectCheck} />)}
+        </TableBody>
+      </Table>
+    </ReportSection>
   );
 }
 
-function AuditCheckRow({ row, onSelect }: { row: AuditCheckRowModel; onSelect: (row: AuditCheckRowModel) => void }) {
+function AuditCheckRow({ row, onSelect }: { row: AuditCheckRowModel & { area?: string; areaText?: string }; onSelect: (row: AuditCheckRowModel) => void }) {
   const value = Number(row.value || 0);
   const variant = row.problem ? (value > 0 ? row.severity || "warn" : "good") : "outline";
   const clickable = Boolean(row.problem && row.types?.length);
   return (
-    <button
-      type="button"
-      className={cn(
-        "flex min-h-14 w-full items-center justify-between gap-4 rounded-md bg-muted/35 px-4 py-3 text-left transition-colors",
-        clickable ? "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : "cursor-default",
-      )}
-      onClick={() => clickable ? onSelect(row) : undefined}
-      disabled={!clickable}
-    >
-      <span className="text-sm font-medium">{row.label}</span>
-      <div className="flex items-center gap-2">
-        <span className="nums text-xl font-semibold">{formatNumber(value)}</span>
-        {row.problem ? <Badge variant={variant as any}>{value ? "issues" : "clear"}</Badge> : null}
-      </div>
-    </button>
+    <TableRow>
+      <TableCell className="min-w-44">
+        <div className="font-medium">{row.area}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{row.areaText}</div>
+      </TableCell>
+      <TableCell className="min-w-56 font-medium">{row.label}</TableCell>
+      <TableCell className="nums text-lg font-semibold">{formatNumber(value)}</TableCell>
+      <TableCell>
+        {row.problem ? (
+          <Badge variant={variant as any}>{value ? "issues" : "clear"}</Badge>
+        ) : (
+          <Badge variant="outline">evidence</Badge>
+        )}
+      </TableCell>
+      <TableCell className="min-w-64">
+        {row.types?.length ? (
+          <div className="flex flex-wrap gap-1">
+            {row.types.map((type) => <Badge key={type} variant="outline">{type.replaceAll("-", " ")}</Badge>)}
+          </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">Measured evidence</span>
+        )}
+      </TableCell>
+      <TableCell className="text-right">
+        {clickable ? (
+          <Button size="sm" variant={value ? "outline" : "ghost"} onClick={() => onSelect(row)}>
+            <ListChecks /> Review
+          </Button>
+        ) : null}
+      </TableCell>
+    </TableRow>
   );
 }
 
