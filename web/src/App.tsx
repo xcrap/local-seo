@@ -581,6 +581,23 @@ function auditProgress(audit: any) {
   return Math.min(96, Math.max(8, pageProgress, phaseProgress));
 }
 
+function auditIsActive(audit: any) {
+  return audit?.status === "queued" || audit?.status === "running";
+}
+
+function sortAuditRows(rows: any[]) {
+  return [...rows].sort((a, b) => {
+    const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
+    const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
+function upsertAuditRow(rows: any[], audit: any) {
+  if (!audit?.id) return rows;
+  return sortAuditRows([audit, ...rows.filter((row) => row.id !== audit.id)]);
+}
+
 function auditPhaseKey(audit: any) {
   const phase = String(audit?.result?.phase || audit?.result?.summary?.phase || "").toLowerCase();
   if (audit?.status === "queued") return "queued";
@@ -3418,8 +3435,9 @@ function AuditsPage({ project }: { project: Project }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [showCustomUrl, setShowCustomUrl] = useState(false);
+  const activeAudit = auditIsActive(detail) ? detail : audits.find(auditIsActive);
   async function load() {
-    const rows = await api.audits(project.id);
+    const rows = sortAuditRows(await api.audits(project.id));
     setAudits(rows);
     if (detail?.id) {
       const nextDetail = rows.find((row) => row.id === detail.id);
@@ -3440,13 +3458,35 @@ function AuditsPage({ project }: { project: Project }) {
     setShowCustomUrl(false);
   }, [project.id, project.domain, project.crawl_protocol, project.crawl_host]);
   useEffect(() => {
-    const hasActiveScan = audits.some((audit) => audit.status === "queued" || audit.status === "running");
+    const hasActiveScan = audits.some(auditIsActive);
     if (!hasActiveScan) return;
     const interval = window.setInterval(() => {
       load().catch(console.error);
     }, 1500);
     return () => window.clearInterval(interval);
   }, [project.id, audits, detail?.id]);
+  useEffect(() => {
+    if (!detail?.id || !auditIsActive(detail)) return;
+    let cancelled = false;
+    async function refreshSelectedAudit() {
+      try {
+        const nextAudit = await api.audit(detail.id);
+        if (cancelled || !nextAudit) return;
+        setDetail(nextAudit);
+        setAudits((rows) => upsertAuditRow(rows, nextAudit));
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not refresh scan progress");
+      }
+    }
+    const interval = window.setInterval(() => {
+      refreshSelectedAudit().catch(console.error);
+    }, 1000);
+    refreshSelectedAudit().catch(console.error);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [detail?.id, detail?.status]);
   async function start(event: FormEvent) {
     event.preventDefault();
     setError("");
@@ -3454,8 +3494,9 @@ function AuditsPage({ project }: { project: Project }) {
     try {
       const audit = await api.startAudit({ projectId: project.id, url });
       setDetail(audit);
+      setAudits((rows) => upsertAuditRow(rows, audit));
       if (audit?.id) localStorage.setItem(selectedAuditStorageKey, audit.id);
-      await load();
+      load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start scan");
     } finally {
@@ -3469,8 +3510,9 @@ function AuditsPage({ project }: { project: Project }) {
     try {
       const result = await api.scanProject(project.id);
       setDetail(result.audit);
+      setAudits((rows) => upsertAuditRow(rows, result.audit));
       if (result.audit?.id) localStorage.setItem(selectedAuditStorageKey, result.audit.id);
-      await load();
+      load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start site scan");
     } finally {
@@ -3547,6 +3589,7 @@ function AuditsPage({ project }: { project: Project }) {
         </div>
       </section>
       <div className="mt-6 space-y-6">
+        {activeAudit ? <ActiveScanBanner audit={activeAudit} /> : null}
         <section className="space-y-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -3645,6 +3688,34 @@ function AuditsPage({ project }: { project: Project }) {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function ActiveScanBanner({ audit }: { audit: any }) {
+  const progress = auditProgress(audit);
+  return (
+    <section className="rounded-md border border-primary/40 bg-primary/5 p-5">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="warn" className="gap-1"><Activity className="size-3" /> Scan running</Badge>
+            <span className="text-sm font-medium">{auditPhaseLabel(audit)}</span>
+          </div>
+          <div className="mt-3 max-w-4xl break-all text-lg font-semibold">{audit.url}</div>
+          <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+            <span>{formatNumber(audit.pages_crawled || 0)} pages crawled</span>
+            <span>{formatNumber(audit.issue_count || 0)} issues found</span>
+            <span>{formatNumber(progress)}% complete</span>
+          </div>
+          <div className="mt-4 max-w-3xl">
+            <ProgressBar value={progress} />
+          </div>
+        </div>
+        <Button asChild variant="secondary">
+          <Link to={`/audits/${audit.id}`}><FileSearch /> Open live report</Link>
+        </Button>
+      </div>
+    </section>
   );
 }
 

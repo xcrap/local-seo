@@ -12,8 +12,11 @@ let fixtureUrl = "";
 
 const fixtureServer = Bun.serve({
   port: 0,
-  fetch(request) {
+  async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === "/about/" || url.pathname === "/styles.css") {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
     if (url.pathname === "/") {
       return new Response(
         `<!doctype html>
@@ -272,6 +275,11 @@ try {
     await page.getByText("No scan report yet").waitFor();
     await page.getByRole("button", { name: /^Scan site now$/ }).first().waitFor();
     await page.getByText("No audits yet").waitFor();
+    await page.getByRole("button", { name: /^Scan site now$/ }).first().click();
+    await page.getByText("Scan running").waitFor({ timeout: 5000 });
+    await page.locator("section", { hasText: "Scan running" }).getByText(/pages crawled/i).first().waitFor();
+    await page.getByRole("link", { name: /Open live report/i }).waitFor();
+    await page.getByText("completed").first().waitFor({ timeout: 60_000 });
 
     await page.getByRole("navigation").getByRole("link", { name: /^MCP$/ }).click();
     await page.getByRole("heading", { name: /^MCP$/ }).waitFor();
