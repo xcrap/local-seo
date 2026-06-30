@@ -240,6 +240,19 @@ try {
   if (webAppClient.includes("projectId: project.id")) {
     throw new Error("The app should send siteId for selected-site actions.");
   }
+  for (const pattern of [
+    "row.searchVolume || \"-\"",
+    "formatNumber(row.search_volume)",
+    "formatNumber(row.keyword_difficulty)",
+    "row.cpc ?? \"-\"",
+  ]) {
+    if (webAppClient.includes(pattern)) {
+      throw new Error(`Keyword metric tables should render unavailable metrics explicitly, not with ${pattern}.`);
+    }
+  }
+  if (!webAppClient.includes("show as unavailable unless a real metrics source is connected")) {
+    throw new Error("Keyword research copy should explain unavailable metric values clearly.");
+  }
   const project = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),

@@ -551,6 +551,10 @@ function formatMetricStatus(value: unknown) {
   return hasMetric(value) ? formatNumber(value) : "Not available";
 }
 
+function keywordMetricClass(value: unknown) {
+  return cn("nums", !hasMetric(value) && "text-left text-xs text-muted-foreground");
+}
+
 function formatBytes(value: unknown) {
   const bytes = Number(value || 0);
   if (!Number.isFinite(bytes) || bytes <= 0) return "-";
@@ -1981,7 +1985,7 @@ function KeywordsPage({ project }: { project: Project }) {
 
   return (
     <>
-      <PageHeader eyebrow="Research" title="Keyword research" description="Find real keyword suggestions. Volume, CPC, and difficulty stay blank unless a real metrics source is connected." />
+      <PageHeader eyebrow="Research" title="Keyword research" description="Find real keyword suggestions. Volume, CPC, and difficulty show as unavailable unless a real metrics source is connected." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_120px_auto]" onSubmit={submit}>
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="seed keyword" />
@@ -2037,9 +2041,9 @@ function KeywordTable({
               </TableCell>
             )}
             <TableCell className="font-medium">{row.keyword}</TableCell>
-            <TableCell className="nums">{row.searchVolume || "-"}</TableCell>
-            <TableCell className="nums">{row.difficulty || "-"}</TableCell>
-            <TableCell className="nums">{row.cpc ?? "-"}</TableCell>
+            <TableCell className={keywordMetricClass(row.searchVolume)}>{formatMetricStatus(row.searchVolume)}</TableCell>
+            <TableCell className={keywordMetricClass(row.difficulty)}>{formatMetricStatus(row.difficulty)}</TableCell>
+            <TableCell className={keywordMetricClass(row.cpc)}>{formatMetricStatus(row.cpc)}</TableCell>
             <TableCell><Badge variant="outline">{row.intent}</Badge></TableCell>
           </TableRow>
         ))}
@@ -2202,9 +2206,9 @@ function SavedKeywordsTable({
               <Checkbox checked={Boolean(selected[row.id])} onCheckedChange={(checked) => setSelected({ ...selected, [row.id]: checked === true })} />
             </TableCell>
             <TableCell className="font-medium">{row.keyword}</TableCell>
-            <TableCell className="nums">{formatNumber(row.search_volume)}</TableCell>
-            <TableCell className="nums">{formatNumber(row.difficulty)}</TableCell>
-            <TableCell className="nums">{row.cpc ?? "-"}</TableCell>
+            <TableCell className={keywordMetricClass(row.search_volume)}>{formatMetricStatus(row.search_volume)}</TableCell>
+            <TableCell className={keywordMetricClass(row.difficulty)}>{formatMetricStatus(row.difficulty)}</TableCell>
+            <TableCell className={keywordMetricClass(row.cpc)}>{formatMetricStatus(row.cpc)}</TableCell>
             <TableCell><Badge variant="outline">{row.intent}</Badge></TableCell>
             <TableCell><TagList tags={row.tags || []} /></TableCell>
           </TableRow>
@@ -2521,9 +2525,9 @@ function RankKeywordTable({
           <TableRow key={row.id}>
             <TableCell><Checkbox checked={Boolean(selected[row.id])} onCheckedChange={(checked) => setSelected({ ...selected, [row.id]: checked === true })} /></TableCell>
             <TableCell className="font-medium">{row.keyword}</TableCell>
-            <TableCell className="nums">{formatNumber(row.search_volume)}</TableCell>
-            <TableCell className="nums">{formatNumber(row.keyword_difficulty)}</TableCell>
-            <TableCell className="nums">{row.cpc ?? "-"}</TableCell>
+            <TableCell className={keywordMetricClass(row.search_volume)}>{formatMetricStatus(row.search_volume)}</TableCell>
+            <TableCell className={keywordMetricClass(row.keyword_difficulty)}>{formatMetricStatus(row.keyword_difficulty)}</TableCell>
+            <TableCell className={keywordMetricClass(row.cpc)}>{formatMetricStatus(row.cpc)}</TableCell>
             <TableCell className="text-muted-foreground">{row.metrics_fetched_at || "-"}</TableCell>
           </TableRow>
         ))}
