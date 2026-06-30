@@ -1,0 +1,116 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Avenir Next", "SF Pro Text", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Avenir Next", "SF Pro Display", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
+:root {
+  color-scheme: light;
+  --radius: 0.45rem;
+  --background: oklch(0.972 0.006 235);
+  --foreground: oklch(0.205 0.026 246);
+  --card: oklch(0.998 0.002 235);
+  --card-foreground: oklch(0.205 0.026 246);
+  --popover: oklch(0.998 0.002 235);
+  --popover-foreground: oklch(0.205 0.026 246);
+  --primary: oklch(0.42 0.105 190);
+  --primary-foreground: oklch(0.985 0.004 210);
+  --secondary: oklch(0.925 0.01 235);
+  --secondary-foreground: oklch(0.27 0.028 246);
+  --muted: oklch(0.935 0.01 235);
+  --muted-foreground: oklch(0.47 0.026 246);
+  --accent: oklch(0.9 0.045 95);
+  --accent-foreground: oklch(0.24 0.035 246);
+  --destructive: oklch(0.54 0.22 28);
+  --destructive-foreground: oklch(0.985 0.004 210);
+  --border: oklch(0.84 0.014 235);
+  --input: oklch(0.78 0.018 235);
+  --ring: oklch(0.42 0.105 190);
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, color-mix(in oklch, var(--background) 92%, white), var(--background)),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+::selection {
+  background: color-mix(in oklch, var(--primary) 30%, transparent);
+}
+
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.grain {
+  position: relative;
+}
+
+.grain::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.09;
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.page-title {
+  font-family: var(--font-heading);
+  letter-spacing: 0;
+}
