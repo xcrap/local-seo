@@ -119,6 +119,14 @@ const fixtureServer = Bun.serve({
   },
 });
 fixtureUrl = `http://localhost:${fixtureServer.port}`;
+const emptyEvidenceServer = Bun.serve({
+  port: 0,
+  fetch() {
+    return new Response("stopped before scan");
+  },
+});
+const emptyEvidenceUrl = `http://localhost:${emptyEvidenceServer.port}`;
+emptyEvidenceServer.stop(true);
 
 const server = Bun.spawn([process.execPath, "src/index.ts"], {
   cwd: rootDir,
@@ -352,6 +360,25 @@ try {
     indexableRows + nonIndexableRows + unknownIndexabilityRows !== fixturePages.length
   ) {
     throw new Error("Fixture audit indexability summary does not match page-level evidence.");
+  }
+  const emptyEvidenceAudit = await request("/api/audits", {
+    method: "POST",
+    body: JSON.stringify({ siteId: localProject.id, url: emptyEvidenceUrl }),
+  });
+  const emptyEvidenceResult = await waitForAudit(emptyEvidenceAudit.id);
+  const emptyEvidenceIssueTypes = new Set((emptyEvidenceResult.result?.issues || []).map((issue: any) => issue.type));
+  if (
+    emptyEvidenceResult.status !== "completed" ||
+    emptyEvidenceResult.pages_crawled !== 0 ||
+    emptyEvidenceResult.score !== 0 ||
+    !emptyEvidenceIssueTypes.has("no-pages-crawled")
+  ) {
+    throw new Error(`Empty-evidence scans must not look healthy: ${JSON.stringify({
+      status: emptyEvidenceResult.status,
+      pages: emptyEvidenceResult.pages_crawled,
+      score: emptyEvidenceResult.score,
+      issues: [...emptyEvidenceIssueTypes],
+    })}`);
   }
   const fixtureIssueTypes = new Set((fixtureAudit.result?.issues || []).map((issue: any) => issue.type));
   for (const expected of [

@@ -3931,12 +3931,29 @@ async function runLocalAudit(auditId: string) {
       evidence: { discovery: page.discovery, sitemapListed: page.sitemapListed },
     });
   }
+  if (pages.length === 0) {
+    pushAuditIssue(issues, pageBucket(startUrl), {
+      url: startUrl,
+      severity: "high",
+      category: "crawl",
+      type: "no-pages-crawled",
+      message: "No HTML pages were crawled",
+      recommendation: "Check the scan URL, redirects, DNS, TLS, firewall rules, and whether the target returns crawlable HTML.",
+      evidence: {
+        visitedUrls: visited.size,
+        sitemapUrls: (sitemap.urls || []).length,
+        checkedLinks: checkedLinks.length,
+        checkedImages: checkedImages.length,
+        checkedAssets: checkedAssets.length,
+      },
+    });
+  }
 
   phase = "completed";
   const high = issues.filter((issue) => issue.severity === "high").length;
   const medium = issues.filter((issue) => issue.severity === "medium").length;
   const low = issues.filter((issue) => issue.severity === "low").length;
-  const score = Math.max(0, Math.min(100, 100 - high * 8 - medium * 3 - low));
+  const score = pages.length === 0 ? 0 : Math.max(0, Math.min(100, 100 - high * 8 - medium * 3 - low));
   const result = auditResult({
     startUrl,
     origin,
