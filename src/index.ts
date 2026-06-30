@@ -21,7 +21,9 @@ import {
   disconnectGsc,
   gscStatus,
   handleGscCallback,
+  importGscPerformance,
   inspectGscUrls,
+  listGscImports,
   listGscSites,
   queryGscPerformance,
   setGscSite,
@@ -496,6 +498,7 @@ app.post(
 );
 
 app.get("/api/gsc/status/:projectId", safe((c) => c.json(gscStatus(c.req.param("projectId")))));
+app.get("/api/gsc/imports/:projectId", safe((c) => c.json(listGscImports(c.req.param("projectId")))));
 app.post(
   "/api/gsc/start",
   safe(async (c) => {
@@ -526,6 +529,10 @@ app.post(
 app.post(
   "/api/gsc/performance",
   safe(async (c) => c.json(await queryGscPerformance((await readJson(c)) as any))),
+);
+app.post(
+  "/api/gsc/import",
+  safe(async (c) => c.json(importGscPerformance((await readJson(c)) as any))),
 );
 app.post(
   "/api/gsc/inspect",

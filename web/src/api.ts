@@ -139,6 +139,7 @@ export const api = {
   createAiJob: (body: any) =>
     request<any>("/api/ai/jobs", { method: "POST", body: JSON.stringify(body) }),
   gscStatus: (projectId: string) => request<any>(`/api/gsc/status/${projectId}`),
+  gscImports: (projectId: string) => request<any[]>(`/api/gsc/imports/${projectId}`),
   gscStart: (projectId: string) =>
     request<{ url: string }>("/api/gsc/start", { method: "POST", body: JSON.stringify({ projectId }) }),
   gscSites: (projectId: string) => request<any[]>(`/api/gsc/sites/${projectId}`),
@@ -146,6 +147,8 @@ export const api = {
     request<any>("/api/gsc/site", { method: "POST", body: JSON.stringify({ projectId, siteUrl }) }),
   gscPerformance: (body: any) =>
     request<any>("/api/gsc/performance", { method: "POST", body: JSON.stringify(body) }),
+  gscImport: (body: any) =>
+    request<any>("/api/gsc/import", { method: "POST", body: JSON.stringify(body) }),
   gscInspect: (body: any) =>
     request<any>("/api/gsc/inspect", { method: "POST", body: JSON.stringify(body) }),
   gscDisconnect: (projectId: string) =>

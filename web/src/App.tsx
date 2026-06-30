@@ -34,6 +34,7 @@ import {
   Tags,
   Target,
   Trash2,
+  Upload,
   Zap,
 } from "lucide-react";
 import { api, auth, type KeywordResult, type Project } from "./api";
@@ -5208,23 +5209,43 @@ function AuditLinkInventoryTable({ rows }: { rows: any[] }) {
 function GscPage({ project }: { project: Project }) {
   const [status, setStatus] = useState<any>(null);
   const [sites, setSites] = useState<any[]>([]);
+  const [imports, setImports] = useState<any[]>([]);
   const [performance, setPerformance] = useState<any>(null);
   const [inspectUrls, setInspectUrls] = useState(project.domain ? `https://${project.domain}/` : "");
   const [inspection, setInspection] = useState<any>(null);
   const [dimension, setDimension] = useState("query");
+  const [importSiteUrl, setImportSiteUrl] = useState(project.domain ? `sc-domain:${cleanSiteDomain(project.domain).replace(/^www\./i, "")}` : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState("");
   const today = new Date();
   const defaultEndDate = today.toISOString().slice(0, 10);
   const defaultStartDate = new Date(today.getTime() - 28 * 86400000).toISOString().slice(0, 10);
   const [dateRange, setDateRange] = useState({ startDate: defaultStartDate, endDate: defaultEndDate });
+  const latestImport = imports[0];
 
   async function load() {
-    setStatus(await api.gscStatus(project.id));
+    const [nextStatus, nextImports] = await Promise.all([
+      api.gscStatus(project.id),
+      api.gscImports(project.id),
+    ]);
+    setStatus(nextStatus);
+    setImports(nextImports);
+    if (nextImports[0]) {
+      showImport(nextImports[0]);
+    } else {
+      setPerformance(null);
+    }
   }
   useEffect(() => {
+    setImportSiteUrl(project.domain ? `sc-domain:${cleanSiteDomain(project.domain).replace(/^www\./i, "")}` : "");
+    setInspectUrls(project.domain ? `https://${project.domain}/` : "");
     load().catch(console.error);
-  }, [project.id]);
+  }, [project.id, project.domain]);
+
+  function showImport(row: any) {
+    setPerformance({ source: "import", import: row, rows: row.rows || [] });
+    setDimension(row.dimensions?.[0] || "query");
+  }
 
   async function connect() {
     setError("");
@@ -5274,6 +5295,29 @@ function GscPage({ project }: { project: Project }) {
       setLoading("");
     }
   }
+  async function importCsv(event: FormEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setLoading("import");
+    setError("");
+    try {
+      const csv = await file.text();
+      const result = await api.gscImport({
+        projectId: project.id,
+        siteUrl: importSiteUrl || project.domain,
+        sourceName: file.name,
+        csv,
+      });
+      setImports((rows) => [result, ...rows.filter((row) => row.id !== result.id)]);
+      showImport(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not import Search Console CSV");
+    } finally {
+      input.value = "";
+      setLoading("");
+    }
+  }
   async function inspect() {
     setLoading("inspection");
     setError("");
@@ -5306,47 +5350,23 @@ function GscPage({ project }: { project: Project }) {
       <PageHeader
         eyebrow="Google"
         title="Search Console"
-        description="Connect one property per site, read performance rows, and inspect index coverage from your real Search Console account."
-        action={<Badge variant={status?.connected ? "good" : status?.configured ? "warn" : "outline"}>{status?.connected ? "Connected" : status?.configured ? "Ready to connect" : "OAuth missing"}</Badge>}
+        description="Connect Google when OAuth is available, or import a Search Console CSV into local SQLite."
+        action={<Badge variant={status?.connected || imports.length ? "good" : status?.configured ? "warn" : "outline"}>{status?.connected ? "Connected" : imports.length ? "Local imports" : status?.configured ? "Ready to connect" : "OAuth missing"}</Badge>}
       />
       {error ? <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
-      <div className="grid gap-6 2xl:grid-cols-[420px_minmax(0,1fr)]">
-        <section className="rounded-md border bg-background">
-          <div className="border-b px-5 py-4">
-            <h2 className="text-lg font-semibold">Connection</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {status?.configured ? "OAuth is available in this local runtime." : "OAuth keys are missing from this local runtime."}
-            </p>
-          </div>
-          <div className="space-y-3 p-5">
-            <StatusEvidenceTable
-              rows={[
-                { title: "Google account", status: status?.connected ? "Connected" : "Not connected", tone: status?.connected ? "good" : "warn", text: status?.connection?.accountEmail || "Connect once, then choose the matching property." },
-                { title: "Selected property", status: status?.connection?.siteUrl ? "Selected" : "None", tone: status?.connection?.siteUrl ? "good" : "warn", text: status?.connection?.siteUrl || "Load properties and pick the property for this site." },
-              ]}
-            />
-            <Button className="w-full" onClick={connect} disabled={!status?.configured}>Connect Google</Button>
-            <Button className="w-full" variant="secondary" onClick={loadSites} disabled={!status?.connected || loading === "sites"}>{loading === "sites" ? "Loading" : "Load properties"}</Button>
-            <Button className="w-full" variant="outline" onClick={disconnect} disabled={!status?.connected || loading === "disconnect"}>Disconnect</Button>
-            {sites.length > 0 ? (
-              <Field label="Property">
-                <Select value={status?.connection?.siteUrl || ""} onValueChange={selectSite}>
-                  <SelectTrigger><SelectValue placeholder="Choose property" /></SelectTrigger>
-                  <SelectContent>
-                    {sites.map((site) => <SelectItem key={site.siteUrl} value={site.siteUrl}>{site.siteUrl}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-            ) : null}
-          </div>
-        </section>
-        <section className="rounded-md border bg-background">
-          <div className="border-b px-5 py-4">
-            <h2 className="text-lg font-semibold">Performance</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Clicks, impressions, CTR, and average position from the selected property.</p>
-          </div>
-          <div className="space-y-4 p-5">
-            <div className="grid gap-3 md:grid-cols-[1fr_1fr_180px_auto]">
+      <Tabs defaultValue="performance" className="space-y-5">
+        <TabsList>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="import">Local import</TabsTrigger>
+          <TabsTrigger value="inspection">URL inspection</TabsTrigger>
+          <TabsTrigger value="connection">Connection</TabsTrigger>
+        </TabsList>
+        <TabsContent value="performance" className="space-y-5">
+          <ReportSection
+            title="Performance rows"
+            description={performance?.source === "import" ? `Viewing ${performance.import?.sourceName || "local import"} from ${formatDate(performance.import?.createdAt)}` : "Clicks, impressions, CTR, and average position from Search Console."}
+          >
+            <div className="mb-5 grid gap-3 md:grid-cols-[1fr_1fr_180px_auto_auto]">
               <Field label="Start date">
                 <DatePicker value={dateRange.startDate} onChange={(startDate) => setDateRange({ ...dateRange, startDate })} />
               </Field>
@@ -5365,7 +5385,10 @@ function GscPage({ project }: { project: Project }) {
                 </Select>
               </Field>
               <div className="flex items-end">
-                <Button onClick={query} disabled={!status?.connection?.siteUrl || loading === "performance"}><BarChart3 /> {loading === "performance" ? "Querying" : "Query"}</Button>
+                <Button onClick={query} disabled={!status?.connection?.siteUrl || loading === "performance"}><BarChart3 /> {loading === "performance" ? "Querying" : "Query live"}</Button>
+              </div>
+              <div className="flex items-end">
+                <Button variant="secondary" onClick={() => latestImport && showImport(latestImport)} disabled={!latestImport}><Upload /> Latest import</Button>
               </div>
             </div>
             {performance?.rows?.length ? (
@@ -5375,25 +5398,117 @@ function GscPage({ project }: { project: Project }) {
               </div>
             ) : (
               <EmptyState
-                title="No performance rows"
-                text={status?.connection?.siteUrl ? "Query Search Console to load real performance rows." : "Connect Google and choose a property first."}
+                title="No Search Console rows"
+                text="Import a CSV locally or connect Google and query a property."
               />
             )}
-          </div>
-        </section>
-      </div>
-      <section className="mt-6 rounded-md border bg-background">
-        <div className="border-b px-5 py-4">
-          <h2 className="text-lg font-semibold">URL inspection</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Inspect up to 20 URLs against the selected property.</p>
-        </div>
-        <div className="space-y-4 p-5">
-          <Textarea value={inspectUrls} onChange={(event) => setInspectUrls(event.target.value)} placeholder="https://example.com/page" />
-          <Button onClick={inspect} disabled={!status?.connection?.siteUrl || loading === "inspection"}><ExternalLink /> {loading === "inspection" ? "Inspecting" : "Inspect URLs"}</Button>
-          {inspection?.rows?.length ? <GscInspectionResults rows={inspection.rows} /> : null}
-        </div>
-      </section>
+          </ReportSection>
+        </TabsContent>
+        <TabsContent value="import" className="space-y-5">
+          <ReportSection
+            title="Local CSV import"
+            description="Export Search Console performance as CSV and store it in this app's SQLite database."
+          >
+            <div className="grid gap-4 lg:grid-cols-[minmax(260px,360px)_minmax(260px,1fr)]">
+              <Field label="Property label">
+                <Input value={importSiteUrl} onChange={(event) => setImportSiteUrl(event.target.value)} placeholder="sc-domain:example.com" />
+              </Field>
+              <Field label="CSV file">
+                <Input type="file" accept=".csv,text/csv" onChange={importCsv} disabled={loading === "import"} />
+              </Field>
+            </div>
+            <div className="mt-5">
+              {latestImport ? (
+                <StatusEvidenceTable
+                  rows={[
+                    { title: "Latest import", status: "Saved", tone: "good", text: `${latestImport.sourceName || "Search Console CSV"} · ${formatDate(latestImport.createdAt)}` },
+                    { title: "Rows", status: formatNumber(latestImport.rowCount), tone: "good", text: `${formatNumber(latestImport.totals?.clicks || 0)} clicks · ${formatNumber(latestImport.totals?.impressions || 0)} impressions` },
+                    { title: "Storage", status: "SQLite", tone: "good", text: "Rows are stored locally and can be reopened without Google OAuth." },
+                  ]}
+                />
+              ) : (
+                <EmptyState title="No imports yet" text="Choose a Search Console CSV export to save real performance evidence locally." />
+              )}
+            </div>
+            {imports.length ? <GscImportHistory rows={imports} onOpen={showImport} /> : null}
+          </ReportSection>
+        </TabsContent>
+        <TabsContent value="inspection" className="space-y-5">
+          <ReportSection title="URL inspection" description="Inspect up to 20 URLs against the selected Google property.">
+            <div className="space-y-4">
+              <Textarea value={inspectUrls} onChange={(event) => setInspectUrls(event.target.value)} placeholder="https://example.com/page" />
+              <Button onClick={inspect} disabled={!status?.connection?.siteUrl || loading === "inspection"}><ExternalLink /> {loading === "inspection" ? "Inspecting" : "Inspect URLs"}</Button>
+              {inspection?.rows?.length ? <GscInspectionResults rows={inspection.rows} /> : null}
+            </div>
+          </ReportSection>
+        </TabsContent>
+        <TabsContent value="connection" className="space-y-5">
+          <ReportSection
+            title="Google connection"
+            description={status?.configured ? "OAuth is available in this local runtime." : "OAuth is not configured; local CSV import still works."}
+          >
+            <div className="space-y-4">
+              <StatusEvidenceTable
+                rows={[
+                  { title: "Google account", status: status?.connected ? "Connected" : "Not connected", tone: status?.connected ? "good" : "warn", text: status?.connection?.accountEmail || "Connect once, then choose the matching property." },
+                  { title: "Selected property", status: status?.connection?.siteUrl ? "Selected" : "None", tone: status?.connection?.siteUrl ? "good" : "warn", text: status?.connection?.siteUrl || "Load properties and pick the property for this site." },
+                ]}
+              />
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={connect} disabled={!status?.configured}>Connect Google</Button>
+                <Button variant="secondary" onClick={loadSites} disabled={!status?.connected || loading === "sites"}>{loading === "sites" ? "Loading" : "Load properties"}</Button>
+                <Button variant="outline" onClick={disconnect} disabled={!status?.connected || loading === "disconnect"}>Disconnect</Button>
+              </div>
+              {sites.length > 0 ? (
+                <Field label="Property">
+                  <Select value={status?.connection?.siteUrl || ""} onValueChange={selectSite}>
+                    <SelectTrigger><SelectValue placeholder="Choose property" /></SelectTrigger>
+                    <SelectContent>
+                      {sites.map((site) => <SelectItem key={site.siteUrl} value={site.siteUrl}>{site.siteUrl}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : null}
+            </div>
+          </ReportSection>
+        </TabsContent>
+      </Tabs>
     </>
+  );
+}
+
+function GscImportHistory({ rows, onOpen }: { rows: any[]; onOpen: (row: any) => void }) {
+  return (
+    <div className="mt-5 overflow-hidden rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Import</TableHead>
+            <TableHead>Property</TableHead>
+            <TableHead>Rows</TableHead>
+            <TableHead>Clicks</TableHead>
+            <TableHead>Impressions</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell className="font-medium">{row.sourceName || "Search Console CSV"}</TableCell>
+              <TableCell className="break-all text-sm text-muted-foreground">{row.siteUrl || "-"}</TableCell>
+              <TableCell className="nums">{formatNumber(row.rowCount)}</TableCell>
+              <TableCell className="nums">{formatNumber(row.totals?.clicks || 0)}</TableCell>
+              <TableCell className="nums">{formatNumber(row.totals?.impressions || 0)}</TableCell>
+              <TableCell>{formatDate(row.createdAt)}</TableCell>
+              <TableCell className="text-right">
+                <Button size="sm" variant="outline" onClick={() => onOpen(row)}>Open</Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 

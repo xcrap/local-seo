@@ -298,6 +298,25 @@ migrate(
   `,
 );
 
+migrate(
+  "005_gsc_imports",
+  `
+  CREATE TABLE IF NOT EXISTS gsc_imports (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_url TEXT NOT NULL DEFAULT '',
+    source_name TEXT NOT NULL DEFAULT '',
+    dimensions_json TEXT NOT NULL DEFAULT '[]',
+    row_count INTEGER NOT NULL DEFAULT 0,
+    totals_json TEXT NOT NULL DEFAULT '{}',
+    rows_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_gsc_imports_project_created ON gsc_imports(project_id, created_at DESC);
+  `,
+);
+
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];
 }

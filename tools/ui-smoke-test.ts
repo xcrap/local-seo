@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -239,6 +239,20 @@ try {
     await page.getByText("External backlink index", { exact: true }).waitFor();
     await page.getByRole("button", { name: /Backlink index not connected/i }).waitFor();
     await page.getByText("No web-wide backlink rows are generated locally").waitFor();
+
+    const gscCsvPath = path.join(tempDir, "search-console-ui.csv");
+    await writeFile(
+      gscCsvPath,
+      "Top queries,Clicks,Impressions,CTR,Position\nfixture seo,12,120,10%,2.4\nlocal crawler,3,30,10%,5.2\n",
+    );
+    await page.getByRole("navigation").getByRole("link", { name: /^Search Console$/ }).click();
+    await page.getByRole("heading", { name: /^Search Console$/ }).waitFor();
+    await page.getByRole("tab", { name: /^Local import$/ }).click();
+    await page.getByLabel("CSV file").setInputFiles(gscCsvPath);
+    await page.getByRole("cell", { name: "search-console-ui.csv", exact: true }).waitFor();
+    await page.getByRole("tab", { name: /^Performance$/ }).click();
+    await page.getByRole("cell", { name: "fixture seo" }).waitFor();
+    await page.getByRole("cell", { name: "local crawler" }).waitFor();
 
     await page.getByRole("link", { name: /Sites/i }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();

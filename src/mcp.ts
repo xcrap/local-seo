@@ -24,7 +24,7 @@ import {
   startAudit,
   updateSavedKeywordTags,
 } from "./seo";
-import { inspectGscUrls, queryGscPerformance } from "./gsc";
+import { getGscPerformance, inspectGscUrls } from "./gsc";
 import { resolveSavedSiteScanUrl } from "./site-target";
 
 type JsonRpcRequest = {
@@ -303,7 +303,7 @@ const tools = [
   },
   {
     name: "get_gsc_performance",
-    description: "Query Google Search Console performance for a connected site.",
+    description: "Read Search Console performance for a saved site from Google OAuth or the latest local CSV import.",
     inputSchema: {
       type: "object",
       properties: {
@@ -492,9 +492,9 @@ async function callTool(name: string, args: any) {
     case "get_audit":
       return getAudit(args.auditId);
     case "get_gsc_performance":
-      return queryGscPerformance(args);
+      return getGscPerformance(args);
     case "inspect_urls":
-      return inspectGscUrls(args);
+      return inspectGscUrls({ ...args, projectId: args.projectId || args.siteId });
     case "brand_lookup":
       return brandLookup(args);
     case "prompt_explorer":

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import Papa from "papaparse";
 import { getConfigValue } from "./config";
-import { all, get, run } from "./db";
+import { all, get, jsonParse, run } from "./db";
+import { getProject } from "./seo";
 
 const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 
@@ -12,6 +14,42 @@ type GscConnection = {
   refresh_token: string;
   expires_at: number;
   account_email: string;
+};
+
+type GscImportRecord = {
+  id: string;
+  project_id: string;
+  site_url: string;
+  source_name: string;
+  dimensions_json: string;
+  row_count: number;
+  totals_json: string;
+  rows_json: string;
+  created_at: string;
+};
+
+type ImportedGscPerformanceRow = {
+  keys: string[];
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+const DIMENSION_ALIASES: Record<string, string[]> = {
+  query: ["query", "queries", "top query", "top queries", "keyword", "keywords"],
+  page: ["page", "pages", "top page", "top pages", "url", "landing page", "landing pages"],
+  country: ["country", "countries"],
+  device: ["device", "devices"],
+  date: ["date", "day"],
+};
+
+const DIMENSION_ORDER = ["query", "page", "country", "device", "date"];
+const METRIC_ALIASES = {
+  clicks: ["clicks"],
+  impressions: ["impressions"],
+  ctr: ["ctr", "click through rate", "click-through rate"],
+  position: ["position", "avg position", "average position"],
 };
 
 function googleClientConfig() {
@@ -211,6 +249,251 @@ export async function queryGscPerformance(input: {
     throw new Error(`GSC performance failed: ${JSON.stringify(data).slice(0, 300)}`);
   }
   return data;
+}
+
+function normalizeHeader(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function findValue(row: Record<string, unknown>, aliases: string[]) {
+  const entries = Object.entries(row);
+  for (const alias of aliases) {
+    const target = normalizeHeader(alias);
+    const match = entries.find(([key]) => normalizeHeader(key) === target);
+    if (match && match[1] !== null && match[1] !== undefined) {
+      return String(match[1]).trim();
+    }
+  }
+  return "";
+}
+
+function parseMetricNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  let raw = String(value ?? "").trim();
+  if (!raw || raw === "-") return 0;
+  raw = raw.replace(/\s+/g, "").replace(/%$/, "");
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(raw) || /^-?\d+,\d+$/.test(raw)) {
+    raw = raw.replace(/\./g, "").replace(",", ".");
+  } else {
+    raw = raw.replace(/,/g, "");
+  }
+  const number = Number(raw);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function parseCtr(value: unknown) {
+  const raw = String(value ?? "").trim();
+  const number = parseMetricNumber(value);
+  if (!Number.isFinite(number)) return 0;
+  return raw.includes("%") || number > 1 ? number / 100 : number;
+}
+
+function canonicalDimension(value: string) {
+  const normalized = normalizeHeader(value);
+  return DIMENSION_ORDER.find((dimension) =>
+    [dimension, ...(DIMENSION_ALIASES[dimension] || [])].some(
+      (alias) => normalizeHeader(alias) === normalized,
+    ),
+  );
+}
+
+function inferGscDimensions(rows: Record<string, unknown>[]) {
+  const sample = rows[0] || {};
+  if (Array.isArray((sample as { keys?: unknown }).keys)) return ["query"];
+  const headers = new Set(Object.keys(sample).map(normalizeHeader));
+  const dimensions = DIMENSION_ORDER.filter((dimension) =>
+    DIMENSION_ALIASES[dimension].some((alias) => headers.has(normalizeHeader(alias))),
+  );
+  return dimensions.length ? dimensions : ["query"];
+}
+
+function normalizeGscDimensions(
+  dimensions: string[] | string | undefined,
+  rows: Record<string, unknown>[],
+) {
+  const raw = Array.isArray(dimensions)
+    ? dimensions
+    : String(dimensions || "")
+        .split(/[,|]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+  const canonical = raw.map(canonicalDimension).filter(Boolean) as string[];
+  return canonical.length ? [...new Set(canonical)] : inferGscDimensions(rows);
+}
+
+function normalizeGscImportRow(
+  row: Record<string, unknown>,
+  dimensions: string[],
+): ImportedGscPerformanceRow {
+  const keys = Array.isArray((row as { keys?: unknown[] }).keys)
+    ? ((row as { keys: unknown[] }).keys || []).map((key) => String(key || "").trim())
+    : dimensions.map((dimension) => findValue(row, DIMENSION_ALIASES[dimension] || [dimension]));
+  return {
+    keys,
+    clicks: parseMetricNumber((row as { clicks?: unknown }).clicks ?? findValue(row, METRIC_ALIASES.clicks)),
+    impressions: parseMetricNumber(
+      (row as { impressions?: unknown }).impressions ?? findValue(row, METRIC_ALIASES.impressions),
+    ),
+    ctr: parseCtr((row as { ctr?: unknown }).ctr ?? findValue(row, METRIC_ALIASES.ctr)),
+    position: parseMetricNumber(
+      (row as { position?: unknown }).position ?? findValue(row, METRIC_ALIASES.position),
+    ),
+  };
+}
+
+function rowHasGscEvidence(row: ImportedGscPerformanceRow) {
+  return (
+    row.keys.some(Boolean) ||
+    row.clicks > 0 ||
+    row.impressions > 0 ||
+    row.ctr > 0 ||
+    row.position > 0
+  );
+}
+
+function computeGscTotals(rows: ImportedGscPerformanceRow[]) {
+  const totals = rows.reduce(
+    (acc, row) => {
+      acc.clicks += row.clicks;
+      acc.impressions += row.impressions;
+      acc.weightedPosition += row.position * row.impressions;
+      if (row.position > 0) {
+        acc.positionCount += 1;
+        acc.positionSum += row.position;
+      }
+      return acc;
+    },
+    { clicks: 0, impressions: 0, weightedPosition: 0, positionCount: 0, positionSum: 0 },
+  );
+  const ctr = totals.impressions ? totals.clicks / totals.impressions : 0;
+  const position = totals.impressions
+    ? totals.weightedPosition / totals.impressions
+    : totals.positionCount
+      ? totals.positionSum / totals.positionCount
+      : 0;
+  return {
+    clicks: Math.round(totals.clicks),
+    impressions: Math.round(totals.impressions),
+    ctr,
+    position,
+  };
+}
+
+function parseGscCsv(csv: string) {
+  const parsed = Papa.parse<Record<string, unknown>>(csv, {
+    header: true,
+    skipEmptyLines: true,
+  });
+  return parsed.data.filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+}
+
+function mapGscImport(row: GscImportRecord) {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    siteUrl: row.site_url,
+    sourceName: row.source_name,
+    dimensions: jsonParse<string[]>(row.dimensions_json, []),
+    rowCount: row.row_count,
+    totals: jsonParse<Record<string, number>>(row.totals_json, {}),
+    rows: jsonParse<ImportedGscPerformanceRow[]>(row.rows_json, []),
+    createdAt: row.created_at,
+  };
+}
+
+export function listGscImports(projectId: string) {
+  return all<GscImportRecord>(
+    "SELECT * FROM gsc_imports WHERE project_id = ? ORDER BY created_at DESC LIMIT 20",
+    [projectId],
+  ).map(mapGscImport);
+}
+
+export function importGscPerformance(input: {
+  projectId: string;
+  siteUrl?: string;
+  sourceName?: string;
+  dimensions?: string[] | string;
+  csv?: string;
+  rows?: Record<string, unknown>[];
+}) {
+  const project = getProject(input.projectId);
+  if (!project) throw new Error("Site not found.");
+  const rawRows = input.csv ? parseGscCsv(input.csv) : input.rows || [];
+  if (!rawRows.length) {
+    throw new Error("Import file has no Search Console rows.");
+  }
+  const dimensions = normalizeGscDimensions(input.dimensions, rawRows);
+  const rows = rawRows
+    .map((row) => normalizeGscImportRow(row, dimensions))
+    .filter(rowHasGscEvidence)
+    .slice(0, 5000);
+  if (!rows.length) {
+    throw new Error("Import must include Search Console columns such as query/page, clicks, impressions, CTR, and position.");
+  }
+  const id = randomUUID();
+  const sourceName = String(input.sourceName || "Search Console CSV").trim().slice(0, 180);
+  const siteUrl = String(input.siteUrl || project.domain || "").trim();
+  const totals = computeGscTotals(rows);
+  run(
+    `
+    INSERT INTO gsc_imports
+      (id, project_id, site_url, source_name, dimensions_json, row_count, totals_json, rows_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      id,
+      project.id,
+      siteUrl,
+      sourceName,
+      JSON.stringify(dimensions),
+      rows.length,
+      JSON.stringify(totals),
+      JSON.stringify(rows),
+    ],
+  );
+  const record = get<GscImportRecord>("SELECT * FROM gsc_imports WHERE id = ?", [id]);
+  if (!record) throw new Error("Failed to save Search Console import.");
+  return mapGscImport(record);
+}
+
+export async function getGscPerformance(input: {
+  projectId?: string;
+  siteId?: string;
+  siteUrl?: string;
+  startDate?: string;
+  endDate?: string;
+  dimensions?: string[];
+  rowLimit?: number;
+}) {
+  const projectId = String(input.projectId || input.siteId || "");
+  if (!projectId) throw new Error("Site id is required.");
+  const status = gscStatus(projectId);
+  if (status.connected && (input.siteUrl || status.connection?.siteUrl)) {
+    return {
+      source: "google_search_console",
+      ...(await queryGscPerformance({
+        projectId,
+        siteUrl: input.siteUrl,
+        startDate: String(input.startDate || ""),
+        endDate: String(input.endDate || ""),
+        dimensions: input.dimensions,
+        rowLimit: input.rowLimit,
+      })),
+    };
+  }
+  const latest = listGscImports(projectId)[0];
+  if (latest) {
+    return {
+      source: "local_gsc_import",
+      siteUrl: latest.siteUrl,
+      dimensions: latest.dimensions,
+      totals: latest.totals,
+      rows: latest.rows,
+      importedAt: latest.createdAt,
+      sourceName: latest.sourceName,
+    };
+  }
+  throw new Error("No Search Console data yet. Connect Google or import a Search Console CSV.");
 }
 
 export function listGscConnections() {

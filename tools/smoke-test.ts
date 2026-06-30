@@ -423,6 +423,22 @@ try {
   });
   await request(`/api/audits/${audit.id}`);
   await request(`/api/gsc/status/${project.id}`);
+  const gscImport = await request("/api/gsc/import", {
+    method: "POST",
+    body: JSON.stringify({
+      projectId: project.id,
+      siteUrl: "sc-domain:example.com",
+      sourceName: "search-console.csv",
+      csv: "Top queries,Clicks,Impressions,CTR,Position\nseo software,10,100,10%,3.2\nlocal seo,5,50,10%,4.8\n",
+    }),
+  });
+  if (gscImport.rowCount !== 2 || gscImport.totals?.clicks !== 15 || gscImport.totals?.impressions !== 150) {
+    throw new Error(`GSC CSV import totals were not normalized: ${JSON.stringify(gscImport)}`);
+  }
+  const gscImports = await request(`/api/gsc/imports/${project.id}`);
+  if (!gscImports.length || gscImports[0].id !== gscImport.id) {
+    throw new Error("GSC import was not persisted in SQLite.");
+  }
   const mcp = await request("/mcp", {
     method: "POST",
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
@@ -449,6 +465,21 @@ try {
   const projectRequiredTool = visibleMcpTools.find((tool: any) => tool.inputSchema?.required?.includes("projectId"));
   if (projectRequiredTool) {
     throw new Error(`Visible MCP tool still requires projectId: ${projectRequiredTool.name}`);
+  }
+  const mcpGsc = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "get_gsc_performance",
+        arguments: { siteId: project.id, startDate: "2026-01-01", endDate: "2026-01-31", dimensions: ["query"] },
+      },
+    }),
+  });
+  if (mcpGsc.result?.structuredContent?.source !== "local_gsc_import" || mcpGsc.result?.structuredContent?.totals?.clicks !== 15) {
+    throw new Error(`MCP GSC performance did not read the local import: ${JSON.stringify(mcpGsc)}`);
   }
   console.log("Smoke test passed.");
 } finally {
