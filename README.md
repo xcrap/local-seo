@@ -96,6 +96,11 @@ prompt explorer, and Codex AI job creation.
 
 ```sh
 bun x tsc --noEmit
-bun run --filter web build
 bun run test:smoke
+bun run test:ui
+bun run test:waka
+bun run --filter web build
 ```
+
+Smoke and UI tests run against temporary SQLite databases. They do not write to
+the local app database at `data/local-seo.sqlite`.

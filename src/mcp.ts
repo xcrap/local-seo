@@ -25,12 +25,18 @@ import {
   updateSavedKeywordTags,
 } from "./seo";
 import { inspectGscUrls, queryGscPerformance } from "./gsc";
+import { resolveSavedSiteScanUrl } from "./site-target";
 
 type JsonRpcRequest = {
   jsonrpc?: string;
   id?: string | number | null;
   method?: string;
   params?: any;
+};
+
+const siteIdInput = {
+  siteId: { type: "string", description: "Local site id." },
+  projectId: { type: "string", description: "Legacy alias for siteId." },
 };
 
 const tools = [
@@ -87,7 +93,8 @@ const tools = [
     description: "Get saved keywords, trackers, audits, and snapshots for a site.",
     inputSchema: {
       type: "object",
-      properties: { siteId: { type: "string" }, projectId: { type: "string" } },
+      properties: siteIdInput,
+      required: ["siteId"],
     },
   },
   {
@@ -96,11 +103,11 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         query: { type: "string" },
         limit: { type: "number" },
       },
-      required: ["projectId", "query"],
+      required: ["siteId", "query"],
     },
   },
   {
@@ -109,12 +116,12 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         keyword: { type: "string" },
         target: { type: "string" },
         depth: { type: "number" },
       },
-      required: ["projectId", "keyword"],
+      required: ["siteId", "keyword"],
     },
   },
   {
@@ -122,8 +129,8 @@ const tools = [
     description: "List saved keywords for a site.",
     inputSchema: {
       type: "object",
-      properties: { projectId: { type: "string" } },
-      required: ["projectId"],
+      properties: siteIdInput,
+      required: ["siteId"],
     },
   },
   {
@@ -132,13 +139,13 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         search: { type: "string" },
         tagNames: { type: "array", items: { type: "string" } },
         page: { type: "number" },
         pageSize: { type: "number" },
       },
-      required: ["projectId"],
+      required: ["siteId"],
     },
   },
   {
@@ -147,10 +154,10 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         keywords: { type: "array" },
       },
-      required: ["projectId", "keywords"],
+      required: ["siteId", "keywords"],
     },
   },
   {
@@ -159,12 +166,12 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         savedKeywordIds: { type: "array", items: { type: "string" } },
         addTags: { type: "array", items: { type: "string" } },
         removeTagNames: { type: "array", items: { type: "string" } },
       },
-      required: ["projectId", "savedKeywordIds"],
+      required: ["siteId", "savedKeywordIds"],
     },
   },
   {
@@ -173,10 +180,10 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         target: { type: "string" },
       },
-      required: ["projectId", "target"],
+      required: ["siteId", "target"],
     },
   },
   {
@@ -185,11 +192,11 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         domain: { type: "string" },
         limit: { type: "number" },
       },
-      required: ["projectId"],
+      required: ["siteId"],
     },
   },
   {
@@ -198,14 +205,14 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         domain: { type: "string" },
         page: { type: "number" },
         pageSize: { type: "number" },
         sortMode: { type: "string" },
         sortOrder: { type: "string" },
       },
-      required: ["projectId"],
+      required: ["siteId"],
     },
   },
   {
@@ -214,12 +221,12 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         domain: { type: "string" },
         page: { type: "number" },
         pageSize: { type: "number" },
       },
-      required: ["projectId"],
+      required: ["siteId"],
     },
   },
   {
@@ -228,10 +235,10 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         target: { type: "string" },
       },
-      required: ["projectId", "target"],
+      required: ["siteId", "target"],
     },
   },
   {
@@ -240,13 +247,13 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         target: { type: "string" },
         tab: { type: "string", enum: ["backlinks", "domains", "pages"] },
         page: { type: "number" },
         pageSize: { type: "number" },
       },
-      required: ["projectId", "target"],
+      required: ["siteId", "target"],
     },
   },
   {
@@ -255,10 +262,10 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         trackerId: { type: "string" },
       },
-      required: ["projectId"],
+      required: ["siteId"],
     },
   },
   {
@@ -267,10 +274,10 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         url: { type: "string" },
       },
-      required: ["projectId", "url"],
+      required: ["siteId", "url"],
     },
   },
   {
@@ -279,10 +286,10 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        siteId: { type: "string" },
-        projectId: { type: "string" },
+        ...siteIdInput,
         url: { type: "string" },
       },
+      required: ["siteId"],
     },
   },
   {
@@ -300,12 +307,12 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         startDate: { type: "string" },
         endDate: { type: "string" },
         dimensions: { type: "array", items: { type: "string" } },
       },
-      required: ["projectId", "startDate", "endDate"],
+      required: ["siteId", "startDate", "endDate"],
     },
   },
   {
@@ -314,11 +321,11 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         urls: { type: "array", items: { type: "string" } },
         siteUrl: { type: "string" },
       },
-      required: ["projectId", "urls"],
+      required: ["siteId", "urls"],
     },
   },
   {
@@ -327,11 +334,11 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         query: { type: "string" },
         competitors: { type: "array", items: { type: "string" } },
       },
-      required: ["projectId", "query"],
+      required: ["siteId", "query"],
     },
   },
   {
@@ -340,12 +347,12 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        ...siteIdInput,
         prompt: { type: "string" },
         highlightBrand: { type: "string" },
         models: { type: "array", items: { type: "string" } },
       },
-      required: ["projectId", "prompt"],
+      required: ["siteId", "prompt"],
     },
   },
   {
@@ -478,7 +485,7 @@ async function callTool(name: string, args: any) {
       const siteId = args.siteId || args.projectId;
       const site = getProject(siteId);
       if (!site) throw new Error("Site not found.");
-      const url = args.url || (site.domain ? `https://${site.domain}` : "");
+      const url = args.url || (site.domain ? await resolveSavedSiteScanUrl(site) : "");
       if (!url) throw new Error("Set a site domain or pass a URL.");
       return startAudit(site.id, url);
     }

@@ -3660,20 +3660,49 @@ function AuditDetail({ audit }: { audit: any }) {
             onSeveritySelect={selectSeverity}
           />
 
-          <StatsBand
-            title="Audit snapshot"
-            items={[
-              { title: "Score", value: audit.status === "completed" ? audit.score : 0, icon: Gauge },
-              { title: "High impact", value: severityCounts.high, icon: ShieldCheck },
-              { title: "Pages crawled", value: coverage.pages, icon: Globe2 },
-              { title: "Title issues", value: titleProblems, icon: FileSearch },
-              { title: "Description issues", value: descriptionProblems, icon: TableProperties },
-              { title: "Alt issues", value: altProblems, icon: ImageOff },
-              { title: "Broken links", value: coverage.brokenLinks, icon: Link2 },
-              { title: "Broken images", value: coverage.brokenImages, icon: ImageOff },
-              { title: "CSS/JS failures", value: coverage.brokenAssets, icon: Cable },
+          <AuditEvidenceSnapshot
+            rows={[
+              {
+                area: "Impact",
+                status: (
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant={severityCounts.high ? "bad" : "outline"}>{formatNumber(severityCounts.high)} high</Badge>
+                    <Badge variant={severityCounts.medium ? "warn" : "outline"}>{formatNumber(severityCounts.medium)} medium</Badge>
+                    <Badge variant="outline">{formatNumber(severityCounts.low)} low</Badge>
+                  </div>
+                ),
+                evidence: `${formatNumber(audit.issue_count)} total issues from ${formatNumber(coverage.pages)} crawled pages`,
+                action: severityCounts.high ? (
+                  <Button size="sm" variant="outline" onClick={() => selectSeverity("high")}>Review high</Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => selectSeverity("all")}>Open issues</Button>
+                ),
+              },
+              {
+                area: "Metadata",
+                status: `${formatNumber(titleProblems)} title · ${formatNumber(descriptionProblems)} description`,
+                evidence: "Title, description, duplicate, and length checks for every crawled page.",
+                action: <Button size="sm" variant="outline" onClick={() => selectCategory("metadata")}>Open metadata</Button>,
+              },
+              {
+                area: "Images",
+                status: `${formatNumber(coverage.imageTags)} tags · ${formatNumber(coverage.checkedImages)} checked`,
+                evidence: `${formatNumber(altProblems)} alt issues · ${formatNumber(coverage.brokenImages)} broken image URLs · ${formatNumber(coverage.largeImages)} large images`,
+                action: <Button size="sm" variant="outline" onClick={() => setActiveTab("images")}>Open images</Button>,
+              },
+              {
+                area: "Links and assets",
+                status: `${formatNumber(coverage.linkTags)} links · ${formatNumber(coverage.assetTags)} CSS/JS refs`,
+                evidence: `${formatNumber(coverage.checkedLinks)} checked links · ${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.checkedAssets)} CSS/JS checked`,
+                action: <Button size="sm" variant="outline" onClick={() => setActiveTab("links")}>Open links</Button>,
+              },
+              {
+                area: "Indexing and sitemap",
+                status: `${formatNumber(coverage.indexablePages)} indexable · ${formatNumber(coverage.nonIndexablePages)} non-indexable`,
+                evidence: `${formatNumber(coverage.sitemapUrls)} sitemap URLs · ${formatNumber(coverage.pagesMissingFromSitemap)} pages missing from sitemap · ${formatNumber(coverage.unknownIndexabilityPages)} unknown`,
+                action: <Button size="sm" variant="outline" onClick={() => setActiveTab("crawl")}>Open crawl</Button>,
+              },
             ]}
-            columns="lg:grid-cols-3 2xl:grid-cols-5"
           />
 
           <AuditActionBoard audit={audit} summary={summary} coverage={coverage} issues={issues} issueGroups={issueGroups} onSelectGroup={selectIssueGroup} />
@@ -3831,6 +3860,48 @@ function severityVariant(severity: string) {
   if (severity === "high") return "bad";
   if (severity === "medium") return "warn";
   return "outline";
+}
+
+function AuditEvidenceSnapshot({
+  rows,
+}: {
+  rows: Array<{
+    area: string;
+    status: ReactNode;
+    evidence: ReactNode;
+    action?: ReactNode;
+  }>;
+}) {
+  return (
+    <section className="rounded-md border bg-background">
+      <div className="border-b px-5 py-4">
+        <h2 className="text-lg font-semibold">Audit snapshot</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Key evidence from this saved crawl run.</p>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Area</TableHead>
+            <TableHead>Counts</TableHead>
+            <TableHead>Evidence</TableHead>
+            <TableHead className="text-right">Open</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.area}>
+              <TableCell className="font-medium">{row.area}</TableCell>
+              <TableCell className="min-w-56">{row.status}</TableCell>
+              <TableCell className="min-w-96 text-sm text-muted-foreground">{row.evidence}</TableCell>
+              <TableCell>
+                <div className="flex justify-end">{row.action}</div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
+  );
 }
 
 function AuditReportOverview({

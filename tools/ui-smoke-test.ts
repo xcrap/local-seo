@@ -157,6 +157,11 @@ try {
 
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
+    await page.getByRole("heading", { name: /Audit snapshot/i }).waitFor();
+    await page.getByText("Links and assets").waitFor();
+    await page.getByRole("button", { name: /Open images/i }).click();
+    await page.getByText("Image tag inventory").waitFor();
+    await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByText("Checked image URLs").first().waitFor();
     if (await page.getByText("0 chars").count()) {
       throw new Error("Audit report still shows standalone 0 chars badges.");

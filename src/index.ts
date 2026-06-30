@@ -27,6 +27,7 @@ import {
   setGscSite,
 } from "./gsc";
 import { handleMcp, mcpToolList } from "./mcp";
+import { resolveSavedSiteScanUrl } from "./site-target";
 import {
   addRankKeywords,
   archiveProject,
@@ -73,8 +74,6 @@ import {
   updateSavedKeywordTags,
   updateProject,
 } from "./seo";
-import type { Project } from "./seo";
-
 dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local", override: true });
 
@@ -108,101 +107,6 @@ function currentUser(c: any) {
   if (!userId) return null;
   const user = getAdminById(userId);
   return user ? publicUser(user) : null;
-}
-
-function localHostFirst(domain: string) {
-  const host = (
-    domain.startsWith("[") && domain.includes("]")
-      ? domain.slice(1, domain.indexOf("]"))
-      : domain.split(":")[0]
-  )?.toLowerCase() || "";
-  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
-}
-
-async function probeScanUrl(url: string) {
-  async function request(method: "HEAD" | "GET") {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
-    try {
-      const response = await fetch(url, {
-        method,
-        redirect: "follow",
-        signal: controller.signal,
-        headers: {
-          "user-agent": "LocalSEO/0.1 (+local audit)",
-          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          ...(method === "GET" ? { range: "bytes=0-2048" } : {}),
-        },
-      });
-      return { status: response.status, finalUrl: response.url || url };
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  try {
-    const head = await request("HEAD");
-    if (![403, 405, 501].includes(head.status)) return head;
-  } catch {
-    // Try GET below. Some hosts reject or time out HEAD.
-  }
-
-  try {
-    return await request("GET");
-  } catch {
-    return null;
-  }
-}
-
-type SavedSiteScanTarget = Pick<Project, "domain" | "crawl_protocol" | "crawl_host">;
-
-function normalizeCrawlProtocol(value: unknown) {
-  return value === "https" || value === "http" || value === "both" ? value : "auto";
-}
-
-function normalizeCrawlHost(value: unknown) {
-  return value === "root" || value === "www" || value === "both" ? value : "auto";
-}
-
-function scanHostCandidates(domain: string, crawlHost: string) {
-  const rootDomain = domain.replace(/^www\./i, "");
-  if (!rootDomain || localHostFirst(rootDomain)) return [rootDomain];
-  const wwwDomain = `www.${rootDomain}`;
-  if (crawlHost === "root") return [rootDomain];
-  if (crawlHost === "www") return [wwwDomain];
-  return [rootDomain, wwwDomain];
-}
-
-function scanProtocolCandidates(domain: string, crawlProtocol: string) {
-  if (crawlProtocol === "https") return ["https"];
-  if (crawlProtocol === "http") return ["http"];
-  return localHostFirst(domain) ? ["http", "https"] : ["https", "http"];
-}
-
-function siteScanCandidates(site: SavedSiteScanTarget) {
-  const cleanDomain = site.domain.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
-  const crawlProtocol = normalizeCrawlProtocol(site.crawl_protocol);
-  const crawlHost = normalizeCrawlHost(site.crawl_host);
-  const hosts = scanHostCandidates(cleanDomain, crawlHost);
-  const urls: string[] = [];
-  for (const protocol of scanProtocolCandidates(cleanDomain, crawlProtocol)) {
-    for (const host of hosts) {
-      if (host) urls.push(`${protocol}://${host}`);
-    }
-  }
-  return [...new Set(urls)];
-}
-
-async function resolveSavedSiteScanUrl(site: SavedSiteScanTarget) {
-  const candidates = siteScanCandidates(site);
-  let firstAnswered = "";
-  for (const candidate of candidates) {
-    const probe = await probeScanUrl(candidate);
-    if (!probe) continue;
-    firstAnswered ||= probe.finalUrl || candidate;
-    if (probe.status < 400) return probe.finalUrl || candidate;
-  }
-  return firstAnswered || candidates[0] || "";
 }
 
 function safe(handler: (c: any) => Promise<Response> | Response) {

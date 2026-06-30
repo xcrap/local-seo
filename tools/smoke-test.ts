@@ -234,6 +234,19 @@ try {
   if (!String(localSiteScan.scanUrl || "").startsWith(fixtureUrl)) {
     throw new Error(`Local saved-site scan did not resolve to the reachable HTTP fixture: ${localSiteScan.scanUrl}`);
   }
+  const localMcpScan = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: "scan_site", arguments: { siteId: localProject.id } },
+    }),
+  });
+  const mcpAuditUrl = localMcpScan.result?.structuredContent?.url || "";
+  if (!localMcpScan.result?.structuredContent?.id || !String(mcpAuditUrl).startsWith(fixtureUrl)) {
+    throw new Error(`MCP site scan did not resolve through site preferences: ${mcpAuditUrl}`);
+  }
   const missingSite = await requestFailure("/api/sites/not-a-real-site/scan", { method: "POST" });
   if (missingSite.data?.error !== "Site not found.") {
     throw new Error(`Unexpected missing site error: ${JSON.stringify(missingSite.data)}`);
@@ -378,6 +391,18 @@ try {
     !toolNames.has("inspect_urls")
   ) {
     throw new Error("Smoke assertions failed.");
+  }
+  const scanSiteTool = (mcp.result?.tools || []).find((tool: any) => tool.name === "scan_site");
+  if (!scanSiteTool?.inputSchema?.required?.includes("siteId")) {
+    throw new Error("MCP scan_site should expose siteId as the required site identifier.");
+  }
+  const visibleMcpTools = (mcp.result?.tools || []).filter((tool: any) => {
+    const name = String(tool.name || "");
+    return !/^Legacy alias:/i.test(tool.description || "") && !["list_projects", "create_project", "get_project_summary"].includes(name);
+  });
+  const projectRequiredTool = visibleMcpTools.find((tool: any) => tool.inputSchema?.required?.includes("projectId"));
+  if (projectRequiredTool) {
+    throw new Error(`Visible MCP tool still requires projectId: ${projectRequiredTool.name}`);
   }
   console.log("Smoke test passed.");
 } finally {
