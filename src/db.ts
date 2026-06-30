@@ -317,6 +317,14 @@ migrate(
   `,
 );
 
+migrate(
+  "006_remove_generated_fallback_snapshots",
+  `
+  DELETE FROM domain_snapshots WHERE source = 'local-fallback';
+  DELETE FROM backlink_snapshots WHERE source = 'local-fallback';
+  `,
+);
+
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];
 }

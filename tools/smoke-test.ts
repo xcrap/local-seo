@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { Database } from "bun:sqlite";
 
 const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
@@ -418,6 +419,18 @@ try {
       backlinkOverview.dofollowRatio !== null)
   ) {
     throw new Error("Backlink provider-not-configured response should keep external metrics null.");
+  }
+  const smokeDb = new Database(path.join(tempDir, "smoke.sqlite"), { readonly: true });
+  const generatedFallbackRows = smokeDb
+    .query<{ count: number }, []>(`
+      SELECT
+        (SELECT count(*) FROM domain_snapshots WHERE source = 'local-fallback') +
+        (SELECT count(*) FROM backlink_snapshots WHERE source = 'local-fallback') AS count
+    `)
+    .get()?.count || 0;
+  smokeDb.close();
+  if (generatedFallbackRows !== 0) {
+    throw new Error(`Provider-not-configured requests created generated fallback snapshots: ${generatedFallbackRows}`);
   }
   await request("/api/backlinks/profile", {
     method: "POST",

@@ -1297,7 +1297,7 @@ export async function getDomainPagesPage(input: {
 
 export function listDomainSnapshots(projectId: string) {
   return all<any>(
-    "SELECT * FROM domain_snapshots WHERE project_id = ? AND source != 'local-fallback' ORDER BY created_at DESC LIMIT 25",
+    "SELECT * FROM domain_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 25",
     [projectId],
   ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
 }
@@ -1461,7 +1461,7 @@ export async function getBacklinksProfile(input: {
 
 export function listBacklinkSnapshots(projectId: string) {
   return all<any>(
-    "SELECT * FROM backlink_snapshots WHERE project_id = ? AND source != 'local-fallback' ORDER BY created_at DESC LIMIT 25",
+    "SELECT * FROM backlink_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 25",
     [projectId],
   ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
 }
@@ -4066,11 +4066,11 @@ export function projectSummary(projectId: string) {
     rankTrackers: listRankTrackers(projectId),
     audits: listAudits(projectId),
     domainSnapshots: all<any>(
-      "SELECT * FROM domain_snapshots WHERE project_id = ? AND source != 'local-fallback' ORDER BY created_at DESC LIMIT 10",
+      "SELECT * FROM domain_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 10",
       [projectId],
     ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) })),
     backlinkSnapshots: all<any>(
-      "SELECT * FROM backlink_snapshots WHERE project_id = ? AND source != 'local-fallback' ORDER BY created_at DESC LIMIT 10",
+      "SELECT * FROM backlink_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 10",
       [projectId],
     ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) })),
     serpRuns: listSerpRuns(projectId),

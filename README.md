@@ -18,7 +18,7 @@ auth service.
 
 ## OpenSEO-Inspired Local Workflows
 
-- **Sites:** saved websites with domain, market, language, notes, and archived state.
+- **Sites:** saved websites with domain, crawl target preferences, search market/language locale, notes, and archived state.
 - **Keyword research:** real DuckDuckGo suggestions, with DataForSEO metrics when configured.
 - **SERP analysis:** live web result snapshots, target ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
