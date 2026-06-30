@@ -3684,19 +3684,19 @@ function AuditsPage({ project }: { project: Project }) {
   return (
     <>
       <PageHeader eyebrow="Technical" title="Site audits" description="Scan the selected website and open the report when it completes." />
-      <section className="rounded-md border bg-background p-5">
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">Selected site</div>
-              <div className="mt-1 text-xl font-semibold">{project.domain || "Add a domain"}</div>
-              {project.domain ? (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  First target: {preferredAuditUrl(project)} · {scanTargetShortDetail(project)}
-                </p>
-              ) : null}
-              {project.domain ? <p className="mt-1 max-w-4xl break-all text-xs text-muted-foreground">{scanTargetDetail(project)}</p> : null}
+      <section className="border-y bg-background/40 px-4 py-4 sm:px-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">Scan target</span>
+              {project.domain ? <Badge variant="outline">{scanTargetShortDetail(project)}</Badge> : null}
             </div>
+            <div className="mt-2 break-all text-xl font-semibold">
+              {project.domain ? preferredAuditUrl(project) : "Add a site domain"}
+            </div>
+            {project.domain ? <p className="mt-1 text-sm text-muted-foreground">{scanTargetDetail(project)}</p> : null}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row xl:justify-end">
             {project.domain ? (
               <Button disabled={starting} onClick={startSelectedSite}>
                 <FileSearch /> {starting ? "Starting" : `Scan ${project.domain}`}
@@ -3704,24 +3704,24 @@ function AuditsPage({ project }: { project: Project }) {
             ) : (
               <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
             )}
-          </div>
-          <div className="border-t pt-4">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setShowCustomUrl((value) => !value)}>
-              <FileSearch /> {showCustomUrl ? "Hide URL scan" : "Scan a specific URL"}
+            <Button type="button" variant="outline" onClick={() => setShowCustomUrl((value) => !value)}>
+              <FileSearch /> {showCustomUrl ? "Hide URL scan" : "Specific URL"}
             </Button>
-            {showCustomUrl ? (
-              <form className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={start}>
-                <Field label="URL to scan">
-                  <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredAuditUrl(project) || "https://example.com"}/page`} />
-                </Field>
-                <div className="flex items-end">
-                  <Button variant="secondary" disabled={starting || !url.trim()}><FileSearch /> Scan URL</Button>
-                </div>
-              </form>
-            ) : null}
           </div>
-          {error && <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p>}
         </div>
+        {showCustomUrl ? (
+          <form className="mt-4 grid gap-3 border-t pt-4 lg:grid-cols-[1fr_auto]" onSubmit={start}>
+            <Field label="URL to scan">
+              <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredAuditUrl(project) || "https://example.com"}/page`} />
+            </Field>
+            <div className="flex items-end">
+              <Button variant="secondary" disabled={starting || !url.trim()}><FileSearch /> Scan URL</Button>
+            </div>
+          </form>
+        ) : null}
+        {error ? (
+          <p className="mt-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p>
+        ) : null}
       </section>
       <div className="mt-6 space-y-6">
         {activeAudit ? <ActiveScanBanner audit={activeAudit} /> : null}
@@ -4068,7 +4068,7 @@ function AuditDetail({ audit }: { audit: any }) {
   return (
     <div className="space-y-5">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="flex flex-wrap">
+        <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="issues">Issues</TabsTrigger>
           <TabsTrigger value="checks">Checks</TabsTrigger>
