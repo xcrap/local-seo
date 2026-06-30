@@ -325,6 +325,13 @@ migrate(
   `,
 );
 
+migrate(
+  "007_delete_archived_sites",
+  `
+  DELETE FROM projects WHERE archived_at IS NOT NULL;
+  `,
+);
+
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];
 }

@@ -216,25 +216,19 @@ async function searchWeb(query: string, limit: number) {
 }
 
 export function listProjects() {
-  const rows = all<Project>(
-    "SELECT * FROM projects WHERE archived_at IS NULL ORDER BY created_at DESC",
-  );
+  const rows = all<Project>("SELECT * FROM projects ORDER BY created_at DESC");
   if (rows.length > 0) return rows;
   ensureDefaultProject();
-  return all<Project>(
-    "SELECT * FROM projects WHERE archived_at IS NULL ORDER BY created_at DESC",
-  );
+  return all<Project>("SELECT * FROM projects ORDER BY created_at DESC");
 }
 
 export function getProject(projectId: string) {
-  return get<Project>("SELECT * FROM projects WHERE id = ? AND archived_at IS NULL", [
-    projectId,
-  ]);
+  return get<Project>("SELECT * FROM projects WHERE id = ?", [projectId]);
 }
 
 export function ensureDefaultProject() {
   const existing = get<Project>(
-    "SELECT * FROM projects WHERE archived_at IS NULL ORDER BY created_at ASC LIMIT 1",
+    "SELECT * FROM projects ORDER BY created_at ASC LIMIT 1",
   );
   if (existing) return existing;
   return createProject({
@@ -268,7 +262,7 @@ export function createProject(input: {
   const crawlHost = normalizeCrawlHost(input.crawlHost ?? input.crawl_host ?? getConfigValue("default_crawl_host"));
   const placeholder = domain
     ? get<Project>(
-        "SELECT * FROM projects WHERE archived_at IS NULL AND domain = '' AND name = 'Add your site' ORDER BY created_at ASC LIMIT 1",
+        "SELECT * FROM projects WHERE domain = '' AND name = 'Add your site' ORDER BY created_at ASC LIMIT 1",
       )
     : undefined;
   if (placeholder) {
@@ -337,9 +331,9 @@ export function updateProject(projectId: string, input: Partial<Project>) {
   return getProject(projectId)!;
 }
 
-export function archiveProject(projectId: string) {
-  run("UPDATE projects SET archived_at = CURRENT_TIMESTAMP WHERE id = ?", [projectId]);
-  return { id: projectId, archived: true };
+export function deleteProject(projectId: string) {
+  const info = run("DELETE FROM projects WHERE id = ?", [projectId]);
+  return { id: projectId, deleted: Number(info.changes || 0) > 0 };
 }
 
 async function dataForSeo(pathname: string, payload: unknown) {

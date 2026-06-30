@@ -32,7 +32,6 @@ import { handleMcp, mcpToolList } from "./mcp";
 import { resolveSavedSiteScanUrl } from "./site-target";
 import {
   addRankKeywords,
-  archiveProject,
   backlinksOverview,
   brandLookup,
   clearAudits,
@@ -40,6 +39,7 @@ import {
   createRankTracker,
   dashboardSummary,
   deleteAudit,
+  deleteProject,
   deleteSavedKeywordTag,
   domainOverview,
   ensureDefaultProject,
@@ -286,7 +286,7 @@ app.put(
   "/api/projects/:id",
   safe(async (c) => c.json(updateProject(c.req.param("id"), await readJson(c)))),
 );
-app.delete("/api/projects/:id", safe((c) => c.json(archiveProject(c.req.param("id")))));
+app.delete("/api/projects/:id", safe((c) => c.json(deleteProject(c.req.param("id")))));
 app.post("/api/projects/:id/scan", safe(startSavedSiteScan));
 
 app.get("/api/sites", safe((c) => c.json(listProjects())));
@@ -299,7 +299,7 @@ app.put(
   "/api/sites/:id",
   safe(async (c) => c.json(updateProject(c.req.param("id"), await readJson(c)))),
 );
-app.delete("/api/sites/:id", safe((c) => c.json(archiveProject(c.req.param("id")))));
+app.delete("/api/sites/:id", safe((c) => c.json(deleteProject(c.req.param("id")))));
 app.post("/api/sites/:id/scan", safe(startSavedSiteScan));
 
 app.post(

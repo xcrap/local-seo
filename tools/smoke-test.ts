@@ -420,17 +420,47 @@ try {
   ) {
     throw new Error("Backlink provider-not-configured response should keep external metrics null.");
   }
+  const deleteTarget = await request("/api/sites", {
+    method: "POST",
+    body: JSON.stringify({ name: "Delete Me", domain: "delete-me.example" }),
+  });
+  await request("/api/keywords/save", {
+    method: "POST",
+    body: JSON.stringify({
+      projectId: deleteTarget.id,
+      keywords: [{ keyword: "delete me keyword", intent: "manual" }],
+      source: "smoke-delete",
+    }),
+  });
+  const deletedSite = await request(`/api/sites/${deleteTarget.id}`, { method: "DELETE" });
+  if (!deletedSite.deleted) {
+    throw new Error("Site delete endpoint should hard-delete the SQLite row.");
+  }
   const smokeDb = new Database(path.join(tempDir, "smoke.sqlite"), { readonly: true });
-  const generatedFallbackRows = smokeDb
-    .query<{ count: number }, []>(`
+  const deletionEvidence = smokeDb
+    .query<
+      { projectRows: number; keywordRows: number; archivedRows: number; generatedFallbackRows: number },
+      [string, string]
+    >(`
       SELECT
+        (SELECT count(*) FROM projects WHERE id = ?) AS projectRows,
+        (SELECT count(*) FROM saved_keywords WHERE project_id = ?) AS keywordRows,
+        (SELECT count(*) FROM projects WHERE archived_at IS NOT NULL) AS archivedRows,
         (SELECT count(*) FROM domain_snapshots WHERE source = 'local-fallback') +
-        (SELECT count(*) FROM backlink_snapshots WHERE source = 'local-fallback') AS count
+        (SELECT count(*) FROM backlink_snapshots WHERE source = 'local-fallback') AS generatedFallbackRows
     `)
-    .get()?.count || 0;
+    .get(deleteTarget.id, deleteTarget.id);
   smokeDb.close();
-  if (generatedFallbackRows !== 0) {
-    throw new Error(`Provider-not-configured requests created generated fallback snapshots: ${generatedFallbackRows}`);
+  if (
+    !deletionEvidence ||
+    deletionEvidence.projectRows !== 0 ||
+    deletionEvidence.keywordRows !== 0 ||
+    deletionEvidence.archivedRows !== 0
+  ) {
+    throw new Error(`Deleted sites should not stay hidden in SQLite: ${JSON.stringify(deletionEvidence)}`);
+  }
+  if (deletionEvidence.generatedFallbackRows !== 0) {
+    throw new Error(`Provider-not-configured requests created generated fallback snapshots: ${deletionEvidence.generatedFallbackRows}`);
   }
   await request("/api/backlinks/profile", {
     method: "POST",

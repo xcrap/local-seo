@@ -1876,7 +1876,7 @@ function ProjectsPage({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete site?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes "{deleting?.name}" from the active site list. Its saved keywords, scans, trackers, and local history are hidden with the site.
+              This permanently removes "{deleting?.name}" and its saved scans, keywords, trackers, Search Console imports, and local history from SQLite.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
