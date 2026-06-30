@@ -255,6 +255,8 @@ try {
     await page.getByRole("button", { name: /^Clear history$/ }).click();
     await page.getByRole("heading", { name: /^Clear scan history\?$/ }).waitFor();
     await page.getByRole("button", { name: /^Clear scan history$/ }).click();
+    await page.getByText("No scan report yet").waitFor();
+    await page.getByRole("button", { name: /^Scan site now$/ }).first().waitFor();
     await page.getByText("No audits yet").waitFor();
 
     await page.getByRole("navigation").getByRole("link", { name: /^MCP$/ }).click();

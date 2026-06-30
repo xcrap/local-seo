@@ -3555,7 +3555,21 @@ function AuditsPage({ project }: { project: Project }) {
             {detail ? <Badge variant={detail.status === "completed" ? "good" : detail.status === "failed" ? "bad" : "warn"}>{detail.status}</Badge> : null}
           </div>
           {detail ? <AuditDetail audit={detail} /> : (
-            <EmptyState title="No scan selected" text={audits.length ? "Open any saved scan below." : "Start a scan to see the report."} />
+            <EmptyState
+              title={audits.length ? "No scan selected" : "No scan report yet"}
+              text={audits.length ? "Open any saved scan below." : "Start a local site scan to fill this report with crawl evidence."}
+              action={
+                !audits.length
+                  ? project.domain
+                    ? (
+                      <Button onClick={startSelectedSite} disabled={starting}>
+                        <FileSearch /> {starting ? "Starting" : "Scan site now"}
+                      </Button>
+                    )
+                    : <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
+                  : undefined
+              }
+            />
           )}
         </section>
 
