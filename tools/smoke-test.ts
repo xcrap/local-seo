@@ -221,6 +221,27 @@ try {
   if (updatedPreference.crawl_protocol !== "both" || updatedPreference.crawl_host !== "both") {
     throw new Error("Site crawl preferences were not saved on update.");
   }
+  await request("/api/config", {
+    method: "PUT",
+    body: JSON.stringify({
+      default_location_code: "2620",
+      default_language_code: "pt",
+      default_crawl_protocol: "https",
+      default_crawl_host: "www",
+    }),
+  });
+  const defaultsProject = await request("/api/sites", {
+    method: "POST",
+    body: JSON.stringify({ name: "Configured Defaults", domain: "defaults.example" }),
+  });
+  if (
+    defaultsProject.location_code !== 2620 ||
+    defaultsProject.language_code !== "pt" ||
+    defaultsProject.crawl_protocol !== "https" ||
+    defaultsProject.crawl_host !== "www"
+  ) {
+    throw new Error(`New site did not use app defaults: ${JSON.stringify(defaultsProject)}`);
+  }
   const siteScan = await request(`/api/sites/${project.id}/scan`, { method: "POST" });
   if (!siteScan.audit?.id) throw new Error("Site scan did not return an audit.");
   if (!siteScan.related?.some((row: any) => row.key === "technical-audit") || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
@@ -228,7 +249,7 @@ try {
   }
   const localProject = await request("/api/sites", {
     method: "POST",
-    body: JSON.stringify({ name: "Local fixture", domain: `localhost:${fixtureServer.port}` }),
+    body: JSON.stringify({ name: "Local fixture", domain: `localhost:${fixtureServer.port}`, crawlProtocol: "http", crawlHost: "root" }),
   });
   const localSiteScan = await request(`/api/sites/${localProject.id}/scan`, { method: "POST" });
   if (!localSiteScan.audit?.id) throw new Error("Local saved-site scan did not return an audit.");

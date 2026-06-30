@@ -309,6 +309,28 @@ try {
     if (await page.getByText(/API key|ENV|Environment variables/i).count()) {
       throw new Error("Settings page exposes secret/env configuration copy.");
     }
+    const appPreferences = page.locator("section", { hasText: "App preferences" });
+    await appPreferences.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Portugal" }).click();
+    await appPreferences.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Portuguese" }).click();
+    await appPreferences.getByRole("combobox").nth(2).click();
+    await page.getByRole("option", { name: "HTTPS only" }).click();
+    await appPreferences.getByRole("combobox").nth(3).click();
+    await page.getByRole("option", { name: "With www" }).click();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("/api/config") && response.request().method() === "PUT"),
+      page.getByRole("button", { name: /^Save app settings$/ }).click(),
+    ]);
+
+    await page.getByRole("navigation").getByRole("link", { name: /^Sites$/ }).click();
+    await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
+    await page.getByRole("button", { name: /^Add site$/ }).click();
+    const addSiteDialog = page.getByRole("dialog", { name: /^Add site$/ });
+    await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "Portugal" }).first().waitFor();
+    await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "Portuguese" }).first().waitFor();
+    await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "HTTPS only" }).first().waitFor();
+    await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "With www" }).first().waitFor();
   } finally {
     await browser.close();
   }

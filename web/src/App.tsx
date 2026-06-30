@@ -137,6 +137,26 @@ const crawlHostOptions = [
   { value: "both", label: "Try both" },
 ] as const;
 
+function defaultLocationCodeFromConfig(config?: any) {
+  const code = Number(config?.default_location_code || 2840);
+  return marketOptions.some((market) => market.code === code) ? code : 2840;
+}
+
+function defaultLanguageCodeFromConfig(config?: any) {
+  const code = String(config?.default_language_code || "en");
+  return languageOptions.some((language) => language.code === code) ? code : "en";
+}
+
+function defaultCrawlProtocolFromConfig(config?: any): Project["crawl_protocol"] {
+  const value = String(config?.default_crawl_protocol || "auto");
+  return crawlProtocolOptions.some((option) => option.value === value) ? value as Project["crawl_protocol"] : "auto";
+}
+
+function defaultCrawlHostFromConfig(config?: any): Project["crawl_host"] {
+  const value = String(config?.default_crawl_host || "auto");
+  return crawlHostOptions.some((option) => option.value === value) ? value as Project["crawl_host"] : "auto";
+}
+
 const activeSiteStorageKey = "local-seo:site";
 const legacyProjectStorageKey = "local-seo:project";
 const selectedAuditStorageKey = "local-seo:selected-audit";
@@ -1056,6 +1076,8 @@ function Overview({
   const [scanError, setScanError] = useState("");
   const [firstDomain, setFirstDomain] = useState("");
   const [firstName, setFirstName] = useState("");
+  const [firstLocationCode, setFirstLocationCode] = useState(2840);
+  const [firstLanguageCode, setFirstLanguageCode] = useState("en");
   const [firstCrawlProtocol, setFirstCrawlProtocol] = useState<Project["crawl_protocol"]>("auto");
   const [firstCrawlHost, setFirstCrawlHost] = useState<Project["crawl_host"]>("auto");
   const [firstScanError, setFirstScanError] = useState("");
@@ -1064,6 +1086,22 @@ function Overview({
   useEffect(() => {
     api.dashboard(project.id).then(setSummary).catch(console.error);
   }, [project.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.config()
+      .then((data) => {
+        if (cancelled) return;
+        setFirstLocationCode(defaultLocationCodeFromConfig(data));
+        setFirstLanguageCode(defaultLanguageCodeFromConfig(data));
+        setFirstCrawlProtocol(defaultCrawlProtocolFromConfig(data));
+        setFirstCrawlHost(defaultCrawlHostFromConfig(data));
+      })
+      .catch(console.error);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function scanSite() {
     setScanning(true);
@@ -1099,8 +1137,8 @@ function Overview({
       const created = await api.createProject({
         name: firstName.trim() || domain,
         domain,
-        locationCode: project.location_code || 2840,
-        languageCode: project.language_code || "en",
+        locationCode: firstLocationCode,
+        languageCode: firstLanguageCode,
         crawlProtocol: firstCrawlProtocol,
         crawlHost: firstCrawlHost,
       } as any);
@@ -1453,8 +1491,7 @@ function ProjectsPage({
     crawl_protocol: Project["crawl_protocol"];
     crawl_host: Project["crawl_host"];
   };
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<ProjectForm>({
+  const initialProjectForm: ProjectForm = {
     name: "",
     domain: "",
     notes: "",
@@ -1462,7 +1499,10 @@ function ProjectsPage({
     languageCode: "en",
     crawlProtocol: "auto",
     crawlHost: "auto",
-  });
+  };
+  const [open, setOpen] = useState(false);
+  const [siteDefaults, setSiteDefaults] = useState<ProjectForm>(initialProjectForm);
+  const [form, setForm] = useState<ProjectForm>(initialProjectForm);
   const [editing, setEditing] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
   const [editForm, setEditForm] = useState<ProjectEditForm>({
@@ -1480,6 +1520,29 @@ function ProjectsPage({
   const navigate = useNavigate();
   const visibleSites = projects.filter((project) => !isPlaceholderSite(project));
 
+  useEffect(() => {
+    let cancelled = false;
+    api.config()
+      .then((data) => {
+        if (cancelled) return;
+        const defaults = {
+          ...initialProjectForm,
+          locationCode: defaultLocationCodeFromConfig(data),
+          languageCode: defaultLanguageCodeFromConfig(data),
+          crawlProtocol: defaultCrawlProtocolFromConfig(data),
+          crawlHost: defaultCrawlHostFromConfig(data),
+        };
+        setSiteDefaults(defaults);
+        setForm((current) =>
+          current.name || current.domain || current.notes ? current : defaults,
+        );
+      })
+      .catch(console.error);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function createSite(scanAfterCreate: boolean) {
     if (!form.domain.trim()) {
       setError("Enter a domain before saving the site.");
@@ -1494,7 +1557,7 @@ function ProjectsPage({
       });
       selectProject(created.id);
       setOpen(false);
-      setForm({ name: "", domain: "", notes: "", locationCode: 2840, languageCode: "en", crawlProtocol: "auto", crawlHost: "auto" });
+      setForm(siteDefaults);
       if (scanAfterCreate) {
         const result = await api.scanProject(created.id);
         if (result.audit?.id) {
@@ -5880,6 +5943,10 @@ function SettingsPage() {
     setForm({
       codex_model: data.codex_model || "gpt-5.5",
       codex_reasoning_effort: data.codex_reasoning_effort || "medium",
+      default_location_code: defaultLocationCodeFromConfig(data),
+      default_language_code: defaultLanguageCodeFromConfig(data),
+      default_crawl_protocol: defaultCrawlProtocolFromConfig(data),
+      default_crawl_host: defaultCrawlHostFromConfig(data),
     });
   }
   useEffect(() => {
@@ -5891,6 +5958,10 @@ function SettingsPage() {
     await api.saveConfig({
       codex_model: String(form.codex_model || "").trim(),
       codex_reasoning_effort: String(form.codex_reasoning_effort || "medium").trim(),
+      default_location_code: String(form.default_location_code || 2840),
+      default_language_code: String(form.default_language_code || "en"),
+      default_crawl_protocol: String(form.default_crawl_protocol || "auto"),
+      default_crawl_host: String(form.default_crawl_host || "auto"),
     });
     await load();
   }
@@ -5899,19 +5970,63 @@ function SettingsPage() {
     <>
       <PageHeader eyebrow="Local" title="App settings" description="Preferences for the local app. Data sources are shown as status, not secret fields." />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
-        <ReportSection title="Codex" description="Local AI jobs use these app preferences.">
-          <form className="space-y-4" onSubmit={save}>
-            <Field label="Model"><Input value={form.codex_model || ""} onChange={(e) => setForm({ ...form, codex_model: e.target.value })} /></Field>
-            <Field label="Reasoning">
-              <Select value={form.codex_reasoning_effort || "medium"} onValueChange={(value) => setForm({ ...form, codex_reasoning_effort: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
+        <ReportSection title="App preferences" description="Defaults used when a new site is added. Existing sites keep their own saved settings.">
+          <form className="space-y-5" onSubmit={save}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Default market">
+                <Select value={String(form.default_location_code || 2840)} onValueChange={(value) => setForm({ ...form, default_location_code: Number(value) })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Default language">
+                <Select value={form.default_language_code || "en"} onValueChange={(value) => setForm({ ...form, default_language_code: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Default protocol">
+                <Select value={form.default_crawl_protocol || "auto"} onValueChange={(value) => setForm({ ...form, default_crawl_protocol: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Default hostname">
+                <Select value={form.default_crawl_host || "auto"} onValueChange={(value) => setForm({ ...form, default_crawl_host: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <div className="border-t pt-5">
+              <div className="mb-3">
+                <h3 className="font-semibold">Codex defaults</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Local AI jobs use these app preferences.</p>
+              </div>
+              <div className="space-y-4">
+                <Field label="Model"><Input value={form.codex_model || ""} onChange={(e) => setForm({ ...form, codex_model: e.target.value })} /></Field>
+                <Field label="Reasoning">
+                  <Select value={form.codex_reasoning_effort || "medium"} onValueChange={(value) => setForm({ ...form, codex_reasoning_effort: value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+            </div>
             <Button><Settings /> Save app settings</Button>
           </form>
         </ReportSection>
@@ -5921,8 +6036,8 @@ function SettingsPage() {
               { title: "Technical audits", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
               { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless a metrics source is connected." },
               { title: "SERP and rank checks", status: config.openserp_url ? "OpenSERP" : "DuckDuckGo", tone: "good", text: "Uses OpenSERP when available, otherwise live DuckDuckGo results. The source is shown on each report." },
-              { title: "Search Console", status: config.google_client_id && config.google_client_secret ? "Available" : "Connect on Search Console page", tone: config.google_client_id && config.google_client_secret ? "good" : "warn", text: "Connect per site from the Search Console screen to read real GSC performance and inspection data." },
-              { title: "Backlink index", status: config.dataforseo_api_key ? "Connected" : "Not connected", tone: config.dataforseo_api_key ? "good" : "warn", text: "No generated backlink rows are shown. Backlinks require a real backlink index or imported data." },
+              { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally. Google connection is optional for live performance and URL inspection." },
+              { title: "Backlink index", status: config.dataforseo_api_key ? "Connected" : "Not connected", tone: config.dataforseo_api_key ? "good" : "warn", text: "No generated backlink rows are shown. Web-wide backlink rows require a real backlink index." },
               { title: "MCP endpoint", status: "Local", tone: "good", text: "The local JSON-RPC endpoint is available from the MCP screen." },
             ]}
           />

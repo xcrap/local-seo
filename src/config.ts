@@ -49,6 +49,10 @@ export function listPublicConfig() {
     "openserp_url",
     "codex_model",
     "codex_reasoning_effort",
+    "default_location_code",
+    "default_language_code",
+    "default_crawl_protocol",
+    "default_crawl_host",
   ];
   return Object.fromEntries(
     keys.map((key) => {

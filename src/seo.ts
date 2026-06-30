@@ -57,6 +57,15 @@ function normalizeCrawlHost(value: unknown): CrawlHost {
   return value === "root" || value === "www" || value === "both" ? value : "auto";
 }
 
+function defaultLocationCode() {
+  const value = Number(getConfigValue("default_location_code") || 2840);
+  return Number.isFinite(value) && value > 0 ? value : 2840;
+}
+
+function defaultLanguageCode() {
+  return getConfigValue("default_language_code") || "en";
+}
+
 function normalizeTagName(value: string) {
   return value.trim().replace(/\s+/g, " ").slice(0, 64);
 }
@@ -251,8 +260,12 @@ export function createProject(input: {
   const id = randomUUID();
   const domain = normalizeDomain(input.domain || "");
   const name = input.name.trim() || domain || "Untitled site";
-  const crawlProtocol = normalizeCrawlProtocol(input.crawlProtocol ?? input.crawl_protocol);
-  const crawlHost = normalizeCrawlHost(input.crawlHost ?? input.crawl_host);
+  const locationCode = Number(input.locationCode || defaultLocationCode());
+  const languageCode = input.languageCode || defaultLanguageCode();
+  const crawlProtocol = normalizeCrawlProtocol(
+    input.crawlProtocol ?? input.crawl_protocol ?? getConfigValue("default_crawl_protocol"),
+  );
+  const crawlHost = normalizeCrawlHost(input.crawlHost ?? input.crawl_host ?? getConfigValue("default_crawl_host"));
   const placeholder = domain
     ? get<Project>(
         "SELECT * FROM projects WHERE archived_at IS NULL AND domain = '' AND name = 'Add your site' ORDER BY created_at ASC LIMIT 1",
@@ -269,8 +282,8 @@ export function createProject(input: {
         name,
         domain,
         input.notes?.trim() || "",
-        input.locationCode || 2840,
-        input.languageCode || "en",
+        locationCode,
+        languageCode,
         crawlProtocol,
         crawlHost,
         placeholder.id,
@@ -288,8 +301,8 @@ export function createProject(input: {
       name,
       domain,
       input.notes?.trim() || "",
-      input.locationCode || 2840,
-      input.languageCode || "en",
+      locationCode,
+      languageCode,
       crawlProtocol,
       crawlHost,
     ],
