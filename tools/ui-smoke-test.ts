@@ -204,14 +204,14 @@ try {
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
     await page.getByText("First scan target").first().waitFor();
     await page.getByText(/tries 2 targets/i).first().waitFor();
-    await page.getByRole("button", { name: /Scan website/i }).click();
+    await page.getByRole("row", { name: /Selected site.*Scan website/i }).getByRole("button", { name: /Scan website/i }).click();
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
 
     await page.goto(webUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
     await page.getByText("Technical audit").waitFor();
-    await page.getByText("Scan site").waitFor();
+    await page.getByRole("row", { name: /Selected site.*Scan website/i }).waitFor();
     if (await page.getByText("Workspace totals").count()) {
       throw new Error("Overview still renders the old metric-card totals section.");
     }

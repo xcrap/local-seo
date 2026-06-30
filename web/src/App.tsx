@@ -169,6 +169,10 @@ function languageLabel(code: string) {
   return languageOptions.find((item) => item.code === code)?.label || code;
 }
 
+function searchLocaleLabel(project: Project) {
+  return `${marketLabel(project.location_code)} · ${languageLabel(project.language_code)}`;
+}
+
 function localSiteHost(domain: string) {
   const host = (
     domain.startsWith("[") && domain.includes("]")
@@ -1249,34 +1253,6 @@ function Overview({
         </section>
       ) : null}
       {scanError && <p className="mb-6 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{scanError}</p>}
-      {project.domain ? (
-        <section className="mb-6 rounded-md border bg-background p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">Selected website</div>
-              <div className="mt-1 text-2xl font-semibold">{project.domain || "Add a domain"}</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                First target: {preferredAuditUrl(project)} · {scanTargetShortDetail(project)} · Market: {marketLabel(project.location_code)} · Language: {languageLabel(project.language_code)}
-              </p>
-              <p className="mt-1 max-w-4xl break-all text-xs text-muted-foreground">{scanTargetDetail(project)}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button disabled={!project.domain || scanning} onClick={scanSite}>
-                <FileSearch /> {scanning ? "Scanning" : `Scan ${project.domain || "site"}`}
-              </Button>
-              <Button asChild variant="secondary" disabled={!project.domain}>
-                <Link to="/domain"><Globe2 /> Organic research</Link>
-              </Button>
-              <Button asChild variant="secondary" disabled={!project.domain}>
-                <Link to="/backlinks"><Link2 /> Links</Link>
-              </Button>
-              <Button asChild variant="outline" disabled={!project.domain}>
-                <Link to="/rank"><Target /> Track rankings</Link>
-              </Button>
-            </div>
-          </div>
-        </section>
-      ) : null}
       {scan && (
         <section className="mb-6 rounded-md border border-primary/40 bg-background p-5">
           <div className="mb-4">
@@ -1365,19 +1341,31 @@ function SiteCommandCenter({
   const latestGscImport = summary?.latestGscImport;
   const rows = [
     {
+      key: "site",
+      area: "Selected site",
+      status: project.domain || "missing",
+      evidence: project.domain
+        ? `First scan target: ${preferredAuditUrl(project)} · ${scanTargetDetail(project)} · Search locale: ${searchLocaleLabel(project)}`
+        : "Add a site before running audits, rankings, Search Console imports, or AI work.",
+      action: project.domain ? (
+        <Button size="sm" onClick={onScan} disabled={scanning}>
+          <FileSearch /> {scanning ? "Starting" : "Scan website"}
+        </Button>
+      ) : (
+        <Button asChild size="sm"><Link to="/sites"><Plus /> Add site</Link></Button>
+      ),
+      secondary: project.domain ? (
+        <Button asChild size="sm" variant="outline"><Link to="/sites"><Pencil /> Edit site</Link></Button>
+      ) : null,
+    },
+    {
       key: "audit",
       area: "Technical audit",
       status: latestAudit ? latestAudit.status : "not run",
       evidence: latestAudit
         ? `${formatNumber(latestAudit.pages_crawled)} pages · ${formatNumber(latestAudit.issue_count)} issues · ${formatNumber(latestAuditSummary.checkedLinks || 0)} links checked`
         : "No crawl evidence saved yet.",
-      action: project.domain ? (
-        <Button size="sm" onClick={onScan} disabled={scanning}>
-          <FileSearch /> {scanning ? "Starting" : "Scan site"}
-        </Button>
-      ) : (
-        <Button asChild size="sm"><Link to="/sites"><Plus /> Add site</Link></Button>
-      ),
+      action: <Button asChild size="sm" variant="secondary"><Link to="/audits"><FileSearch /> Open audits</Link></Button>,
       secondary: latestAudit ? (
         <Button asChild size="sm" variant="outline">
           <Link to={`/audits/${latestAudit.id}`}><FileSearch /> Open report</Link>
@@ -1456,8 +1444,8 @@ function SiteCommandCenter({
           {rows.map((row) => (
             <TableRow key={row.key}>
               <TableCell className="font-medium">{row.area}</TableCell>
-              <TableCell><Badge variant={row.status === "needs scan" || row.status === "not run" ? "warn" : "outline"}>{row.status}</Badge></TableCell>
-              <TableCell className="text-sm text-muted-foreground">{row.evidence}</TableCell>
+              <TableCell className="min-w-36"><Badge variant={row.status === "needs scan" || row.status === "not run" || row.status === "missing" ? "warn" : "outline"}>{row.status}</Badge></TableCell>
+              <TableCell className="min-w-96 break-words text-sm text-muted-foreground">{row.evidence}</TableCell>
               <TableCell>
                 <div className="flex justify-end gap-2">
                   {row.secondary}
@@ -1700,7 +1688,7 @@ function ProjectsPage({
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Language">
+                  <Field label="Search language">
                     <Select value={form.languageCode} onValueChange={(value) => setForm({ ...form, languageCode: value })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -1756,8 +1744,8 @@ function ProjectsPage({
               <TableRow>
                 <TableHead>Site</TableHead>
                 <TableHead>Scan targets</TableHead>
-                <TableHead>Market</TableHead>
-                <TableHead>Language</TableHead>
+                <TableHead>Search market</TableHead>
+                <TableHead>Search language</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1831,7 +1819,7 @@ function ProjectsPage({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Language">
+              <Field label="Search language">
                 <Select value={editForm.language_code} onValueChange={(value) => setEditForm({ ...editForm, language_code: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -6049,7 +6037,7 @@ function SettingsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Default language">
+              <Field label="Default search language">
                 <Select value={form.default_language_code || "en"} onValueChange={(value) => setForm({ ...form, default_language_code: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
