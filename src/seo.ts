@@ -1424,6 +1424,18 @@ export function listAudits(projectId: string) {
   ]).map((row) => ({ ...row, result: jsonParse(row.result_json, null) }));
 }
 
+export function listAllAudits() {
+  return all<any>(`
+    SELECT
+      audits.*,
+      projects.name AS project_name,
+      projects.domain AS project_domain
+    FROM audits
+    LEFT JOIN projects ON projects.id = audits.project_id
+    ORDER BY audits.created_at DESC
+  `).map((row) => ({ ...row, result: jsonParse(row.result_json, null) }));
+}
+
 export function getAudit(auditId: string) {
   const row = get<any>("SELECT * FROM audits WHERE id = ?", [auditId]);
   return row ? { ...row, result: jsonParse(row.result_json, null) } : null;
@@ -3971,6 +3983,7 @@ export function dashboardSummary(projectId?: string) {
       gscImportCount: 0,
       latestGscImport: null,
       latestAudits: [],
+      allAudits: [],
       latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT 5"),
     };
   }
@@ -4022,6 +4035,7 @@ export function dashboardSummary(projectId?: string) {
         }
       : null,
     latestAudits: listAudits(project.id),
+    allAudits: listAllAudits(),
     latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT 5"),
   };
 }

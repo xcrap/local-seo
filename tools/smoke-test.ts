@@ -533,6 +533,24 @@ try {
   ) {
     throw new Error("Site audits endpoint should keep every scan for the site until the user deletes it.");
   }
+  const otherHistorySite = await request("/api/sites", {
+    method: "POST",
+    body: JSON.stringify({ name: "Other History Site", domain: "other-history.example" }),
+  });
+  const otherHistoryAudit = await request("/api/audits", {
+    method: "POST",
+    body: JSON.stringify({ siteId: otherHistorySite.id, url: "https://other-history.example" }),
+  });
+  const allSavedAudits = await request("/api/audits");
+  const allSavedAuditIds = new Set((allSavedAudits || []).map((row: any) => row.id));
+  for (const id of [siteScan.audit.id, audit.id, otherHistoryAudit.id]) {
+    if (!allSavedAuditIds.has(id)) {
+      throw new Error("Global scan ledger should show every saved scan across sites until the user deletes it.");
+    }
+  }
+  if (!allSavedAudits.some((row: any) => row.id === otherHistoryAudit.id && row.project_name === "Other History Site")) {
+    throw new Error("Global scan ledger should include the saved site name for each scan.");
+  }
   const scanHistoryDb = new Database(serverDbPath);
   try {
     const insertAudit = scanHistoryDb.prepare(`
@@ -552,6 +570,10 @@ try {
       if (!dashboardAuditIds.has(id)) {
         throw new Error("Dashboard scan history should include every saved scan until the user deletes it.");
       }
+    }
+    const dashboardLedgerIds = new Set((dashboardWithFullHistory.allAudits || []).map((row: any) => row.id));
+    if (!dashboardLedgerIds.has(otherHistoryAudit.id)) {
+      throw new Error("Dashboard should expose the full local scan ledger, including scans for other saved sites.");
     }
   } finally {
     scanHistoryDb.close();

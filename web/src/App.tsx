@@ -1141,6 +1141,7 @@ function Overview({
   const [firstCrawlHost, setFirstCrawlHost] = useState<Project["crawl_host"]>("auto");
   const [firstScanError, setFirstScanError] = useState("");
   const navigate = useNavigate();
+  const scanLedgerRows = sortAuditRows(summary?.allAudits || summary?.latestAudits || []);
 
   useEffect(() => {
     api.dashboard(project.id).then(setSummary).catch(console.error);
@@ -1181,8 +1182,8 @@ function Overview({
     }
   }
 
-  function openAuditReport(auditId: string) {
-    setSelectedAuditId(project.id, auditId);
+  function openAuditReport(auditId: string, row?: any) {
+    setSelectedAuditId(row?.project_id || project.id, auditId);
     navigate(`/audits/${auditId}`);
   }
 
@@ -1302,12 +1303,12 @@ function Overview({
           <div className="border-b px-5 py-4">
             <h2 className="text-lg font-semibold">Scan history</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {formatNumber(summary?.latestAudits?.length || 0)} saved scans for this site.
+              {formatNumber(scanLedgerRows.length)} saved scans in local SQLite.
             </p>
           </div>
           <div className="p-5">
-            {summary?.latestAudits?.length ? (
-              <AuditTable rows={summary.latestAudits} onInspect={openAuditReport} />
+            {scanLedgerRows.length ? (
+              <AuditTable rows={scanLedgerRows} showSite onInspect={openAuditReport} />
             ) : (
               <EmptyState
                 title="No audits yet"
@@ -3606,6 +3607,7 @@ function AuditReportRoute() {
 function AuditsPage({ project }: { project: Project }) {
   const [url, setUrl] = useState(preferredAuditUrl(project));
   const [audits, setAudits] = useState<any[]>([]);
+  const [allAudits, setAllAudits] = useState<any[]>([]);
   const [detail, setDetail] = useState<any>(null);
   const [deletingAudit, setDeletingAudit] = useState<any>(null);
   const [clearingAudits, setClearingAudits] = useState(false);
@@ -3613,16 +3615,22 @@ function AuditsPage({ project }: { project: Project }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [showCustomUrl, setShowCustomUrl] = useState(false);
-  const activeAudit = auditIsActive(detail) ? detail : audits.find(auditIsActive);
+  const activeAudit = auditIsActive(detail) ? detail : allAudits.find(auditIsActive);
   async function load() {
-    const rows = sortAuditRows(await api.audits(project.id));
+    const [siteRows, ledgerRows] = await Promise.all([
+      api.audits(project.id),
+      api.allAudits(),
+    ]);
+    const rows = sortAuditRows(siteRows);
+    const ledger = sortAuditRows(ledgerRows);
     setAudits(rows);
-    const currentDetail = detail?.id ? rows.find((row) => row.id === detail.id) : null;
+    setAllAudits(ledger);
+    const currentDetail = detail?.id ? ledger.find((row) => row.id === detail.id) : null;
     const selectedAuditId = getSelectedAuditId(project.id);
-    const selectedAudit = selectedAuditId ? rows.find((row) => row.id === selectedAuditId) : null;
-    const nextDetail = currentDetail || selectedAudit || rows[0] || null;
+    const selectedAudit = selectedAuditId ? ledger.find((row) => row.id === selectedAuditId) : null;
+    const nextDetail = currentDetail || selectedAudit || rows[0] || ledger[0] || null;
     setDetail(nextDetail);
-    if (nextDetail?.id) setSelectedAuditId(project.id, nextDetail.id);
+    if (nextDetail?.id) setSelectedAuditId(nextDetail.project_id || project.id, nextDetail.id);
     else clearSelectedAuditId(project.id);
     return rows;
   }
@@ -3635,13 +3643,13 @@ function AuditsPage({ project }: { project: Project }) {
     setShowCustomUrl(false);
   }, [project.id, project.domain, project.crawl_protocol, project.crawl_host]);
   useEffect(() => {
-    const hasActiveScan = audits.some(auditIsActive);
+    const hasActiveScan = allAudits.some(auditIsActive);
     if (!hasActiveScan) return;
     const interval = window.setInterval(() => {
       load().catch(console.error);
     }, 1500);
     return () => window.clearInterval(interval);
-  }, [project.id, audits, detail?.id]);
+  }, [project.id, allAudits, detail?.id]);
   useEffect(() => {
     if (!detail?.id || !auditIsActive(detail)) return;
     let cancelled = false;
@@ -3651,6 +3659,7 @@ function AuditsPage({ project }: { project: Project }) {
         if (cancelled || !nextAudit) return;
         setDetail(nextAudit);
         setAudits((rows) => upsertAuditRow(rows, nextAudit));
+        setAllAudits((rows) => upsertAuditRow(rows, nextAudit));
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not refresh scan progress");
       }
@@ -3672,6 +3681,7 @@ function AuditsPage({ project }: { project: Project }) {
       const audit = await api.startAudit({ siteId: project.id, url });
       setDetail(audit);
       setAudits((rows) => upsertAuditRow(rows, audit));
+      setAllAudits((rows) => upsertAuditRow(rows, audit));
       if (audit?.id) setSelectedAuditId(project.id, audit.id);
       load().catch(console.error);
     } catch (err) {
@@ -3688,6 +3698,7 @@ function AuditsPage({ project }: { project: Project }) {
       const result = await api.scanProject(project.id);
       setDetail(result.audit);
       setAudits((rows) => upsertAuditRow(rows, result.audit));
+      setAllAudits((rows) => upsertAuditRow(rows, result.audit));
       if (result.audit?.id) setSelectedAuditId(project.id, result.audit.id);
       load().catch(console.error);
     } catch (err) {
@@ -3696,16 +3707,17 @@ function AuditsPage({ project }: { project: Project }) {
       setStarting(false);
     }
   }
-  async function inspect(id: string) {
-    setSelectedAuditId(project.id, id);
+  async function inspect(id: string, row?: any) {
+    setSelectedAuditId(row?.project_id || project.id, id);
     setDetail(await api.audit(id));
   }
-  async function remove(id: string) {
-    await api.deleteAudit(project.id, id);
-    if (getSelectedAuditId(project.id) === id) {
-      clearSelectedAuditId(project.id);
+  async function remove(id: string, row?: any) {
+    const siteId = row?.project_id || project.id;
+    await api.deleteAudit(siteId, id);
+    if (getSelectedAuditId(siteId) === id) {
+      clearSelectedAuditId(siteId);
     }
-    setDetail(null);
+    if (detail?.id === id) setDetail(null);
     await load();
   }
   async function clearHistory() {
@@ -3777,10 +3789,10 @@ function AuditsPage({ project }: { project: Project }) {
           </div>
           {detail ? <AuditDetail audit={detail} /> : (
             <EmptyState
-              title={audits.length ? "No scan selected" : "No scan report yet"}
-              text={audits.length ? "Open any saved scan below." : "Start a local site scan to fill this report with crawl evidence."}
+              title={allAudits.length ? "No scan selected" : "No scan report yet"}
+              text={allAudits.length ? "Open any saved scan below." : "Start a local site scan to fill this report with crawl evidence."}
               action={
-                !audits.length
+                !allAudits.length
                   ? project.domain
                     ? (
                       <Button onClick={startSelectedSite} disabled={starting}>
@@ -3797,8 +3809,8 @@ function AuditsPage({ project }: { project: Project }) {
         <section className="rounded-md border bg-background">
           <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Scan history</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Saved local audit runs for this site.</p>
+              <h2 className="text-lg font-semibold">All scan history</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Every saved scan in local SQLite stays visible until you delete it.</p>
             </div>
             {audits.length ? (
               <Button
@@ -3808,13 +3820,13 @@ function AuditsPage({ project }: { project: Project }) {
                 onClick={() => setConfirmClearAudits(true)}
                 disabled={clearingAudits}
               >
-                <Trash2 /> Clear history
+                <Trash2 /> Clear selected site
               </Button>
             ) : null}
           </div>
           <div className="p-5">
-            {audits.length ? (
-              <AuditTable rows={audits} selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingAudit(audits.find((audit) => audit.id === id) || { id })} />
+            {allAudits.length ? (
+              <AuditTable rows={allAudits} showSite selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingAudit(allAudits.find((audit) => audit.id === id) || { id })} />
             ) : (
               <EmptyState
                 title="No audits yet"
@@ -3841,7 +3853,7 @@ function AuditsPage({ project }: { project: Project }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={() => deletingAudit && remove(deletingAudit.id).then(() => setDeletingAudit(null))}>
+            <AlertDialogAction type="button" onClick={() => deletingAudit && remove(deletingAudit.id, deletingAudit).then(() => setDeletingAudit(null))}>
               Delete scan
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -3850,7 +3862,7 @@ function AuditsPage({ project }: { project: Project }) {
       <AlertDialog open={confirmClearAudits} onOpenChange={setConfirmClearAudits}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear scan history?</AlertDialogTitle>
+            <AlertDialogTitle>Clear selected site scans?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes all saved scan reports for {project.domain || project.name} from local SQLite. The saved site, keywords, rankings, and settings stay in place.
             </AlertDialogDescription>
@@ -3859,7 +3871,7 @@ function AuditsPage({ project }: { project: Project }) {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={clearingAudits}>Cancel</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={clearHistory} disabled={clearingAudits}>
-              {clearingAudits ? "Clearing" : "Clear scan history"}
+              {clearingAudits ? "Clearing" : "Clear selected site"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -3898,24 +3910,26 @@ function ActiveScanBanner({ audit }: { audit: any }) {
 
 function AuditTable({
   rows,
+  showSite,
   selectedId,
   onInspect,
   onDelete,
 }: {
   rows: any[];
+  showSite?: boolean;
   selectedId?: string;
-  onInspect?: (id: string) => void;
-  onDelete?: (id: string) => void;
+  onInspect?: (id: string, row: any) => void;
+  onDelete?: (id: string, row: any) => void;
 }) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>Run</TableHead><TableHead>Status</TableHead><TableHead>Progress</TableHead><TableHead>Score</TableHead><TableHead>Issues</TableHead><TableHead>Pages</TableHead>{(onInspect || onDelete) && <TableHead></TableHead>}</TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>Run</TableHead>{showSite ? <TableHead>Site</TableHead> : null}<TableHead>Status</TableHead><TableHead>Progress</TableHead><TableHead>Score</TableHead><TableHead>Issues</TableHead><TableHead>Pages</TableHead>{(onInspect || onDelete) && <TableHead></TableHead>}</TableRow></TableHeader>
       <TableBody>
         {rows.map((row) => (
           <TableRow
             key={row.id}
             className={cn(onInspect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
-            onClick={() => onInspect?.(row.id)}
+            onClick={() => onInspect?.(row.id, row)}
           >
             <TableCell className="max-w-md">
               <div className="truncate font-medium">{row.url}</div>
@@ -3923,6 +3937,12 @@ function AuditTable({
                 <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
               </div>
             </TableCell>
+            {showSite ? (
+              <TableCell className="min-w-44">
+                <div className="font-medium">{row.project_name || "Deleted site"}</div>
+                <div className="mt-1 break-all text-xs text-muted-foreground">{row.project_domain || row.project_id}</div>
+              </TableCell>
+            ) : null}
             <TableCell><Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge></TableCell>
             <TableCell className="min-w-36">
               <div className="space-y-1">
@@ -3960,7 +3980,7 @@ function AuditTable({
                       size="sm"
                       variant="destructive"
                       aria-label={`Delete scan report for ${row.url}`}
-                      onClick={(event) => { event.stopPropagation(); onDelete(row.id); }}
+                      onClick={(event) => { event.stopPropagation(); onDelete(row.id, row); }}
                     >
                       <Trash2 />
                     </Button>

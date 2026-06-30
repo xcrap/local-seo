@@ -126,6 +126,7 @@ export const api = {
   promptExplorerRuns: (siteId: string) => request<any[]>(`/api/sites/${siteId}/prompt-explorer`),
   promptExplorer: (body: any) =>
     request<any>("/api/prompt-explorer", { method: "POST", body: JSON.stringify(body) }),
+  allAudits: () => request<any[]>("/api/audits"),
   audits: (siteId: string) => request<any[]>(`/api/sites/${siteId}/audits`),
   audit: (id: string) => request<any>(`/api/audits/${id}`),
   startAudit: (body: any) =>
