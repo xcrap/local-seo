@@ -931,12 +931,21 @@ function LoginScreen({ setupRequired, onSuccess }: { setupRequired: boolean; onS
 }
 
 function Workspace() {
+  return (
+    <BrowserRouter>
+      <WorkspaceShell />
+    </BrowserRouter>
+  );
+}
+
+function WorkspaceShell() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState(
     localStorage.getItem(activeSiteStorageKey) || localStorage.getItem(legacyProjectStorageKey) || "",
   );
   const [shellScanning, setShellScanning] = useState(false);
   const [shellScanError, setShellScanError] = useState("");
+  const navigate = useNavigate();
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) || projects[0],
     [projects, activeProjectId],
@@ -972,7 +981,7 @@ function Workspace() {
 
   async function scanActiveSite() {
     if (!activeProject?.domain) {
-      window.location.href = "/sites";
+      navigate("/sites");
       return;
     }
     setShellScanning(true);
@@ -981,9 +990,9 @@ function Workspace() {
       const result = await api.scanProject(activeProject.id);
       if (result.audit?.id) {
         setSelectedAuditId(activeProject.id, result.audit.id);
-        window.location.href = `/audits/${result.audit.id}`;
+        navigate(`/audits/${result.audit.id}`);
       } else {
-        window.location.href = "/audits";
+        navigate("/audits");
       }
     } catch (err) {
       setShellScanError(err instanceof Error ? err.message : "Could not start site scan");
@@ -998,8 +1007,7 @@ function Workspace() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="grain min-h-screen">
+    <div className="grain min-h-screen">
         <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 border-r bg-background/90 px-4 py-6 backdrop-blur lg:block">
           <Link to="/" className="flex items-center gap-3 px-2">
             <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -1075,7 +1083,7 @@ function Workspace() {
             )}
           </div>
           <div className="mt-2">
-            <Select onValueChange={(path) => (window.location.href = path)}>
+            <Select onValueChange={(path) => navigate(path)}>
               <SelectTrigger>
                 <SelectValue placeholder="Navigate" />
               </SelectTrigger>
@@ -1118,8 +1126,7 @@ function Workspace() {
             )}
           </div>
         </main>
-      </div>
-    </BrowserRouter>
+    </div>
   );
 }
 

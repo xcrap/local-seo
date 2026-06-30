@@ -248,6 +248,9 @@ try {
   if (webAppClient.includes("projectId: project.id")) {
     throw new Error("The app should send siteId for selected-site actions.");
   }
+  if (webAppClient.includes("window.location.href")) {
+    throw new Error("The app shell should use React Router navigation instead of full-page window.location.href route changes.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",
