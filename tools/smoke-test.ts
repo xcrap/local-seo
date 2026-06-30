@@ -265,6 +265,19 @@ try {
     throw new Error("Site scan audit report is missing detailed SEO evidence.");
   }
   const fixtureAudit = await waitForAudit(localSiteScan.audit.id);
+  const fixturePages = Array.isArray(fixtureAudit.result?.pages) ? fixtureAudit.result.pages : [];
+  const fixtureSummary = fixtureAudit.result?.summary || {};
+  const indexableRows = fixturePages.filter((page: any) => page.indexable === true).length;
+  const nonIndexableRows = fixturePages.filter((page: any) => page.indexable === false).length;
+  const unknownIndexabilityRows = fixturePages.filter((page: any) => typeof page.indexable !== "boolean").length;
+  if (
+    fixtureSummary.indexablePages !== indexableRows ||
+    fixtureSummary.nonIndexablePages !== nonIndexableRows ||
+    fixtureSummary.unknownIndexabilityPages !== unknownIndexabilityRows ||
+    indexableRows + nonIndexableRows + unknownIndexabilityRows !== fixturePages.length
+  ) {
+    throw new Error("Fixture audit indexability summary does not match page-level evidence.");
+  }
   const fixtureIssueTypes = new Set((fixtureAudit.result?.issues || []).map((issue: any) => issue.type));
   for (const expected of [
 	    "description-missing",

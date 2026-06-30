@@ -498,6 +498,37 @@ function auditProgress(audit: any) {
   return Math.min(96, Math.max(8, pageProgress, phaseProgress));
 }
 
+function auditPhaseKey(audit: any) {
+  const phase = String(audit?.result?.phase || audit?.result?.summary?.phase || "").toLowerCase();
+  if (audit?.status === "queued") return "queued";
+  if (audit?.status === "failed") return "failed";
+  if (audit?.status === "completed" || phase === "completed") return "completed";
+  if (phase.includes("deduplicating")) return "report";
+  if (phase.includes("css images")) return "images";
+  if (phase.includes("assets")) return "assets";
+  if (phase.includes("images")) return "images";
+  if (phase.includes("links")) return "links";
+  if (phase.includes("crawl")) return "crawl";
+  if (phase.includes("robots")) return "robots";
+  return "target";
+}
+
+function auditPhaseLabel(audit: any) {
+  const labels: Record<string, string> = {
+    queued: "Queued",
+    failed: "Failed",
+    completed: "Completed",
+    report: "Building report",
+    assets: "Checking CSS and JavaScript",
+    images: "Checking images",
+    links: "Checking links",
+    crawl: "Crawling pages",
+    robots: "Reading robots and sitemap",
+    target: "Resolving scan target",
+  };
+  return labels[auditPhaseKey(audit)] || "Scanning";
+}
+
 function auditSeverityCounts(audit: any) {
   const summary = audit?.result?.summary?.bySeverity || {};
   const flatSummary = audit?.result?.summary || {};
@@ -542,12 +573,16 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
   const checkedLinks = maxCount(summary.checkedLinks, links.length);
   const checkedImages = maxCount(summary.checkedImages, images.length);
   const checkedAssets = maxCount(summary.checkedAssets, assets.length);
+  const indexabilityUnknownFromRows = Math.max(0, pageCount - indexabilityKnownPages);
+  const unknownIndexabilityPages = Number.isFinite(Number(summary.unknownIndexabilityPages))
+    ? Number(summary.unknownIndexabilityPages)
+    : indexabilityUnknownFromRows;
 
   return {
     pages: pageCount,
-    indexablePages,
-    nonIndexablePages,
-    unknownIndexabilityPages: Math.max(0, pageCount - indexabilityKnownPages),
+    indexablePages: pages.length ? pages.filter((page: any) => page.indexable === true).length : indexablePages,
+    nonIndexablePages: pages.length ? pages.filter((page: any) => page.indexable === false).length : nonIndexablePages,
+    unknownIndexabilityPages,
     sitemapUrls: maxCount(summary.sitemapUrls, sitemapUrls.length, pages.filter((page: any) => page.sitemapListed).length),
     pagesMissingFromSitemap: maxCount(summary.pagesMissingFromSitemap, pages.filter((page: any) => page.sitemapListed === false).length),
     noindexPagesInSitemap: maxCount(summary.noindexPagesInSitemap, pages.filter((page: any) => page.sitemapListed && page.indexable === false).length),
@@ -3480,7 +3515,7 @@ function AuditTable({
             <TableCell className="min-w-36">
               <div className="space-y-1">
                 <ProgressBar value={auditProgress(row)} />
-                <div className="text-xs text-muted-foreground">{row.result?.phase || (row.status === "completed" ? "completed" : "queued")}</div>
+                <div className="text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
               </div>
             </TableCell>
             <TableCell className="nums font-medium">{row.status === "completed" ? row.score : "-"}</TableCell>
@@ -3676,6 +3711,8 @@ function AuditDetail({ audit }: { audit: any }) {
           <TabsTrigger value="raw">Evidence</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-5">
+          <AuditProgressPanel audit={audit} result={result} coverage={coverage} />
+
           <AuditReportOverview
             audit={audit}
             result={result}
@@ -3930,6 +3967,150 @@ function AuditEvidenceSnapshot({
   );
 }
 
+type AuditScanStepState = "complete" | "running" | "pending" | "failed";
+
+function auditStepIndex(audit: any) {
+  const order: Record<string, number> = {
+    target: 0,
+    queued: 0,
+    robots: 1,
+    crawl: 2,
+    links: 3,
+    images: 4,
+    assets: 5,
+    report: 6,
+    completed: 6,
+    failed: 0,
+  };
+  const key = auditPhaseKey(audit);
+  if (key === "failed") {
+    const phase = String(audit?.result?.phase || audit?.result?.summary?.phase || "").toLowerCase();
+    if (phase.includes("deduplicating")) return 6;
+    if (phase.includes("assets")) return 5;
+    if (phase.includes("images") || phase.includes("css images")) return 4;
+    if (phase.includes("links")) return 3;
+    if (phase.includes("crawl")) return 2;
+    if (phase.includes("robots")) return 1;
+  }
+  return order[key] ?? 0;
+}
+
+function auditStepState(audit: any, index: number): AuditScanStepState {
+  if (audit?.status === "completed") return "complete";
+  const activeIndex = auditStepIndex(audit);
+  if (audit?.status === "failed") return index < activeIndex ? "complete" : index === activeIndex ? "failed" : "pending";
+  if (index < activeIndex) return "complete";
+  if (index === activeIndex) return "running";
+  return "pending";
+}
+
+function AuditStepBadge({ state }: { state: AuditScanStepState }) {
+  if (state === "complete") {
+    return <Badge variant="good" className="gap-1"><CheckCircle2 className="size-3" /> Done</Badge>;
+  }
+  if (state === "failed") {
+    return <Badge variant="bad" className="gap-1"><AlertTriangle className="size-3" /> Failed</Badge>;
+  }
+  if (state === "running") {
+    return <Badge variant="warn" className="gap-1"><Activity className="size-3" /> Running</Badge>;
+  }
+  return <Badge variant="outline" className="gap-1"><Clock className="size-3" /> Pending</Badge>;
+}
+
+function AuditProgressPanel({
+  audit,
+  result,
+  coverage,
+}: {
+  audit: any;
+  result: any;
+  coverage: ReturnType<typeof auditCoverageMetrics>;
+}) {
+  const robotsFound = result.robots?.exists ? "robots.txt found" : "robots.txt missing";
+  const sitemapFiles = Array.isArray(result.sitemap?.sitemaps) ? result.sitemap.sitemaps.length : 0;
+  const progress = auditProgress(audit);
+  const steps = [
+    {
+      label: "Resolve target",
+      detail: result.startUrl || audit.url,
+      evidence: "Saved scan URL and crawl scope.",
+    },
+    {
+      label: "Read robots and sitemap",
+      detail: `${robotsFound} · ${formatNumber(sitemapFiles)} sitemap files`,
+      evidence: `${formatNumber(coverage.sitemapUrls)} sitemap URLs available for discovery.`,
+    },
+    {
+      label: "Crawl pages",
+      detail: `${formatNumber(coverage.pages)} pages crawled`,
+      evidence: `${formatNumber(coverage.linkTags)} link tags · ${formatNumber(coverage.imageTags)} image tags · ${formatNumber(coverage.assetTags)} CSS/JS refs.`,
+    },
+    {
+      label: "Check links",
+      detail: `${formatNumber(coverage.checkedLinks)} unique targets checked`,
+      evidence: `${formatNumber(coverage.brokenLinks)} failing · ${formatNumber(coverage.redirectedLinks)} redirecting.`,
+    },
+    {
+      label: "Check images",
+      detail: `${formatNumber(coverage.checkedImages)} image URLs checked`,
+      evidence: `${formatNumber(coverage.brokenImages)} failing · ${formatNumber(coverage.redirectedImages)} redirecting · ${formatNumber(coverage.largeImages)} large.`,
+    },
+    {
+      label: "Check CSS/JS",
+      detail: `${formatNumber(coverage.checkedAssets)} assets checked`,
+      evidence: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(coverage.cssImageResources)} CSS image URLs found.`,
+    },
+    {
+      label: "Build report",
+      detail: audit.status === "completed" ? `Score ${formatNumber(audit.score || 0)}` : audit.status === "failed" ? "Report did not finish" : "Grouping issues",
+      evidence: `${formatNumber(audit.issue_count || 0)} issues saved in local SQLite.`,
+    },
+  ];
+  return (
+    <section className="rounded-md border bg-background">
+      <div className="border-b px-5 py-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Scan progress</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {auditPhaseLabel(audit)} · {formatNumber(coverage.pages)} pages · {formatNumber(audit.issue_count || 0)} issues
+            </p>
+          </div>
+          <Badge variant={audit.status === "completed" ? "good" : audit.status === "failed" ? "bad" : "warn"}>{scanStatusLabel(audit.status)}</Badge>
+        </div>
+        <div className="mt-4 space-y-2">
+          <ProgressBar value={progress} />
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span className="break-all">{result.startUrl || audit.url}</span>
+            <span className="nums">{formatNumber(progress)}%</span>
+          </div>
+        </div>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Step</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Evidence</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {steps.map((step, index) => (
+            <TableRow key={step.label}>
+              <TableCell className="min-w-52">
+                <div className="font-medium">{step.label}</div>
+                <div className="mt-1 break-all text-xs text-muted-foreground">{step.detail}</div>
+              </TableCell>
+              <TableCell className="min-w-32"><AuditStepBadge state={auditStepState(audit, index)} /></TableCell>
+              <TableCell className="min-w-96 text-sm text-muted-foreground">{step.evidence}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
+  );
+}
+
 function AuditReportOverview({
   audit,
   result,
@@ -3980,7 +4161,7 @@ function AuditReportOverview({
             <Badge variant={scoreVariant as any}>{audit.status}</Badge>
           </div>
           <ProgressBar value={auditProgress(audit)} />
-          <div className="text-xs text-muted-foreground">Phase: {result.phase || audit.status}</div>
+          <div className="text-xs text-muted-foreground">{auditPhaseLabel(audit)}</div>
         </div>
         <div className="space-y-3">
           <div>

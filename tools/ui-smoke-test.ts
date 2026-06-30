@@ -156,6 +156,14 @@ try {
     await page.getByRole("button", { name: /Add site and scan/i }).click();
 
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
+    await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
+    await page.getByText("Resolve target").waitFor();
+    await page.getByText("Read robots and sitemap").waitFor();
+    await page.getByText("Crawl pages").waitFor();
+    await page.getByText("Check links").waitFor();
+    await page.getByText("Check images").waitFor();
+    await page.getByText("Check CSS/JS").waitFor();
+    await page.getByText("Build report").waitFor();
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
     await page.getByRole("heading", { name: /Audit snapshot/i }).waitFor();
     await page.getByText("Links and assets").waitFor();

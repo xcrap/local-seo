@@ -2323,8 +2323,10 @@ function auditSummary(
   return {
     phase,
     pages: pages.length,
-    indexablePages: pages.filter((page) => page.indexable).length,
-    nonIndexablePages: pages.filter((page) => !page.indexable).length,
+    indexabilityKnownPages: pages.filter((page) => typeof page.indexable === "boolean").length,
+    indexablePages: pages.filter((page) => page.indexable === true).length,
+    nonIndexablePages: pages.filter((page) => page.indexable === false).length,
+    unknownIndexabilityPages: pages.filter((page) => typeof page.indexable !== "boolean").length,
     thinPages: issues.filter((issue) => issue.type === "thin-content").length,
     noH1Pages: issues.filter((issue) => issue.type === "h1-count" && /Missing H1/i.test(issue.message)).length,
     duplicateH1Pages: issues.filter((issue) => issue.type === "duplicate-h1").length,

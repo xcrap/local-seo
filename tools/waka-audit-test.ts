@@ -47,6 +47,9 @@ try {
   expect(summary.checkedAssets > 0, "Expected Waka checked CSS/JS assets to be greater than zero.");
   expect(summary.checkedImages > 0, "Expected Waka checked image resources to be greater than zero.");
   expect(summary.cssImageResources > 0, "Expected Waka CSS image resources to be checked.");
+  expect(summary.indexablePages === pages.filter((page: any) => page.indexable === true).length, "Waka indexable summary must match page evidence.");
+  expect(summary.nonIndexablePages === pages.filter((page: any) => page.indexable === false).length, "Waka non-indexable summary must match page evidence.");
+  expect(summary.unknownIndexabilityPages === pages.filter((page: any) => typeof page.indexable !== "boolean").length, "Waka unknown indexability summary must match page evidence.");
 
   console.log(JSON.stringify({
     status: audit.status,
