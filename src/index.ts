@@ -255,7 +255,7 @@ async function startSavedSiteScan(c: any) {
           : "Local crawl evidence will be available from this scan. Connect a real organic dataset only for ranked keywords and traffic estimates.",
       },
       {
-        key: "backlinks",
+        key: "links",
         label: "Links",
         status: config.dataforseo_api_key ? "queued" : "local",
         route: "/backlinks",

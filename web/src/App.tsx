@@ -995,7 +995,7 @@ function Overview({
       <PageHeader
         eyebrow="Site workspace"
         title={siteDisplayName(project)}
-        description={project.domain ? "Reports, audits, backlinks, rankings, and Search Console use this domain." : "Add a domain to unlock scans, reports, rankings, and Search Console."}
+        description={project.domain ? "Reports, audits, crawl links, rankings, and Search Console use this site." : "Add a site to unlock scans, reports, rankings, and Search Console."}
         action={<Badge>{project.domain || "No site yet"}</Badge>}
       />
       {!project.domain ? (
@@ -1434,7 +1434,7 @@ function ProjectsPage({
       <PageHeader
         eyebrow="Websites"
         title="Sites"
-        description="Add each website once. The selected site is used by scans, reports, backlinks, rankings, and Search Console."
+        description="Add each website once. The selected site is used by scans, reports, crawl links, rankings, and Search Console."
         action={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -2554,26 +2554,36 @@ function BacklinksPage({ project }: { project: Project }) {
   const [target, setTarget] = useState(project.domain);
   const [overview, setOverview] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [config, setConfig] = useState<any>(null);
   const [latestAudit, setLatestAudit] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [tab, setTab] = useState("backlinks");
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
+  const backlinkIndexConnected = Boolean(config?.dataforseo_api_key);
 
   async function loadHistory() {
-    const [snapshots, audits] = await Promise.all([
+    const [snapshots, audits, appConfig] = await Promise.all([
       api.backlinkSnapshots(project.id),
       api.audits(project.id),
+      api.config(),
     ]);
     setHistory(snapshots);
     setLatestAudit(latestCompletedAudit(audits));
+    setConfig(appConfig);
   }
   useEffect(() => {
     loadHistory().catch(console.error);
   }, [project.id]);
 
   async function run(nextTab = tab) {
+    if (!backlinkIndexConnected) {
+      setOverview(null);
+      setProfile(null);
+      setError("A web-wide backlink index is not connected. Use the local link graph from the latest audit, or connect a real backlink index before running this analysis.");
+      return;
+    }
     setLoading(true);
     setError("");
     const body = { projectId: project.id, target, tab: nextTab, pageSize: 50 };
@@ -2626,16 +2636,32 @@ function BacklinksPage({ project }: { project: Project }) {
 
   return (
     <>
-      <PageHeader eyebrow="Authority" title="Links and backlinks" description="Local link graph from site audits, plus web-wide backlink rows when a real backlink index is connected." />
+      <PageHeader eyebrow="Authority" title="Links" description="Local crawl links are available from audits. Web-wide backlinks are shown only when a real backlink index is connected." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
-          <Field label="Target domain or URL">
+          <Field label="External backlink target">
             <Input value={target} onChange={(event) => setTarget(event.target.value)} placeholder={project.domain || "example.com"} />
           </Field>
           <div className="flex items-end">
-            <Button disabled={loading || !target.trim()}><Link2 /> {loading ? "Analyzing" : "Analyze target"}</Button>
+            <Button disabled={loading || !target.trim() || !backlinkIndexConnected}><Link2 /> {loading ? "Checking" : backlinkIndexConnected ? "Check backlink index" : "Backlink index not connected"}</Button>
           </div>
         </form>
+        <div className="mt-4 rounded-md border bg-muted/25">
+          <div className="grid gap-0 md:grid-cols-[220px_1fr_auto]">
+            <div className="border-b px-4 py-3 md:border-b-0 md:border-r">
+              <div className="text-sm font-medium">External backlink index</div>
+              <Badge className="mt-2" variant={backlinkIndexConnected ? "good" : "warn"}>{backlinkIndexConnected ? "Connected" : "Not connected"}</Badge>
+            </div>
+            <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
+              {backlinkIndexConnected
+                ? "Backlink rows, referring domains, and top linked pages will come from the connected real index."
+                : "No web-wide backlink rows are generated locally. The usable local data on this screen is the crawl link graph below."}
+            </div>
+            <div className="flex items-center px-4 py-3">
+              <Button asChild size="sm" variant="outline"><Link to="/settings"><Settings /> Settings</Link></Button>
+            </div>
+          </div>
+        </div>
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       </section>
       <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_460px]">
@@ -2663,8 +2689,8 @@ function BacklinksPage({ project }: { project: Project }) {
               <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
             </TabsList>
             <TabsContent value="backlinks">
-              <ReportSection title="Strongest backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Run an analysis to load rows."}>
-                {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title="No backlink rows" text={profile?.warning || "Analyze a target to load backlinks."} />}
+              <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Connect a real backlink index, then run a check."}>
+                {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title={backlinkIndexConnected ? "No backlink rows" : "No external backlink index connected"} text={profile?.warning || (backlinkIndexConnected ? "Check a target to load real backlink rows." : "Local audits do not invent web-wide backlinks. Use the local link graph above until a real backlink index is connected.")} />}
               </ReportSection>
             </TabsContent>
             <TabsContent value="domains">
@@ -2682,7 +2708,7 @@ function BacklinksPage({ project }: { project: Project }) {
             </TabsContent>
           </Tabs>
         </div>
-        <HistoryList title="Backlink history" rows={history} labelKey="target" />
+        <HistoryList title="External backlink history" rows={history} labelKey="target" />
       </div>
     </>
   );

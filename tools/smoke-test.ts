@@ -222,7 +222,7 @@ try {
   }
   const siteScan = await request(`/api/sites/${project.id}/scan`, { method: "POST" });
   if (!siteScan.audit?.id) throw new Error("Site scan did not return an audit.");
-  if (!siteScan.related?.some((row: any) => row.key === "technical-audit") || !siteScan.related?.some((row: any) => row.key === "backlinks")) {
+  if (!siteScan.related?.some((row: any) => row.key === "technical-audit") || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
     throw new Error("Site scan did not return related report statuses.");
   }
   const localProject = await request("/api/sites", {

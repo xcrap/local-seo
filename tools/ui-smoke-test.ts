@@ -182,6 +182,13 @@ try {
       throw new Error("Overview still renders the old metric-card totals section.");
     }
 
+    await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
+    await page.getByRole("heading", { name: /^Links$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Local link graph$/ }).waitFor();
+    await page.getByText("External backlink index", { exact: true }).waitFor();
+    await page.getByRole("button", { name: /Backlink index not connected/i }).waitFor();
+    await page.getByText("No web-wide backlink rows are generated locally").waitFor();
+
     await page.getByRole("link", { name: /Sites/i }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
     await page.getByRole("columnheader", { name: /Scan target/i }).waitFor();
