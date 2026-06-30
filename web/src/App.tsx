@@ -1252,7 +1252,7 @@ function Overview({
         <section className="mb-6 rounded-md border border-primary/40 bg-background p-5">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">Start with a site scan</h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the domain once. The scan report opens automatically and stays saved locally.</p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the website address once. The scan report opens automatically and stays saved locally.</p>
           </div>
           <form className="space-y-3" onSubmit={createSiteAndScan}>
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
@@ -1601,7 +1601,7 @@ function ProjectsPage({
 
   async function createSite(scanAfterCreate: boolean) {
     if (!form.domain.trim()) {
-      setError("Enter a domain before saving the site.");
+      setError("Enter a website address before saving the site.");
       return;
     }
     setError("");
@@ -2708,8 +2708,7 @@ function LocalOrganicEvidence({
 }) {
   const pages = audit?.result?.pages || [];
   const rows = [...pages]
-    .sort((a, b) => auditIssueCount(b) - auditIssueCount(a))
-    .slice(0, 25);
+    .sort((a, b) => auditIssueCount(b) - auditIssueCount(a));
   const indexableCount = pages.filter((page: any) => page.indexable === true).length;
   const unknownIndexabilityCount = pages.filter((page: any) => !hasIndexabilityEvidence(page)).length;
   const missingTitleCount = pages.filter((page: any) => !page.title).length;
@@ -2732,7 +2731,7 @@ function LocalOrganicEvidence({
         {!audit ? (
           <EmptyState
             title="No local crawl yet"
-            text={siteDomain ? "Run a site audit once to fill this page with real crawl evidence." : "Add a site domain and run an audit to fill this page."}
+            text={siteDomain ? "Run a site audit once to fill this page with real crawl evidence." : "Add a website address and run an audit to fill this page."}
             action={siteDomain ? (
               <Button variant="secondary" onClick={onScan} disabled={scanning}>
                 <FileSearch /> {scanning ? "Starting scan" : `Scan ${siteDomain}`}
@@ -3084,7 +3083,7 @@ function LocalLinkEvidence({
         {!audit ? (
           <EmptyState
             title="No local link graph yet"
-            text={siteDomain ? "Run a site audit once to collect internal links, external links, and broken link evidence." : "Add a site domain and run an audit to collect link evidence."}
+            text={siteDomain ? "Run a site audit once to collect internal links, external links, and broken link evidence." : "Add a website address and run an audit to collect link evidence."}
             action={siteDomain ? (
               <Button variant="secondary" onClick={onScan} disabled={scanning}>
                 <FileSearch /> {scanning ? "Starting scan" : `Scan ${siteDomain}`}
@@ -3779,7 +3778,7 @@ function AuditsPage({ project }: { project: Project }) {
               {project.domain ? <Badge variant="outline">{scanTargetShortDetail(project)}</Badge> : null}
             </div>
             <div className="mt-2 break-all text-xl font-semibold">
-              {project.domain ? preferredAuditUrl(project) : "Add a site domain"}
+              {project.domain ? preferredAuditUrl(project) : "Add a website address"}
             </div>
             {project.domain ? <p className="mt-1 text-sm text-muted-foreground">{scanTargetDetail(project)}</p> : null}
           </div>
@@ -3863,7 +3862,7 @@ function AuditsPage({ project }: { project: Project }) {
             ) : (
               <EmptyState
                 title="No audits yet"
-                text={project.domain ? "Start a technical scan for this site." : "Add a site before running an audit."}
+                text={project.domain ? "Start a technical scan for this site." : "Add a website address before running an audit."}
                 action={project.domain ? (
                   <Button onClick={startSelectedSite} disabled={starting}>
                     <FileSearch /> {starting ? "Starting" : "Scan site now"}

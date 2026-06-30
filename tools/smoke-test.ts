@@ -263,6 +263,9 @@ try {
   if (webAppClient.includes(".slice(0, 150)") || webAppClient.includes(".slice(0, 100)")) {
     throw new Error("Local link graph should not silently cap audit-derived local evidence rows.");
   }
+  if (webAppClient.includes(".slice(0, 25);")) {
+    throw new Error("Local organic crawl evidence should not silently cap audit-derived page rows.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",
