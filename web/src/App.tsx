@@ -188,7 +188,7 @@ function languageLabel(code: string) {
   return languageOptions.find((item) => item.code === code)?.label || code;
 }
 
-function searchLocaleLabel(project: Project) {
+function searchDefaultsLabel(project: Project) {
   return `${marketLabel(project.location_code)} · ${languageLabel(project.language_code)}`;
 }
 
@@ -1367,7 +1367,7 @@ function SiteCommandCenter({
       area: "Selected site",
       status: project.domain || "missing",
       evidence: project.domain
-        ? `First scan target: ${preferredAuditUrl(project)} · ${scanTargetDetail(project)} · Search locale: ${searchLocaleLabel(project)}`
+        ? `First scan target: ${preferredAuditUrl(project)} · ${scanTargetDetail(project)} · Search defaults: ${searchDefaultsLabel(project)}`
         : "Add a site before running audits, rankings, Search Console imports, or AI work.",
       action: project.domain ? (
         <Button size="sm" onClick={onScan} disabled={scanning}>
@@ -1700,23 +1700,29 @@ function ProjectsPage({
               <form className="space-y-4" onSubmit={submit}>
                 <Field label="Site name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Optional" /></Field>
                 <Field label="Domain"><Input value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="example.com" required /></Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Market">
-                    <Select value={String(form.locationCode)} onValueChange={(value) => setForm({ ...form, locationCode: Number(value) })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Search language">
-                    <Select value={form.languageCode} onValueChange={(value) => setForm({ ...form, languageCode: value })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </Field>
+                <div className="space-y-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Search defaults</h3>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. Site audits still crawl every page language they find.</p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Search market">
+                      <Select value={String(form.locationCode)} onValueChange={(value) => setForm({ ...form, locationCode: Number(value) })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Keyword language">
+                      <Select value={form.languageCode} onValueChange={(value) => setForm({ ...form, languageCode: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Protocol">
@@ -1794,7 +1800,7 @@ function ProjectsPage({
                 <TableHead>Site</TableHead>
                 <TableHead>Scan targets</TableHead>
                 <TableHead>Search market</TableHead>
-                <TableHead>Search language</TableHead>
+                <TableHead>Keyword language</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1859,23 +1865,29 @@ function ProjectsPage({
           <form className="space-y-4" onSubmit={submitEdit}>
             <Field label="Site name"><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></Field>
             <Field label="Domain"><Input value={editForm.domain} onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })} /></Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Market">
-                <Select value={String(editForm.location_code)} onValueChange={(value) => setEditForm({ ...editForm, location_code: Number(value) })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Search language">
-                <Select value={editForm.language_code} onValueChange={(value) => setEditForm({ ...editForm, language_code: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
+            <div className="space-y-2">
+              <div>
+                <h3 className="text-sm font-semibold">Search defaults</h3>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. Site audits still crawl every page language they find.</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Search market">
+                  <Select value={String(editForm.location_code)} onValueChange={(value) => setEditForm({ ...editForm, location_code: Number(value) })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Keyword language">
+                  <Select value={editForm.language_code} onValueChange={(value) => setEditForm({ ...editForm, language_code: value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Protocol">
@@ -6073,8 +6085,12 @@ function SettingsPage() {
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
         <ReportSection title="App preferences" description="Defaults used when a new site is added. Existing sites keep their own saved settings.">
           <form className="space-y-5" onSubmit={save}>
+            <div>
+              <h3 className="text-sm font-semibold">Search defaults</h3>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. They do not restrict multilingual site audits.</p>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Default market">
+              <Field label="Default search market">
                 <Select value={String(form.default_location_code || 2840)} onValueChange={(value) => setForm({ ...form, default_location_code: Number(value) })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -6082,7 +6098,7 @@ function SettingsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Default search language">
+              <Field label="Default keyword language">
                 <Select value={form.default_language_code || "en"} onValueChange={(value) => setForm({ ...form, default_language_code: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

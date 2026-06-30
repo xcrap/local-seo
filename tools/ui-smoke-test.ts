@@ -221,6 +221,10 @@ try {
     if (await page.getByText(/\b2840\b/).count()) {
       throw new Error("Main site flow exposes a raw location code.");
     }
+    await page.getByText(/Search defaults:/i).waitFor();
+    if (await page.getByText(/Search locale/i).count()) {
+      throw new Error("Overview still presents site search defaults as a site locale.");
+    }
 
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
@@ -336,6 +340,9 @@ try {
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
     await page.getByRole("button", { name: /^Add site$/ }).click();
     const addSiteDialog = page.getByRole("dialog", { name: /^Add site$/ });
+    await addSiteDialog.getByText("Search defaults").waitFor();
+    await addSiteDialog.getByText("Search market").waitFor();
+    await addSiteDialog.getByText("Keyword language").waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "Portugal" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "Portuguese" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "HTTPS only" }).first().waitFor();
