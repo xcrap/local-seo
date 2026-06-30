@@ -4591,114 +4591,113 @@ function AuditReportOverview({
 }) {
   const score = audit.status === "completed" ? Number(audit.score || 0) : auditProgress(audit);
   const scoreVariant = audit.status === "failed" ? "bad" : score >= 85 ? "good" : score >= 60 ? "warn" : "bad";
-  const scopeRows = [
-    ["Pages crawled", coverage.pages],
-    ["Indexable", coverage.indexablePages],
-    ["Noindex/non-indexable", coverage.nonIndexablePages],
-    ["Indexability unknown", coverage.unknownIndexabilityPages],
-    ["Sitemap-listed pages", coverage.sitemapUrls],
-    ["Orphan pages", coverage.orphanPages],
-    ["Deep pages", coverage.deepPages],
-    ["Link tags found", coverage.linkTags],
-    ["Image tags found", coverage.imageTags],
-    ["CSS/JS refs found", coverage.assetTags],
-  ];
-  const resourceRows = [
-    ["Checked links", coverage.checkedLinks, coverage.brokenLinks],
-    ["Checked image URLs", coverage.checkedImages, coverage.brokenImages],
-    ["Checked CSS/JS", coverage.checkedAssets, coverage.brokenAssets],
-    ["Redirecting links", coverage.redirectedLinks, null],
-    ["Redirecting images", coverage.redirectedImages, null],
-    ["CSS image URLs", coverage.cssImageResources, null],
-    ["Large images", coverage.largeImages, null],
+  const sourceUrl = result.startUrl || audit.url;
+  const canonicalTarget = result.pages?.find((page: any) => page.finalUrl)?.finalUrl || sourceUrl;
+  const rows = [
+    {
+      area: "Issue impact",
+      status: (
+        <div className="flex flex-wrap gap-1">
+          <Badge variant={severityCounts.high ? "bad" : "outline"}>{formatNumber(severityCounts.high)} high</Badge>
+          <Badge variant={severityCounts.medium ? "warn" : "outline"}>{formatNumber(severityCounts.medium)} medium</Badge>
+          <Badge variant="outline">{formatNumber(severityCounts.low)} low</Badge>
+        </div>
+      ),
+      evidence: `${formatNumber(audit.issue_count || 0)} saved issues from ${formatNumber(coverage.pages)} crawled pages.`,
+      action: (
+        <div className="flex flex-wrap justify-end gap-2">
+          {["high", "medium", "low"].map((severity) => (
+            <Button
+              key={severity}
+              size="sm"
+              variant={activeSeverity === severity ? "default" : "outline"}
+              onClick={() => onSeveritySelect(severity)}
+            >
+              <ListChecks /> {severity}
+            </Button>
+          ))}
+        </div>
+      ),
+    },
+    {
+      area: "Crawl scope",
+      status: `${formatNumber(coverage.pages)} pages`,
+      evidence: `${formatNumber(coverage.indexablePages)} indexable · ${formatNumber(coverage.nonIndexablePages)} non-indexable · ${formatNumber(coverage.unknownIndexabilityPages)} unknown · ${formatNumber(coverage.sitemapUrls)} sitemap-listed.`,
+      action: <Badge variant={coverage.unknownIndexabilityPages || coverage.nonIndexablePages ? "warn" : "good"}>{coverage.unknownIndexabilityPages ? "needs review" : "measured"}</Badge>,
+    },
+    {
+      area: "Resources",
+      status: `${formatNumber(coverage.linkTags)} links · ${formatNumber(coverage.imageTags)} images · ${formatNumber(coverage.assetTags)} CSS/JS`,
+      evidence: `${formatNumber(coverage.checkedLinks)} link targets checked (${formatNumber(coverage.brokenLinks)} failing) · ${formatNumber(coverage.checkedImages)} image URLs checked (${formatNumber(coverage.brokenImages)} failing) · ${formatNumber(coverage.checkedAssets)} CSS/JS checked (${formatNumber(coverage.brokenAssets)} failing).`,
+      action: <Badge variant={coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets ? "bad" : "good"}>{coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets ? "failures" : "reachable"}</Badge>,
+    },
+    {
+      area: "Metadata",
+      status: `${formatNumber(summary.missingTitles || 0)} missing titles · ${formatNumber(summary.missingDescriptions || 0)} missing descriptions`,
+      evidence: `${formatNumber(summary.titleLengthIssues || 0)} title length issues · ${formatNumber(summary.descriptionLengthIssues || 0)} description length issues · ${formatNumber(issueTypeCount(result.issues || [], "duplicate-title"))} duplicate titles.`,
+      action: <Badge variant={summary.missingTitles || summary.missingDescriptions || summary.titleLengthIssues || summary.descriptionLengthIssues ? "warn" : "good"}>{summary.missingTitles || summary.missingDescriptions ? "fix" : "checked"}</Badge>,
+    },
+    {
+      area: "Images",
+      status: `${formatNumber(summary.missingAlt || 0)} alt issues · ${formatNumber(summary.imagesMissingDimensions || 0)} size issues`,
+      evidence: `${formatNumber(summary.cssImageResources || 0)} CSS image URLs · ${formatNumber(summary.imagesMissingLazyLoading || 0)} lazy-loading issues · ${formatNumber(summary.largeImages || coverage.largeImages || 0)} large images.`,
+      action: <Badge variant={summary.imageIssues || coverage.brokenImages ? "warn" : "good"}>{summary.imageIssues || coverage.brokenImages ? "review" : "clear"}</Badge>,
+    },
+    {
+      area: "Scan target",
+      status: audit.status,
+      evidence: (
+        <span className="break-all">
+          Started at {sourceUrl}. Final home evidence: {canonicalTarget}.
+        </span>
+      ),
+      action: <Badge variant={scoreVariant as any}>{formatNumber(score)} score</Badge>,
+    },
   ];
   return (
-    <div className="rounded-md border bg-background p-5">
-      <div className="grid gap-6 2xl:grid-cols-[280px_1fr]">
-        <div className="space-y-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Audit health</div>
-          <div className="flex items-end gap-3">
-            <div className="nums text-7xl font-semibold leading-none">{audit.status === "completed" ? audit.score : auditProgress(audit)}</div>
-            <Badge variant={scoreVariant as any}>{audit.status}</Badge>
+    <ReportSection
+      title="Audit health"
+      description={`${auditPhaseLabel(audit)} · ${formatDate(audit.created_at)} · stored in local SQLite`}
+    >
+      <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
+        <div className="space-y-4 border-b pb-5 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-6">
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">Score</div>
+            <div className="mt-2 flex items-end gap-3">
+              <div className="nums text-7xl font-semibold leading-none">{formatNumber(score)}</div>
+              <Badge variant={scoreVariant as any}>{scanStatusLabel(audit.status)}</Badge>
+            </div>
           </div>
           <ProgressBar value={auditProgress(audit)} />
-          <div className="text-xs text-muted-foreground">{auditPhaseLabel(audit)}</div>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <div className="break-all text-xl font-semibold">{audit.url}</div>
-            <div className="text-sm text-muted-foreground">{formatDate(audit.created_at)} · {formatNumber(audit.issue_count)} issues</div>
+          <div className="text-sm leading-6 text-muted-foreground">
+            {audit.status === "running" || audit.status === "queued"
+              ? "This scan is still running and the evidence updates automatically."
+              : `${formatNumber(audit.issue_count || 0)} issues saved for this run.`}
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <ImpactPill label="High" value={severityCounts.high} tone="bad" active={activeSeverity === "high"} onClick={() => onSeveritySelect("high")} />
-            <ImpactPill label="Medium" value={severityCounts.medium} tone="warn" active={activeSeverity === "medium"} onClick={() => onSeveritySelect("medium")} />
-            <ImpactPill label="Low" value={severityCounts.low} tone="outline" active={activeSeverity === "low"} onClick={() => onSeveritySelect("low")} />
-          </div>
-          {(audit.status === "running" || audit.status === "queued") ? (
-            <p className="text-sm text-muted-foreground">Scanning is still running. Results update automatically.</p>
-          ) : null}
-          {audit.error ? <p className="text-sm text-destructive">{audit.error}</p> : null}
+          {audit.error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{audit.error}</p> : null}
         </div>
-      </div>
-      <div className="mt-5 grid gap-5 xl:grid-cols-2">
-        <div className="rounded-md border">
-          <div className="border-b px-4 py-3 text-sm font-semibold">Crawl scope</div>
-          <div className="divide-y">
-            {scopeRows.map(([label, value]) => (
-              <div key={label} className="flex items-center justify-between gap-5 px-4 py-3">
-                <span className="text-sm text-muted-foreground">{label}</span>
-                <span className="nums text-lg font-semibold">{formatNumber(value)}</span>
-              </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Area</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Evidence</TableHead>
+              <TableHead className="text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.area}>
+                <TableCell className="min-w-44 font-medium">{row.area}</TableCell>
+                <TableCell className="min-w-56">{row.status}</TableCell>
+                <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{row.evidence}</TableCell>
+                <TableCell className="text-right">{row.action}</TableCell>
+              </TableRow>
             ))}
-          </div>
-        </div>
-        <div className="rounded-md border">
-          <div className="border-b px-4 py-3 text-sm font-semibold">Checked resources</div>
-          <div className="divide-y">
-            {resourceRows.map(([label, value, failures]) => (
-              <div key={label} className="flex items-center justify-between gap-5 px-4 py-3">
-                <span className="text-sm text-muted-foreground">{label}</span>
-                <div className="flex items-center gap-3">
-                  <span className="nums text-lg font-semibold">{formatNumber(value)}</span>
-                  {failures != null ? <Badge variant={Number(failures || 0) ? "bad" : "outline"}>{formatNumber(failures)} failing</Badge> : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+          </TableBody>
+        </Table>
       </div>
-            </div>
-  );
-}
-
-function ImpactPill({
-  label,
-  value,
-  tone,
-  active,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  tone: "bad" | "warn" | "outline";
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "rounded-md border bg-muted/25 p-3 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active ? "border-primary bg-primary/10" : "",
-      )}
-      onClick={onClick}
-    >
-      <div className="text-sm font-medium text-muted-foreground">{label} issues</div>
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <span className="nums text-3xl font-semibold leading-none">{formatNumber(value)}</span>
-        <Badge variant={tone}>{value ? "review" : "clear"}</Badge>
-      </div>
-    </button>
+    </ReportSection>
   );
 }
 
@@ -4738,78 +4737,83 @@ function AuditActionBoard({
     { label: "Orphan pages", value: coverage.orphanPages, detail: `${formatNumber(coverage.deepPages)} deep URLs` },
   ];
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-      <section className="rounded-md border bg-background">
-        <div className="border-b px-5 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Fix first</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Grouped issues with the highest crawl and search impact.</p>
-            </div>
-            <Badge variant={audit.status === "completed" ? "good" : "warn"}>{audit.status}</Badge>
+    <div className="space-y-5">
+      <ReportSection
+        title="Fix first"
+        description={
+          <div className="flex flex-wrap items-center gap-2">
+            <span>Grouped issues with the highest crawl and search impact.</span>
+            <Badge variant={audit.status === "completed" ? "good" : "warn"}>{scanStatusLabel(audit.status)}</Badge>
           </div>
-        </div>
-        <div className="p-5">
+        }
+      >
           {priorityGroups.length ? (
-            <div className="space-y-2">
-              {priorityGroups.map((group) => (
-                <button
-                  key={group.key}
-                  type="button"
-                  className="w-full rounded-md border bg-muted/20 p-3 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => onSelectGroup(group)}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge>
-                    <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
-                    <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
-                    <span className="nums text-xs text-muted-foreground">{formatNumber(group.count)} affected</span>
-                  </div>
-                  <div className="mt-2 font-medium">{group.message}</div>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{group.recommendation}</p>
-                </button>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Issue</TableHead>
+                  <TableHead>Affected</TableHead>
+                  <TableHead>Fix</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {priorityGroups.map((group) => (
+                  <TableRow key={group.key}>
+                    <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
+                    <TableCell className="min-w-80">
+                      <div className="font-medium">{group.message}</div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
+                        <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="nums text-lg font-semibold">{formatNumber(group.count)}</TableCell>
+                    <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
+                        <ListChecks /> Review
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : (
             <EmptyState title="No priority blockers" text={audit.status === "completed" ? "High and medium issue groups are clear." : "Priority issues appear while the scan runs."} />
           )}
-        </div>
-      </section>
-      <section className="rounded-md border bg-background">
-        <div className="border-b px-5 py-4">
-          <h2 className="text-lg font-semibold">Audit coverage</h2>
-          <p className="mt-1 text-sm text-muted-foreground">What this local run actually checked.</p>
-        </div>
-        <div className="space-y-4 p-5">
-          <div className="divide-y rounded-md border bg-background">
+      </ReportSection>
+      <ReportSection title="Audit coverage" description="What this local run actually checked.">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Area</TableHead>
+              <TableHead>Problems</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Evidence</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {checks.map((check) => (
-              <div key={check.label} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div>
-                  <div className="text-sm font-medium">{check.label}</div>
-                  <div className="text-xs text-muted-foreground">{check.detail}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="nums text-2xl font-semibold">{formatNumber(check.value)}</span>
-                  <Badge variant={(Number(check.value) ? check.tone : "good") as any}>{Number(check.value) ? "issues" : "clear"}</Badge>
-                </div>
-              </div>
+              <TableRow key={check.label}>
+                <TableCell className="min-w-44 font-medium">{check.label}</TableCell>
+                <TableCell className="nums text-lg font-semibold">{formatNumber(check.value)}</TableCell>
+                <TableCell><Badge variant={(Number(check.value) ? check.tone : "good") as any}>{Number(check.value) ? "issues" : "clear"}</Badge></TableCell>
+                <TableCell className="min-w-96 text-sm text-muted-foreground">{check.detail}</TableCell>
+              </TableRow>
             ))}
-          </div>
-          <div className="rounded-md border bg-muted/25 p-3">
-            <div className="grid gap-2 text-sm">
-              {coverageRows.map((row) => (
-                <div key={row.label} className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium">{row.label}</div>
-                    <div className="text-xs text-muted-foreground">{row.detail}</div>
-                  </div>
-                  <div className="nums text-lg font-semibold">{formatNumber(row.value)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+            {coverageRows.map((row) => (
+              <TableRow key={row.label}>
+                <TableCell className="min-w-44 font-medium">{row.label}</TableCell>
+                <TableCell className="nums text-lg font-semibold">{formatNumber(row.value)}</TableCell>
+                <TableCell><Badge variant="outline">measured</Badge></TableCell>
+                <TableCell className="min-w-96 text-sm text-muted-foreground">{row.detail}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ReportSection>
     </div>
   );
 }

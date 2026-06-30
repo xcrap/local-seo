@@ -11,6 +11,7 @@ function expect(condition: unknown, message: string) {
 
 try {
   const seo = await import("../src/seo");
+  const { resolveSavedSiteScanUrl } = await import("../src/site-target");
   expect(seo.sameSiteUrl("https://www.waka.pt/about/", "https://waka.pt"), "Root and www Waka URLs must share crawl scope.");
 
   const project = seo.createProject({
@@ -21,7 +22,12 @@ try {
     crawlProtocol: "https",
     crawlHost: "both",
   });
-  const started = seo.startAudit(project.id, "https://waka.pt");
+  const resolvedScanUrl = await resolveSavedSiteScanUrl(project);
+  expect(
+    resolvedScanUrl.startsWith("https://www.waka.pt"),
+    `Expected saved-site scan resolver to prefer Waka's live www HTTPS target, got ${resolvedScanUrl}.`,
+  );
+  const started = seo.startAudit(project.id, resolvedScanUrl);
   expect(started?.id, "Could not start Waka audit.");
 
   const startedAt = Date.now();
@@ -41,6 +47,8 @@ try {
 
   expect(sitemapUrls.length >= 8, `Expected at least 8 Waka sitemap URLs, got ${sitemapUrls.length}.`);
   expect(pages.length >= 8, `Expected at least 8 crawled Waka pages, got ${pages.length}.`);
+  expect(summary.indexablePages >= 8, `Expected Waka pages to be indexable, got ${summary.indexablePages || 0}.`);
+  expect(summary.nonIndexablePages === 0, `Expected Waka scan to avoid false non-indexable pages, got ${summary.nonIndexablePages || 0}.`);
   expect(summary.sitemapUrls >= 8, `Expected Waka crawled pages to match the sitemap, got ${summary.sitemapUrls || 0}.`);
   expect(summary.linkTags > 0, "Expected Waka link inventory to be greater than zero.");
   expect(summary.checkedLinks > 0, "Expected Waka checked links to be greater than zero.");
@@ -64,6 +72,7 @@ try {
     checkedImages: summary.checkedImages,
     cssImageResources: summary.cssImageResources,
     checkedAssets: summary.checkedAssets,
+    resolvedScanUrl,
     startedUrl: result.startUrl,
     finalHomeUrl: pages[0]?.finalUrl,
   }, null, 2));

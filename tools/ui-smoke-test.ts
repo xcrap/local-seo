@@ -194,7 +194,8 @@ try {
     await page.getByRole("heading", { name: /^Crawl coverage$/ }).waitFor();
     await page.getByRole("cell", { name: /sitemap\.xml/i }).last().waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
-    await page.getByText("Checked image URLs").first().waitFor();
+    await page.getByRole("heading", { name: /^Audit health$/ }).waitFor();
+    await page.getByRole("row", { name: /Resources.*image URLs checked/i }).waitFor();
     if (await page.getByText("0 chars").count()) {
       throw new Error("Audit report still shows standalone 0 chars badges.");
     }
