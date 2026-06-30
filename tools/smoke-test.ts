@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Database } from "bun:sqlite";
+import { randomUUID } from "node:crypto";
 
 const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
@@ -28,6 +29,7 @@ if (sameSiteUrl("https://blog.waka.pt/", "https://waka.pt")) {
 }
 const port = 4131 + Math.floor(Math.random() * 400);
 const baseUrl = `http://localhost:${port}`;
+const serverDbPath = path.join(tempDir, "smoke.sqlite");
 const cookieJar = new Map<string, string>();
 let fixtureUrl = "";
 const fixtureServer = Bun.serve({
@@ -125,7 +127,7 @@ const server = Bun.spawn([process.execPath, "src/index.ts"], {
   env: {
     ...process.env,
     PORT: String(port),
-    DB_PATH: path.join(tempDir, "smoke.sqlite"),
+    DB_PATH: serverDbPath,
     AUTH_SESSION_SECRET: "smoke-test-secret-000000000000000000000",
   },
 });
@@ -168,7 +170,12 @@ async function request(pathname: string, options: RequestInit = {}) {
   });
   storeCookies(response);
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`${pathname} returned non-JSON: ${response.status} ${text.slice(0, 500)}`);
+  }
   if (!response.ok) {
     throw new Error(`${pathname} failed: ${response.status} ${text}`);
   }
@@ -186,7 +193,12 @@ async function requestFailure(pathname: string, options: RequestInit = {}) {
   });
   storeCookies(response);
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`${pathname} returned non-JSON: ${response.status} ${text.slice(0, 500)}`);
+  }
   if (response.ok) {
     throw new Error(`${pathname} unexpectedly succeeded.`);
   }
@@ -509,6 +521,29 @@ try {
     !projectAuditsAfterSecondScan.some((row: any) => row.id === audit.id)
   ) {
     throw new Error("Site audits endpoint should keep every scan for the site until the user deletes it.");
+  }
+  const scanHistoryDb = new Database(serverDbPath);
+  try {
+    const insertAudit = scanHistoryDb.prepare(`
+      INSERT INTO audits (id, project_id, url, status, score, pages_crawled, issue_count, result_json, created_at, updated_at)
+      VALUES (?, ?, ?, 'completed', 88, 1, 0, '{}', ?, ?)
+    `);
+    const insertedAuditIds: string[] = [];
+    for (let index = 0; index < 6; index += 1) {
+      const id = randomUUID();
+      const timestamp = `2026-06-30 12:0${index}:00`;
+      insertedAuditIds.push(id);
+      insertAudit.run(id, project.id, `https://example.com/history-${index}`, timestamp, timestamp);
+    }
+    const dashboardWithFullHistory = await request(`/api/dashboard?projectId=${project.id}`);
+    const dashboardAuditIds = new Set((dashboardWithFullHistory.latestAudits || []).map((row: any) => row.id));
+    for (const id of [siteScan.audit.id, audit.id, ...insertedAuditIds]) {
+      if (!dashboardAuditIds.has(id)) {
+        throw new Error("Dashboard scan history should include every saved scan until the user deletes it.");
+      }
+    }
+  } finally {
+    scanHistoryDb.close();
   }
   await request(`/api/gsc/status/${project.id}`);
   const gscImport = await request("/api/gsc/import", {

@@ -1300,8 +1300,10 @@ function Overview({
       <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]">
         <section className="rounded-md border bg-background">
           <div className="border-b px-5 py-4">
-            <h2 className="text-lg font-semibold">Recent audits</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Technical crawl runs stored in local SQLite.</p>
+            <h2 className="text-lg font-semibold">Scan history</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {formatNumber(summary?.latestAudits?.length || 0)} saved scans for this site.
+            </p>
           </div>
           <div className="p-5">
             {summary?.latestAudits?.length ? (

@@ -4021,7 +4021,7 @@ export function dashboardSummary(projectId?: string) {
           createdAt: latestGscImport.created_at,
         }
       : null,
-    latestAudits: listAudits(project.id).slice(0, 5),
+    latestAudits: listAudits(project.id),
     latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT 5"),
   };
 }
