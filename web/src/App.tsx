@@ -5919,20 +5919,35 @@ function AiPage({ project }: { project: Project }) {
   const [jobs, setJobs] = useState<any[]>([]);
   const [type, setType] = useState("seo.coach");
   const [context, setContext] = useState(`Site: ${project.name}\nDomain: ${project.domain}`);
+  const [activeJobId, setActiveJobId] = useState("");
+  const activeJob = jobs.find((job) => job.id === activeJobId) || jobs[0] || null;
 
   async function load() {
-    setPrompts(await api.aiPrompts());
-    setJobs(await api.aiJobs());
+    const [nextPrompts, nextJobs] = await Promise.all([
+      api.aiPrompts(),
+      api.aiJobs(),
+    ]);
+    setPrompts(nextPrompts);
+    setJobs(nextJobs);
+    setActiveJobId((current) => current && nextJobs.some((job: any) => job.id === current) ? current : nextJobs[0]?.id || "");
   }
   useEffect(() => {
     setContext(`Site: ${project.name}\nDomain: ${project.domain}`);
     load().catch(console.error);
   }, [project.id, project.name, project.domain]);
+  useEffect(() => {
+    if (!jobs.some((job) => job.status === "queued" || job.status === "running")) return;
+    const interval = window.setInterval(() => {
+      load().catch(console.error);
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, [jobs]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const prompt = prompts.find((item) => item.key === type)?.template?.replace("{{context}}", context) || context;
-    await api.createAiJob({ type, prompt });
+    const job = await api.createAiJob({ type, prompt });
+    if (job?.id) setActiveJobId(job.id);
     await load();
   }
 
@@ -5952,29 +5967,91 @@ function AiPage({ project }: { project: Project }) {
             <Button><Bot /> Start job</Button>
           </form>
         </ReportSection>
-        <ReportSection title="Jobs">
-          {jobs.length ? <JobTable rows={jobs} /> : <EmptyState title="No jobs" text="Start a local Codex workflow." />}
-        </ReportSection>
+        <div className="space-y-6">
+          <ReportSection
+            title="Jobs"
+            description={
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span>Saved local Codex runs from SQLite.</span>
+                <Button size="sm" variant="outline" type="button" onClick={() => load().catch(console.error)}>
+                  <RefreshCw /> Refresh
+                </Button>
+              </div>
+            }
+          >
+            {jobs.length ? <JobTable rows={jobs} selectedId={activeJob?.id || ""} onSelect={setActiveJobId} /> : <EmptyState title="No jobs" text="Start a local Codex workflow." />}
+          </ReportSection>
+          <AiJobOutput job={activeJob} />
+        </div>
       </div>
     </>
   );
 }
 
-function JobTable({ rows }: { rows: any[] }) {
+function JobTable({
+  rows,
+  selectedId,
+  onSelect,
+}: {
+  rows: any[];
+  selectedId?: string;
+  onSelect?: (id: string) => void;
+}) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Message</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>Workflow</TableHead><TableHead>Status</TableHead><TableHead>Message</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
       <TableBody>
         {rows.map((row) => (
-          <TableRow key={row.id}>
+          <TableRow
+            key={row.id}
+            className={cn(onSelect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
+            onClick={() => onSelect?.(row.id)}
+          >
             <TableCell className="font-medium">{row.type}</TableCell>
             <TableCell><Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge></TableCell>
-            <TableCell className="max-w-md truncate text-muted-foreground">{row.error || row.message || row.result_text}</TableCell>
+            <TableCell className="max-w-md truncate text-muted-foreground">{row.error || row.message || row.result_text || "-"}</TableCell>
             <TableCell className="text-muted-foreground">{row.created_at}</TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+function AiJobOutput({ job }: { job: any }) {
+  return (
+    <ReportSection
+      title="Job output"
+      description={job ? `${job.type} · ${formatDate(job.created_at)}` : "Select a saved Codex job to read its full local result."}
+    >
+      {job ? (
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <AiJobFact label="Status" value={job.status || "-"} />
+            <AiJobFact label="Started" value={job.started_at ? formatDate(job.started_at) : "-"} />
+            <AiJobFact label="Finished" value={job.finished_at ? formatDate(job.finished_at) : "-"} />
+          </div>
+          {job.error ? (
+            <pre className="max-h-[520px] overflow-auto rounded-md border border-destructive/40 bg-muted/30 p-4 text-sm leading-6 text-destructive whitespace-pre-wrap">{job.error}</pre>
+          ) : job.result_text ? (
+            <pre className="max-h-[520px] overflow-auto rounded-md border bg-muted/30 p-4 text-sm leading-6 whitespace-pre-wrap">{job.result_text}</pre>
+          ) : (
+            <EmptyState title={job.status === "queued" || job.status === "running" ? "Codex is working" : "No output yet"} text={job.message || "The saved job has not produced text yet."} />
+          )}
+        </div>
+      ) : (
+        <EmptyState title="No job selected" text="Start or select a local Codex job to read the complete output here." />
+      )}
+    </ReportSection>
+  );
+}
+
+function AiJobFact({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md border bg-muted/25 p-3">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+      <div className="mt-1 break-all text-sm font-medium">{value}</div>
+    </div>
   );
 }
 

@@ -318,6 +318,13 @@ try {
       throw new Error("MCP page exposes workspace wording.");
     }
 
+    await page.getByRole("navigation").getByRole("link", { name: /^AI lab$/ }).click();
+    await page.getByRole("heading", { name: /^AI lab$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Jobs$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Job output$/ }).waitFor();
+    await page.getByText("Saved local Codex runs from SQLite.").waitFor();
+    await page.getByText("Start or select a local Codex job to read the complete output here.").waitFor();
+
     await page.getByRole("navigation").getByRole("link", { name: /^Settings$/ }).click();
     await page.getByRole("heading", { name: /^App settings$/ }).waitFor();
     await page.getByRole("heading", { name: /^Data sources$/ }).waitFor();
