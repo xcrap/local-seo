@@ -33,6 +33,7 @@ import {
   archiveProject,
   backlinksOverview,
   brandLookup,
+  clearAudits,
   createProject,
   createRankTracker,
   dashboardSummary,
@@ -460,6 +461,8 @@ app.post(
 app.get("/api/projects/:id/audits", safe((c) => c.json(listAudits(c.req.param("id")))));
 app.get("/api/sites/:id/audits", safe((c) => c.json(listAudits(c.req.param("id")))));
 app.get("/api/audits/:id", safe((c) => c.json(getAudit(c.req.param("id")))));
+app.delete("/api/projects/:id/audits", safe((c) => c.json(clearAudits(c.req.param("id")))));
+app.delete("/api/sites/:id/audits", safe((c) => c.json(clearAudits(c.req.param("id")))));
 app.delete(
   "/api/projects/:projectId/audits/:id",
   safe((c) => c.json(deleteAudit(c.req.param("projectId"), c.req.param("id")))),

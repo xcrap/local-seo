@@ -232,6 +232,13 @@ try {
     await page.getByText("Hostname").waitFor();
     await page.keyboard.press("Escape");
 
+    await page.getByRole("navigation").getByRole("link", { name: /^Audits$/ }).click();
+    await page.getByRole("heading", { name: /^Scan history$/ }).waitFor();
+    await page.getByRole("button", { name: /^Clear history$/ }).click();
+    await page.getByRole("heading", { name: /^Clear scan history\?$/ }).waitFor();
+    await page.getByRole("button", { name: /^Clear scan history$/ }).click();
+    await page.getByText("No audits yet").waitFor();
+
     await page.getByRole("navigation").getByRole("link", { name: /^MCP$/ }).click();
     await page.getByRole("heading", { name: /^MCP$/ }).waitFor();
     await page.getByRole("columnheader", { name: /Required inputs/i }).first().waitFor();

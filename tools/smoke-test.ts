@@ -312,6 +312,22 @@ try {
   if (!fixtureAudit.result?.summary?.cssImageResources || !fixtureAudit.result?.summary?.pictureSourceImages) {
     throw new Error("Fixture audit did not check CSS image URLs and picture source URLs.");
   }
+  const mcpFixtureAuditId = localMcpScan.result?.structuredContent?.id;
+  if (mcpFixtureAuditId) {
+    await waitForAudit(mcpFixtureAuditId);
+  }
+  const fixtureAuditsBeforeClear = await request(`/api/sites/${localProject.id}/audits`);
+  if (fixtureAuditsBeforeClear.length < 2) {
+    throw new Error("Fixture site should have multiple scans before clear-history verification.");
+  }
+  const clearedFixtureAudits = await request(`/api/sites/${localProject.id}/audits`, { method: "DELETE" });
+  if (clearedFixtureAudits.deleted < 2) {
+    throw new Error(`Clear history should delete fixture scans, got ${clearedFixtureAudits.deleted}.`);
+  }
+  const fixtureAuditsAfterClear = await request(`/api/sites/${localProject.id}/audits`);
+  if (fixtureAuditsAfterClear.length !== 0) {
+    throw new Error("Clear history did not remove all fixture scans from local SQLite.");
+  }
   const siteAudits = await request(`/api/sites/${project.id}/audits`);
   if (!siteAudits.some((row: any) => row.id === siteScan.audit.id)) {
     throw new Error("Site audits endpoint did not return the scan.");

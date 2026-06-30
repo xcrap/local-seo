@@ -1471,6 +1471,13 @@ export function deleteAudit(projectId: string, auditId: string) {
   return { deleted: Number(info.changes || 0) > 0 };
 }
 
+export function clearAudits(projectId: string) {
+  const project = getProject(projectId);
+  if (!project) throw new Error("Site not found.");
+  const info = run("DELETE FROM audits WHERE project_id = ?", [project.id]);
+  return { deleted: Number(info.changes || 0) };
+}
+
 export function startAudit(projectId: string, url: string) {
   const project = getProject(projectId);
   if (!project) throw new Error("Site not found.");

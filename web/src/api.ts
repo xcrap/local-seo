@@ -130,6 +130,8 @@ export const api = {
   audit: (id: string) => request<any>(`/api/audits/${id}`),
   startAudit: (body: any) =>
     request<any>("/api/audits", { method: "POST", body: JSON.stringify(body) }),
+  clearAudits: (projectId: string) =>
+    request<any>(`/api/sites/${projectId}/audits`, { method: "DELETE" }),
   deleteAudit: (projectId: string, auditId: string) =>
     request<any>(`/api/sites/${projectId}/audits/${auditId}`, { method: "DELETE" }),
   aiPrompts: () => request<any[]>("/api/ai/prompts"),

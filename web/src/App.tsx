@@ -3359,6 +3359,8 @@ function AuditsPage({ project }: { project: Project }) {
   const [audits, setAudits] = useState<any[]>([]);
   const [detail, setDetail] = useState<any>(null);
   const [deletingAudit, setDeletingAudit] = useState<any>(null);
+  const [clearingAudits, setClearingAudits] = useState(false);
+  const [confirmClearAudits, setConfirmClearAudits] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [showCustomUrl, setShowCustomUrl] = useState(false);
@@ -3433,6 +3435,21 @@ function AuditsPage({ project }: { project: Project }) {
     setDetail(null);
     await load();
   }
+  async function clearHistory() {
+    setError("");
+    setClearingAudits(true);
+    try {
+      await api.clearAudits(project.id);
+      localStorage.removeItem(selectedAuditStorageKey);
+      setDetail(null);
+      setConfirmClearAudits(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear scan history");
+    } finally {
+      setClearingAudits(false);
+    }
+  }
   return (
     <>
       <PageHeader eyebrow="Technical" title="Site audits" description="Scan the selected website and open the report when it completes." />
@@ -3489,9 +3506,22 @@ function AuditsPage({ project }: { project: Project }) {
         </section>
 
         <section className="rounded-md border bg-background">
-          <div className="border-b px-5 py-4">
-            <h2 className="text-lg font-semibold">Scan history</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Saved local audit runs for this site.</p>
+          <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Scan history</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Saved local audit runs for this site.</p>
+            </div>
+            {audits.length ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmClearAudits(true)}
+                disabled={clearingAudits}
+              >
+                <Trash2 /> Clear history
+              </Button>
+            ) : null}
           </div>
           <div className="p-5">
             {audits.length ? (
@@ -3524,6 +3554,23 @@ function AuditsPage({ project }: { project: Project }) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={() => deletingAudit && remove(deletingAudit.id).then(() => setDeletingAudit(null))}>
               Delete scan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={confirmClearAudits} onOpenChange={setConfirmClearAudits}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear scan history?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes all saved scan reports for {project.domain || project.name} from local SQLite. The saved site, keywords, rankings, and settings stay in place.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearingAudits}>Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={clearHistory} disabled={clearingAudits}>
+              {clearingAudits ? "Clearing" : "Clear scan history"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
