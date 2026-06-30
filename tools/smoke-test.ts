@@ -5,6 +5,7 @@ import path from "node:path";
 const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
 process.env.DB_PATH = path.join(tempDir, "scope.sqlite");
+process.env.DATAFORSEO_API_KEY = "";
 const { sameSiteUrl } = await import("../src/seo");
 if (!sameSiteUrl("https://www.waka.pt/about/", "https://waka.pt")) {
   throw new Error("Root and www variants should share audit scope.");
@@ -365,10 +366,18 @@ try {
     method: "POST",
     body: JSON.stringify({ projectId: project.id, keyword: "seo software", target: "example.com" }),
   });
-  await request("/api/domain/overview", {
+  const organicOverview = await request("/api/domain/overview", {
     method: "POST",
     body: JSON.stringify({ projectId: project.id, target: "example.com" }),
   });
+  if (
+    organicOverview.source === "provider-not-configured" &&
+    (organicOverview.organicKeywords !== null ||
+      organicOverview.organicTraffic !== null ||
+      organicOverview.estimatedValue !== null)
+  ) {
+    throw new Error("Organic provider-not-configured response should keep external metrics null.");
+  }
   await request("/api/domain/keywords", {
     method: "POST",
     body: JSON.stringify({ projectId: project.id, domain: "example.com", pageSize: 10 }),
@@ -377,10 +386,18 @@ try {
     method: "POST",
     body: JSON.stringify({ projectId: project.id, domain: "example.com", pageSize: 10 }),
   });
-  await request("/api/backlinks/overview", {
+  const backlinkOverview = await request("/api/backlinks/overview", {
     method: "POST",
     body: JSON.stringify({ projectId: project.id, target: "example.com" }),
   });
+  if (
+    backlinkOverview.source === "provider-not-configured" &&
+    (backlinkOverview.backlinks !== null ||
+      backlinkOverview.referringDomains !== null ||
+      backlinkOverview.dofollowRatio !== null)
+  ) {
+    throw new Error("Backlink provider-not-configured response should keep external metrics null.");
+  }
   await request("/api/backlinks/profile", {
     method: "POST",
     body: JSON.stringify({ projectId: project.id, target: "example.com", tab: "domains", pageSize: 10 }),

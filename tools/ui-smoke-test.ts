@@ -101,6 +101,7 @@ const api = Bun.spawn([process.execPath, "src/index.ts"], {
     PORT: String(apiPort),
     DB_PATH: path.join(tempDir, "ui.sqlite"),
     AUTH_SESSION_SECRET: "ui-smoke-secret-000000000000000000000",
+    DATAFORSEO_API_KEY: "",
   },
 });
 
@@ -214,6 +215,21 @@ try {
     }
     if (await page.getByText(/\b2840\b/).count()) {
       throw new Error("Main site flow exposes a raw location code.");
+    }
+
+    await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
+    await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
+    await page.getByRole("button", { name: /^Analyze target$/ }).click();
+    await page.getByText("External ranked-keyword dataset unavailable").waitFor();
+    await page.getByRole("tab", { name: /^Snapshot$/ }).click();
+    await page.getByRole("heading", { name: /^Snapshot$/ }).waitFor();
+    const organicKeywordsRow = await page.getByRole("row", { name: /Organic keywords/i }).textContent();
+    const normalizedOrganicKeywordsRow = (organicKeywordsRow || "").replace(/\s+/g, " ").trim();
+    if (!normalizedOrganicKeywordsRow.includes("Not available")) {
+      throw new Error(`Missing organic metric should render as unavailable, got: ${normalizedOrganicKeywordsRow}`);
+    }
+    if (/Organic keywords 0\b/.test(normalizedOrganicKeywordsRow)) {
+      throw new Error("Missing organic metric rendered as a measured zero.");
     }
 
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();

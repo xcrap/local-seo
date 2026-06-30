@@ -428,6 +428,18 @@ function formatNumber(value: unknown) {
   return Number.isFinite(number) ? new Intl.NumberFormat().format(number) : String(value);
 }
 
+function metricValue(...values: unknown[]) {
+  return values.find((value) => value !== null && value !== undefined && value !== "") ?? null;
+}
+
+function hasMetric(value: unknown) {
+  return value !== null && value !== undefined && value !== "";
+}
+
+function formatMetricStatus(value: unknown) {
+  return hasMetric(value) ? formatNumber(value) : "Not available";
+}
+
 function formatBytes(value: unknown) {
   const bytes = Number(value || 0);
   if (!Number.isFinite(bytes) || bytes <= 0) return "-";
@@ -2412,10 +2424,10 @@ function DomainPage({ project }: { project: Project }) {
             <StatsBand
               title="Connected organic dataset"
               items={[
-                { title: "Organic keywords", value: overview.organicKeywords || 0, icon: Search },
-                { title: "Organic traffic", value: overview.organicTraffic || 0, icon: BarChart3 },
-                { title: "Traffic value", value: overview.estimatedValue || 0, icon: Gauge },
-                { title: "Top pages", value: overview.topPages?.length || pages?.pages?.length || 0, icon: Globe2 },
+                { title: "Organic keywords", value: metricValue(overview.organicKeywords), icon: Search },
+                { title: "Organic traffic", value: metricValue(overview.organicTraffic), icon: BarChart3 },
+                { title: "Traffic value", value: metricValue(overview.estimatedValue), icon: Gauge },
+                { title: "Top pages", value: metricValue(pages?.pages?.length, overview.topPages?.length), icon: Globe2 },
               ]}
               columns="lg:grid-cols-4"
             />
@@ -2570,6 +2582,9 @@ function LocalOrganicPagesTable({ rows }: { rows: any[] }) {
 }
 
 function OrganicSnapshot({ result, target, keywordRows, pageRows }: { result: any; target: string; keywordRows: number; pageRows: number }) {
+  const organicKeywords = metricValue(result.organicKeywords);
+  const organicTraffic = metricValue(result.organicTraffic);
+  const estimatedValue = metricValue(result.estimatedValue);
   return (
     <ReportSection
       title="Snapshot"
@@ -2580,9 +2595,9 @@ function OrganicSnapshot({ result, target, keywordRows, pageRows }: { result: an
           { title: "Target", status: target || result.target || "-", tone: "good", text: "The selected site or competitor target analyzed in this run." },
           { title: "Keyword rows", status: formatNumber(keywordRows), tone: keywordRows ? "good" : "warn", text: "Rows returned by the real organic search dataset." },
           { title: "Page rows", status: formatNumber(pageRows), tone: pageRows ? "good" : "warn", text: "Top pages returned for this target." },
-          { title: "Organic keywords", status: formatNumber(result.organicKeywords || 0), tone: result.organicKeywords ? "good" : "warn", text: "Connected data-source metric. Blank or zero when no dataset is connected." },
-          { title: "Organic traffic", status: formatNumber(result.organicTraffic || 0), tone: result.organicTraffic ? "good" : "warn", text: "Estimate from the connected organic dataset." },
-          { title: "Traffic value", status: formatNumber(result.estimatedValue || 0), tone: result.estimatedValue ? "good" : "warn", text: "Estimate from the connected organic dataset." },
+          { title: "Organic keywords", status: formatMetricStatus(organicKeywords), tone: hasMetric(organicKeywords) ? "good" : "warn", text: "Metric returned by the connected organic dataset." },
+          { title: "Organic traffic", status: formatMetricStatus(organicTraffic), tone: hasMetric(organicTraffic) ? "good" : "warn", text: "Estimate from the connected organic dataset." },
+          { title: "Traffic value", status: formatMetricStatus(estimatedValue), tone: hasMetric(estimatedValue) ? "good" : "warn", text: "Estimate from the connected organic dataset." },
         ]}
       />
     </ReportSection>
@@ -2751,9 +2766,9 @@ function BacklinksPage({ project }: { project: Project }) {
             <StatsBand
               title="Connected backlink index"
               items={[
-                { title: "Backlinks", value: overview.backlinks || overview.summary?.backlinks || 0, icon: Link2 },
-                { title: "Ref. domains", value: overview.referringDomains || overview.summary?.referringDomains || 0, icon: Globe2 },
-                { title: "Dofollow %", value: overview.dofollowRatio || 0, icon: CheckCircle2 },
+                { title: "Backlinks", value: metricValue(overview.backlinks, overview.summary?.backlinks), icon: Link2 },
+                { title: "Ref. domains", value: metricValue(overview.referringDomains, overview.summary?.referringDomains), icon: Globe2 },
+                { title: "Dofollow %", value: metricValue(overview.dofollowRatio), icon: CheckCircle2 },
               ]}
               columns="lg:grid-cols-3"
             />
@@ -2952,8 +2967,9 @@ function LocalInternalGraphTable({ rows }: { rows: any[] }) {
 }
 
 function BacklinkSnapshot({ result, target, rows, tab }: { result: any; target: string; rows: number; tab: string }) {
-  const backlinks = result.backlinks || result.summary?.backlinks || 0;
-  const referringDomains = result.referringDomains || result.summary?.referringDomains || 0;
+  const backlinks = metricValue(result.backlinks, result.summary?.backlinks);
+  const referringDomains = metricValue(result.referringDomains, result.summary?.referringDomains);
+  const dofollowRatio = metricValue(result.dofollowRatio);
   return (
     <ReportSection
       title="Snapshot"
@@ -2963,9 +2979,9 @@ function BacklinkSnapshot({ result, target, rows, tab }: { result: any; target: 
         rows={[
           { title: "Target", status: target || result.target || "-", tone: "good", text: "The domain or URL analyzed in this run." },
           { title: "Visible rows", status: formatNumber(rows), tone: rows ? "good" : "warn", text: `Rows currently loaded in the ${tab} tab.` },
-          { title: "Backlinks", status: formatNumber(backlinks), tone: backlinks ? "good" : "warn", text: "Total backlinks from the connected index." },
-          { title: "Referring domains", status: formatNumber(referringDomains), tone: referringDomains ? "good" : "warn", text: "Unique linking domains from the connected index." },
-          { title: "Dofollow %", status: formatNumber(result.dofollowRatio || 0), tone: result.dofollowRatio ? "good" : "warn", text: "Dofollow ratio reported by the connected index." },
+          { title: "Backlinks", status: formatMetricStatus(backlinks), tone: hasMetric(backlinks) ? "good" : "warn", text: "Total backlinks from the connected index." },
+          { title: "Referring domains", status: formatMetricStatus(referringDomains), tone: hasMetric(referringDomains) ? "good" : "warn", text: "Unique linking domains from the connected index." },
+          { title: "Dofollow %", status: formatMetricStatus(dofollowRatio), tone: hasMetric(dofollowRatio) ? "good" : "warn", text: "Dofollow ratio reported by the connected index." },
           { title: "Source", status: sourceLabel(result.source), tone: sourceVariant(result.source) as any, text: result.warning || "Snapshot saved locally in SQLite." },
         ]}
       />
