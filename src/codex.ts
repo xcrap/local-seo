@@ -30,7 +30,7 @@ export const promptTemplates = [
     key: "seo.coach",
     label: "SEO coach",
     template:
-      "You are a local SEO coach. Given this project context, recommend the next 5 SEO moves with evidence and priority. Return concise markdown.\n\n{{context}}",
+      "You are a local SEO coach. Given this site context, recommend the next 5 SEO moves with evidence and priority. Return concise markdown.\n\n{{context}}",
   },
   {
     key: "keywords.cluster",

@@ -680,7 +680,7 @@ function LoginScreen({ setupRequired, onSuccess }: { setupRequired: boolean; onS
             <div>
               <CardTitle className="text-xl">Local SEO</CardTitle>
               <CardDescription>
-                {setupRequired ? "Create the single local admin." : "Sign in to your local workspace."}
+                {setupRequired ? "Create the single local admin." : "Sign in to your local SEO app."}
               </CardDescription>
             </div>
           </div>
@@ -783,7 +783,7 @@ function Workspace() {
             </div>
             <div>
               <div className="text-sm font-bold uppercase tracking-[0.18em]">Local SEO</div>
-              <div className="text-xs text-muted-foreground">SQLite workspace</div>
+              <div className="text-xs text-muted-foreground">Local SQLite</div>
             </div>
           </Link>
 
@@ -993,7 +993,7 @@ function Overview({
   return (
     <>
       <PageHeader
-        eyebrow="Site workspace"
+        eyebrow="Site overview"
         title={siteDisplayName(project)}
         description={project.domain ? "Reports, audits, crawl links, rankings, and Search Console use this site." : "Add a site to unlock scans, reports, rankings, and Search Console."}
         action={<Badge>{project.domain || "No site yet"}</Badge>}
@@ -1574,7 +1574,7 @@ function ProjectsPage({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit site</DialogTitle>
-            <DialogDescription>Changes apply to this local site workspace.</DialogDescription>
+            <DialogDescription>Changes apply to this saved site.</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitEdit}>
             <Field label="Site name"><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></Field>
@@ -5284,7 +5284,7 @@ export default function App() {
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Badge>Loading local workspace</Badge>
+        <Badge>Loading local data</Badge>
       </div>
     );
   }

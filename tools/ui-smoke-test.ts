@@ -181,6 +181,12 @@ try {
     if (await page.getByText("Workspace totals").count()) {
       throw new Error("Overview still renders the old metric-card totals section.");
     }
+    if (await page.getByText(/workspace/i).count()) {
+      throw new Error("Main site flow still exposes workspace wording.");
+    }
+    if (await page.getByText(/\b2840\b/).count()) {
+      throw new Error("Main site flow exposes a raw location code.");
+    }
 
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
     await page.getByRole("heading", { name: /^Links$/ }).waitFor();
