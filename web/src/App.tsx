@@ -247,7 +247,7 @@ function crawlPreferenceLabel(project?: Project | null) {
 
 function scanTargetDetail(project?: Project | null) {
   const candidates = scanTargetCandidates(project);
-  if (!candidates.length) return "Set a domain to scan.";
+  if (!candidates.length) return "Set a website address to scan.";
   if (candidates.length === 1) return crawlPreferenceLabel(project);
   return `${crawlPreferenceLabel(project)} · tries ${formatNumber(candidates.length)} targets: ${candidates.join(" -> ")}`;
 }
@@ -1323,7 +1323,7 @@ function Overview({
             ) : (
               <EmptyState
                 title="No audits yet"
-                text={project.domain ? "Start a technical scan for this site." : "Add a domain to start scanning."}
+                text={project.domain ? "Start a technical scan for this site." : "Add a website address to start scanning."}
                 action={
                   project.domain ? (
                     <Button onClick={scanSite} disabled={scanning}>
@@ -1698,7 +1698,7 @@ function ProjectsPage({
       <PageHeader
         eyebrow="Websites"
         title="Sites"
-        description="Add each website once. The selected site is used by scans, reports, crawl links, rankings, and Search Console."
+        description="A site is one saved website address plus its scan target preferences. The selected site feeds scans, reports, crawl links, rankings, and Search Console."
         action={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -1707,11 +1707,11 @@ function ProjectsPage({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add site</DialogTitle>
-                <DialogDescription>Add the website once, choose the crawl variant when needed, and start a local audit immediately.</DialogDescription>
+                <DialogDescription>Add the website once, choose exactly how it should be reached, and start a local audit immediately.</DialogDescription>
               </DialogHeader>
               <form className="space-y-4" onSubmit={submit}>
                 <Field label="Site name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Optional" /></Field>
-                <Field label="Domain"><Input value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="example.com" required /></Field>
+                <Field label="Website address"><Input value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="example.com" required /></Field>
                 <div className="space-y-2">
                   <div>
                     <h3 className="text-sm font-semibold">Search defaults</h3>
@@ -1774,7 +1774,7 @@ function ProjectsPage({
         <section className="rounded-md border border-primary/40 bg-background p-5">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">Start with a site scan</h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the domain once. The scan report opens automatically and stays saved locally.</p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the website address once. The scan report opens automatically and stays saved locally.</p>
           </div>
           <form className="space-y-4" onSubmit={submit}>
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
@@ -1810,7 +1810,7 @@ function ProjectsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Site</TableHead>
-                <TableHead>Scan targets</TableHead>
+                <TableHead>First scan target</TableHead>
                 <TableHead>Search defaults</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Status</TableHead>
@@ -1822,10 +1822,10 @@ function ProjectsPage({
                 <TableRow key={project.id} className={activeProjectId === project.id ? "bg-accent/35" : ""}>
                   <TableCell className="min-w-64">
                     <div className="font-medium">{project.name}</div>
-                    <div className="text-xs text-muted-foreground">{project.domain || "Add a domain"}</div>
+                    <div className="text-xs text-muted-foreground">{project.domain || "Add a website address"}</div>
                   </TableCell>
                   <TableCell className="min-w-56">
-                    <div className="font-medium">{preferredAuditUrl(project) || "Set domain"}</div>
+                    <div className="font-medium">{preferredAuditUrl(project) || "Set website address"}</div>
                     <div className="line-clamp-2 max-w-md break-all text-xs text-muted-foreground">{scanTargetDetail(project)}</div>
                   </TableCell>
                   <TableCell className="min-w-44">
@@ -1840,7 +1840,7 @@ function ProjectsPage({
                     <div className="flex justify-end gap-2">
                       {activeProjectId !== project.id ? (
                         <Button size="sm" variant="secondary" onClick={() => selectProject(project.id)}>
-                          Use
+                          Select site
                         </Button>
                       ) : null}
                       {project.domain ? (
@@ -1873,11 +1873,11 @@ function ProjectsPage({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit site</DialogTitle>
-            <DialogDescription>Changes apply to this saved site.</DialogDescription>
+            <DialogDescription>Changes apply to this saved website address and future scans.</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitEdit}>
             <Field label="Site name"><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></Field>
-            <Field label="Domain"><Input value={editForm.domain} onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })} /></Field>
+            <Field label="Website address"><Input value={editForm.domain} onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })} /></Field>
             <div className="space-y-2">
               <div>
                 <h3 className="text-sm font-semibold">Search defaults</h3>

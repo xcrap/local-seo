@@ -280,7 +280,8 @@ try {
 
     await page.getByRole("link", { name: /Sites/i }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
-    await page.getByRole("columnheader", { name: /Scan targets/i }).waitFor();
+    await page.getByText("A site is one saved website address").waitFor();
+    await page.getByRole("columnheader", { name: /First scan target/i }).waitFor();
     await page.getByRole("columnheader", { name: /^Search defaults$/ }).waitFor();
     await page.getByText(/tries 2 targets/i).first().waitFor();
     await page.getByRole("button", { name: /Edit Fixture Site/i }).click();
@@ -355,7 +356,7 @@ try {
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "Portuguese" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "HTTPS only" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "With www" }).first().waitFor();
-    await addSiteDialog.getByLabel("Domain").fill("second.test");
+    await addSiteDialog.getByLabel("Website address").fill("second.test");
     await Promise.all([
       page.waitForResponse((response) => response.url().includes("/api/sites") && response.request().method() === "POST"),
       addSiteDialog.getByRole("button", { name: /^Save site only$/ }).click(),
