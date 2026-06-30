@@ -1339,7 +1339,7 @@ function Overview({
         </section>
         <section className="rounded-md border bg-background">
           <div className="border-b px-5 py-4">
-            <h2 className="text-lg font-semibold">Recent Codex jobs</h2>
+            <h2 className="text-lg font-semibold">Codex job history</h2>
             <p className="mt-1 text-sm text-muted-foreground">Local AI work runs through the Codex CLI with medium reasoning.</p>
           </div>
           <div className="p-5">
@@ -1446,7 +1446,7 @@ function SiteCommandCenter({
       key: "ai",
       area: "AI lab",
       status: summary?.latestAiJobs?.length ? "has jobs" : "ready",
-      evidence: `${formatNumber(summary?.latestAiJobs?.length || 0)} recent Codex jobs · runs locally with medium reasoning`,
+      evidence: `${formatNumber(summary?.latestAiJobs?.length || 0)} saved Codex jobs · runs locally with medium reasoning`,
       action: <Button asChild size="sm" variant="secondary"><Link to="/ai"><Bot /> Open</Link></Button>,
       secondary: null,
     },
@@ -3326,7 +3326,7 @@ function BrandLookupPage({ project }: { project: Project }) {
         </ReportSection>
         <div className="space-y-6">
           {result ? <BrandLookupResult result={result} /> : <EmptyState title="No lookup yet" text="Run a brand lookup to save an AI visibility snapshot." />}
-          <HistoryList title="Recent lookups" rows={runs} labelKey="query" />
+          <HistoryList title="Lookup history" rows={runs} labelKey="query" />
         </div>
       </div>
     </>
@@ -3469,7 +3469,7 @@ function PromptExplorerPage({ project }: { project: Project }) {
         </ReportSection>
         <div className="space-y-6">
           {result ? <PromptResult result={result} /> : <EmptyState title="No prompt run" text="Run a prompt to compare AI answer surfaces." />}
-          <HistoryList title="Recent prompts" rows={runs} labelKey="prompt" />
+          <HistoryList title="Prompt history" rows={runs} labelKey="prompt" />
         </div>
       </div>
     </>
@@ -3535,7 +3535,7 @@ function HistoryList({ title, rows, labelKey }: { title: string; rows: any[]; la
   return (
     <ReportSection title={title}>
       <div className="space-y-2">
-        {rows.length ? rows.slice(0, 6).map((row) => (
+        {rows.length ? rows.map((row) => (
           <div key={row.id} className="rounded-md border bg-background p-3 text-sm">
             <div className="truncate font-medium">{row[labelKey]}</div>
             <div className="text-xs text-muted-foreground">{row.source} · {row.created_at}</div>

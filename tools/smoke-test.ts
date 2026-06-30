@@ -266,6 +266,9 @@ try {
   if (webAppClient.includes(".slice(0, 25);")) {
     throw new Error("Local organic crawl evidence should not silently cap audit-derived page rows.");
   }
+  if (webAppClient.includes("rows.slice(0, 6)")) {
+    throw new Error("Local history widgets should not silently cap saved history rows.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",
@@ -579,6 +582,13 @@ try {
         throw new Error("AI lab should show every saved local Codex job until the user deletes it.");
       }
     }
+    const dashboardWithAiJobs = await request(`/api/dashboard?siteId=${project.id}`);
+    const dashboardAiJobIds = new Set((dashboardWithAiJobs.latestAiJobs || []).map((row: any) => row.id));
+    for (const id of insertedAiJobIds) {
+      if (!dashboardAiJobIds.has(id)) {
+        throw new Error("Dashboard should show every saved local Codex job until the user deletes it.");
+      }
+    }
   } finally {
     aiHistoryDb.close();
   }
@@ -601,6 +611,116 @@ try {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, prompt: "best seo software", highlightBrand: "Example" }),
   });
+  const localHistoryDb = new Database(serverDbPath);
+  try {
+    const insertDomainSnapshot = localHistoryDb.prepare(`
+      INSERT INTO domain_snapshots (id, project_id, target, source, result_json, created_at)
+      VALUES (?, ?, ?, 'smoke-history', '{}', ?)
+    `);
+    const insertBacklinkSnapshot = localHistoryDb.prepare(`
+      INSERT INTO backlink_snapshots (id, project_id, target, source, result_json, created_at)
+      VALUES (?, ?, ?, 'smoke-history', '{}', ?)
+    `);
+    const insertSerpRun = localHistoryDb.prepare(`
+      INSERT INTO serp_runs (id, project_id, keyword, target, location_code, language_code, source, result_json, created_at)
+      VALUES (?, ?, ?, 'example.com', 2840, 'en', 'smoke-history', '{}', ?)
+    `);
+    const insertBrandRun = localHistoryDb.prepare(`
+      INSERT INTO brand_lookup_runs (id, project_id, query, competitors, source, result_json, created_at)
+      VALUES (?, ?, ?, '[]', 'smoke-history', '{}', ?)
+    `);
+    const insertPromptRun = localHistoryDb.prepare(`
+      INSERT INTO prompt_explorer_runs (id, project_id, prompt, highlight_brand, models, source, result_json, created_at)
+      VALUES (?, ?, ?, 'Example', '[]', 'smoke-history', '{}', ?)
+    `);
+    const insertSavedKeyword = localHistoryDb.prepare(`
+      INSERT INTO saved_keywords (id, project_id, keyword, location_code, language_code, intent, source, created_at)
+      VALUES (?, ?, ?, 2840, 'en', 'manual', 'smoke-history', ?)
+    `);
+    const trackerId = randomUUID();
+    localHistoryDb
+      .prepare(`
+        INSERT INTO rank_trackers (id, project_id, domain, location_code, language_code, created_at, updated_at)
+        VALUES (?, ?, 'example.com', 2840, 'en', '2026-06-30 15:00:00', '2026-06-30 15:00:00')
+      `)
+      .run(trackerId, project.id);
+    const insertRankRun = localHistoryDb.prepare(`
+      INSERT INTO rank_runs (id, tracker_id, status, message, started_at, finished_at)
+      VALUES (?, ?, 'completed', 'smoke-history', ?, ?)
+    `);
+    const insertedHistoryIds: Record<string, string[]> = {
+      domain: [],
+      backlink: [],
+      serp: [],
+      brand: [],
+      prompt: [],
+      keyword: [],
+      rankRun: [],
+    };
+    for (let index = 0; index < 30; index += 1) {
+      const timestamp = `2026-06-30 15:${String(index).padStart(2, "0")}:00`;
+      const domainId = randomUUID();
+      const backlinkId = randomUUID();
+      const serpId = randomUUID();
+      const brandId = randomUUID();
+      const promptId = randomUUID();
+      const keywordId = randomUUID();
+      const rankRunId = randomUUID();
+      insertedHistoryIds.domain.push(domainId);
+      insertedHistoryIds.backlink.push(backlinkId);
+      insertedHistoryIds.serp.push(serpId);
+      insertedHistoryIds.brand.push(brandId);
+      insertedHistoryIds.prompt.push(promptId);
+      insertedHistoryIds.keyword.push(keywordId);
+      insertedHistoryIds.rankRun.push(rankRunId);
+      insertDomainSnapshot.run(domainId, project.id, `domain-history-${index}.example`, timestamp);
+      insertBacklinkSnapshot.run(backlinkId, project.id, `backlink-history-${index}.example`, timestamp);
+      insertSerpRun.run(serpId, project.id, `serp history ${index}`, timestamp);
+      insertBrandRun.run(brandId, project.id, `Brand history ${index}`, timestamp);
+      insertPromptRun.run(promptId, project.id, `Prompt history ${index}`, timestamp);
+      insertSavedKeyword.run(keywordId, project.id, `smoke history keyword ${index}`, timestamp);
+      insertRankRun.run(rankRunId, trackerId, timestamp, timestamp);
+    }
+    const historyChecks = [
+      { ids: insertedHistoryIds.domain, rows: await request(`/api/sites/${project.id}/domain-snapshots`), label: "organic research" },
+      { ids: insertedHistoryIds.backlink, rows: await request(`/api/sites/${project.id}/backlink-snapshots`), label: "backlink" },
+      { ids: insertedHistoryIds.serp, rows: await request(`/api/sites/${project.id}/serp`), label: "SERP" },
+      { ids: insertedHistoryIds.brand, rows: await request(`/api/sites/${project.id}/brand-lookup`), label: "brand lookup" },
+      { ids: insertedHistoryIds.prompt, rows: await request(`/api/sites/${project.id}/prompt-explorer`), label: "prompt explorer" },
+    ];
+    for (const check of historyChecks) {
+      const rowIds = new Set((check.rows || []).map((row: any) => row.id));
+      for (const id of check.ids) {
+        if (!rowIds.has(id)) {
+          throw new Error(`${check.label} history should show every saved local row until the user deletes it.`);
+        }
+      }
+    }
+    const siteSummaryWithFullHistory = await request(`/api/sites/${project.id}`);
+    const summaryChecks = [
+      { ids: insertedHistoryIds.keyword, rows: siteSummaryWithFullHistory.savedKeywords, label: "saved keyword summary" },
+      { ids: insertedHistoryIds.domain, rows: siteSummaryWithFullHistory.domainSnapshots, label: "organic summary" },
+      { ids: insertedHistoryIds.backlink, rows: siteSummaryWithFullHistory.backlinkSnapshots, label: "backlink summary" },
+    ];
+    for (const check of summaryChecks) {
+      const rowIds = new Set((check.rows || []).map((row: any) => row.id));
+      for (const id of check.ids) {
+        if (!rowIds.has(id)) {
+          throw new Error(`${check.label} should expose every saved local row until the user deletes it.`);
+        }
+      }
+    }
+    const trackerRows = await request(`/api/sites/${project.id}/rank-trackers`);
+    const smokeTracker = (trackerRows || []).find((row: any) => row.id === trackerId);
+    const rankRunIds = new Set((smokeTracker?.runs || []).map((row: any) => row.id));
+    for (const id of insertedHistoryIds.rankRun) {
+      if (!rankRunIds.has(id)) {
+        throw new Error("Rank tracker history should expose every saved local run until the user deletes it.");
+      }
+    }
+  } finally {
+    localHistoryDb.close();
+  }
   const audit = await request("/api/audits", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, url: "https://example.com" }),

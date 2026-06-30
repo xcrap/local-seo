@@ -706,7 +706,7 @@ export function listRankTrackers(projectId: string) {
       tracker.id,
     ]),
     runs: all<any>(
-      "SELECT * FROM rank_runs WHERE tracker_id = ? ORDER BY started_at DESC LIMIT 12",
+      "SELECT * FROM rank_runs WHERE tracker_id = ? ORDER BY started_at DESC",
       [tracker.id],
     ),
     latest: all<any>(
@@ -1249,7 +1249,7 @@ export async function getDomainPagesPage(input: {
 
 export function listDomainSnapshots(projectId: string) {
   return all<any>(
-    "SELECT * FROM domain_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 25",
+    "SELECT * FROM domain_snapshots WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
   ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
 }
@@ -1413,7 +1413,7 @@ export async function getBacklinksProfile(input: {
 
 export function listBacklinkSnapshots(projectId: string) {
   return all<any>(
-    "SELECT * FROM backlink_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 25",
+    "SELECT * FROM backlink_snapshots WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
   ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
 }
@@ -1585,7 +1585,7 @@ export async function getSerpAnalysis(input: {
 
 export function listSerpRuns(projectId: string) {
   return all<any>(
-    "SELECT * FROM serp_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT 25",
+    "SELECT * FROM serp_runs WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
   ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
 }
@@ -1678,7 +1678,7 @@ export async function brandLookup(input: {
 
 export function listBrandLookupRuns(projectId: string) {
   return all<any>(
-    "SELECT * FROM brand_lookup_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT 25",
+    "SELECT * FROM brand_lookup_runs WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
   ).map((row) => ({
     ...row,
@@ -1786,7 +1786,7 @@ export async function promptExplorer(input: {
 
 export function listPromptExplorerRuns(projectId: string) {
   return all<any>(
-    "SELECT * FROM prompt_explorer_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT 25",
+    "SELECT * FROM prompt_explorer_runs WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
   ).map((row) => ({
     ...row,
@@ -4001,7 +4001,7 @@ export function dashboardSummary(projectId?: string) {
       latestGscImport: null,
       latestAudits: [],
       allAudits: [],
-      latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT 5"),
+      latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC"),
     };
   }
   const latestGscImport = get<any>(
@@ -4053,7 +4053,7 @@ export function dashboardSummary(projectId?: string) {
       : null,
     latestAudits: listAudits(project.id),
     allAudits: listAllAudits(),
-    latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT 5"),
+    latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC"),
   };
 }
 
@@ -4062,15 +4062,15 @@ export function projectSummary(projectId: string) {
   if (!project) throw new Error("Site not found.");
   return {
     project,
-    savedKeywords: listSavedKeywords(projectId).slice(0, 50),
+    savedKeywords: listSavedKeywords(projectId),
     rankTrackers: listRankTrackers(projectId),
     audits: listAudits(projectId),
     domainSnapshots: all<any>(
-      "SELECT * FROM domain_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 10",
+      "SELECT * FROM domain_snapshots WHERE project_id = ? ORDER BY created_at DESC",
       [projectId],
     ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) })),
     backlinkSnapshots: all<any>(
-      "SELECT * FROM backlink_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 10",
+      "SELECT * FROM backlink_snapshots WHERE project_id = ? ORDER BY created_at DESC",
       [projectId],
     ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) })),
     serpRuns: listSerpRuns(projectId),
