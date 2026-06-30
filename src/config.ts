@@ -26,6 +26,11 @@ export function getConfigValue(key: string): string {
   return row?.value?.trim() || "";
 }
 
+export function getStoredConfigValue(key: string): string {
+  const row = get<ConfigRow>("SELECT * FROM app_config WHERE key = ?", [key]);
+  return row?.value?.trim() || "";
+}
+
 export function setConfigValue(key: string, value: string) {
   run(
     `
@@ -54,16 +59,24 @@ export function listPublicConfig() {
     "default_crawl_protocol",
     "default_crawl_host",
   ];
+  const appPreferenceKeys = new Set([
+    "codex_model",
+    "codex_reasoning_effort",
+    "default_location_code",
+    "default_language_code",
+    "default_crawl_protocol",
+    "default_crawl_host",
+  ]);
   return Object.fromEntries(
     keys.map((key) => {
-      const value = getConfigValue(key);
+      const value = appPreferenceKeys.has(key) ? getStoredConfigValue(key) : getConfigValue(key);
       return [key, SECRET_KEYS.has(key) ? Boolean(value) : value];
     }),
   );
 }
 
 export function codexModel() {
-  return getConfigValue("codex_model") || process.env.CODEX_MODEL || "gpt-5.5";
+  return getConfigValue("codex_model") || process.env.CODEX_MODEL || "";
 }
 
 export function codexReasoningEffort() {

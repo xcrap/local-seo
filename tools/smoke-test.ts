@@ -7,7 +7,16 @@ const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
 process.env.DB_PATH = path.join(tempDir, "scope.sqlite");
 process.env.DATAFORSEO_API_KEY = "";
+process.env.CODEX_MODEL = "";
+process.env.CODEX_REASONING_EFFORT = "";
 const { sameSiteUrl } = await import("../src/seo");
+const { codexModel, codexReasoningEffort } = await import("../src/config");
+if (codexModel() !== "") {
+  throw new Error("Codex should use the local CLI default model unless an override is configured.");
+}
+if (codexReasoningEffort() !== "medium") {
+  throw new Error("Codex reasoning should default to medium.");
+}
 if (!sameSiteUrl("https://www.waka.pt/about/", "https://waka.pt")) {
   throw new Error("Root and www variants should share audit scope.");
 }

@@ -6015,7 +6015,7 @@ function SettingsPage() {
     const data = await api.config();
     setConfig(data);
     setForm({
-      codex_model: data.codex_model || "gpt-5.5",
+      codex_model: data.codex_model || "",
       codex_reasoning_effort: data.codex_reasoning_effort || "medium",
       default_location_code: defaultLocationCodeFromConfig(data),
       default_language_code: defaultLanguageCodeFromConfig(data),
@@ -6085,10 +6085,10 @@ function SettingsPage() {
             <div className="border-t pt-5">
               <div className="mb-3">
                 <h3 className="font-semibold">Codex defaults</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Local AI jobs use these app preferences.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Local AI jobs use medium reasoning. Leave the model empty to use your Codex CLI default.</p>
               </div>
               <div className="space-y-4">
-                <Field label="Model"><Input value={form.codex_model || ""} onChange={(e) => setForm({ ...form, codex_model: e.target.value })} /></Field>
+                <Field label="Model override"><Input value={form.codex_model || ""} onChange={(e) => setForm({ ...form, codex_model: e.target.value })} placeholder="Codex CLI default" /></Field>
                 <Field label="Reasoning">
                   <Select value={form.codex_reasoning_effort || "medium"} onValueChange={(value) => setForm({ ...form, codex_reasoning_effort: value })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>

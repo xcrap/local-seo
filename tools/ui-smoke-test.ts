@@ -310,6 +310,10 @@ try {
     if (await page.getByText(/API key|ENV|Environment variables/i).count()) {
       throw new Error("Settings page exposes secret/env configuration copy.");
     }
+    await page.getByPlaceholder("Codex CLI default").waitFor();
+    if (await page.locator('input[value="gpt-5.5"]').count()) {
+      throw new Error("Settings page should not force a hard-coded Codex model override.");
+    }
     const appPreferences = page.locator("section", { hasText: "App preferences" });
     await appPreferences.getByRole("combobox").nth(0).click();
     await page.getByRole("option", { name: "Portugal" }).click();
