@@ -332,6 +332,13 @@ migrate(
   `,
 );
 
+migrate(
+  "008_delete_placeholder_sites",
+  `
+  DELETE FROM projects WHERE domain = '' AND name = 'Add your site';
+  `,
+);
+
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];
 }

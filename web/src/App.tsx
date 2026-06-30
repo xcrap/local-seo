@@ -258,13 +258,9 @@ function scanTargetShortDetail(project?: Project | null) {
   return `${crawlPreferenceLabel(project)} · tries ${formatNumber(candidates.length)} targets`;
 }
 
-function isPlaceholderSite(project?: Project | null) {
-  return Boolean(project && !project.domain && project.name === "Add your site");
-}
-
 function siteDisplayName(project?: Project | null) {
   if (!project) return "No site";
-  return isPlaceholderSite(project) ? "No site yet" : project.name;
+  return project.name;
 }
 
 function ActiveSiteSelect({
@@ -941,13 +937,18 @@ function Workspace() {
     () => projects.find((project) => project.id === activeProjectId) || projects[0],
     [projects, activeProjectId],
   );
-  const visibleSites = useMemo(() => projects.filter((project) => !isPlaceholderSite(project)), [projects]);
 
   async function loadProjects() {
     const rows = await api.projects();
     setProjects(rows);
+    if (rows.length === 0) {
+      setActiveProjectId("");
+      localStorage.removeItem(activeSiteStorageKey);
+      localStorage.removeItem(legacyProjectStorageKey);
+      return;
+    }
     if (rows.length > 0 && !rows.some((project) => project.id === activeProjectId)) {
-      const nextActive = rows.find((project) => !isPlaceholderSite(project)) || rows[0];
+      const nextActive = rows[0];
       setActiveProjectId(nextActive.id);
       localStorage.setItem(activeSiteStorageKey, nextActive.id);
       localStorage.removeItem(legacyProjectStorageKey);
@@ -1008,7 +1009,7 @@ function Workspace() {
 
           <div className="mt-6 space-y-2">
             <Label>Active site</Label>
-            <ActiveSiteSelect sites={visibleSites} activeSiteId={activeProject?.id || ""} onSelect={selectProject} />
+            <ActiveSiteSelect sites={projects} activeSiteId={activeProject?.id || ""} onSelect={selectProject} />
           </div>
 
           {activeProject?.domain ? (
@@ -1060,7 +1061,7 @@ function Workspace() {
             </Button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <ActiveSiteSelect sites={visibleSites} activeSiteId={activeProject?.id || ""} onSelect={selectProject} />
+            <ActiveSiteSelect sites={projects} activeSiteId={activeProject?.id || ""} onSelect={selectProject} />
             {activeProject?.domain ? (
               <Button size="sm" onClick={scanActiveSite} disabled={shellScanning}>
                 <FileSearch /> {shellScanning ? "Starting" : "Scan"}
@@ -1560,7 +1561,6 @@ function ProjectsPage({
   const [scanningSiteId, setScanningSiteId] = useState("");
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
   const navigate = useNavigate();
-  const visibleSites = projects.filter((project) => !isPlaceholderSite(project));
 
   useEffect(() => {
     let cancelled = false;
@@ -1750,11 +1750,39 @@ function ProjectsPage({
         }
       />
       {error && <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p>}
-      {visibleSites.length === 0 ? (
+      {projects.length === 0 ? (
         <section className="rounded-md border border-primary/40 bg-background p-5">
-          <h2 className="text-lg font-semibold">No sites yet</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Add one domain and start the first local audit.</p>
-          <Button className="mt-4" onClick={() => setOpen(true)}><FileSearch /> Add site and scan</Button>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold">Start with a site scan</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the domain once. The scan report opens automatically and stays saved locally.</p>
+          </div>
+          <form className="space-y-4" onSubmit={submit}>
+            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+              <Input value={form.domain} onChange={(event) => setForm({ ...form, domain: event.target.value })} placeholder="example.com" required />
+              <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Site name (optional)" />
+              <Button type="submit" disabled={Boolean(creatingAction)}>
+                <FileSearch /> {creatingAction === "scan" ? "Starting scan" : "Add site and scan"}
+              </Button>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Protocol">
+                <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Project["crawl_protocol"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Hostname">
+                <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Project["crawl_host"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          </form>
         </section>
       ) : (
         <section className="rounded-md border bg-background">
@@ -1771,7 +1799,7 @@ function ProjectsPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleSites.map((project) => (
+              {projects.map((project) => (
                 <TableRow key={project.id} className={activeProjectId === project.id ? "bg-accent/35" : ""}>
                   <TableCell className="min-w-64">
                     <div className="font-medium">{project.name}</div>

@@ -210,6 +210,13 @@ try {
     body: JSON.stringify({ email: "admin@example.com", password: "local-password-123" }),
   });
   const dashboard = await request("/api/dashboard");
+  if (dashboard.activeProject !== null || dashboard.projects?.length !== 0) {
+    throw new Error(`Fresh setup should not create a placeholder site: ${JSON.stringify(dashboard)}`);
+  }
+  const initialSites = await request("/api/sites");
+  if (initialSites.length !== 0) {
+    throw new Error(`Fresh setup should keep the site list empty until the user adds a real site: ${JSON.stringify(initialSites)}`);
+  }
   const project = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),
@@ -530,7 +537,7 @@ try {
   });
   const toolNames = new Set((mcp.result?.tools || []).map((tool: any) => tool.name));
   if (
-    !dashboard.activeProject ||
+    !dashboardWithGsc.activeProject ||
     !Array.isArray(mcp.result?.tools) ||
     !toolNames.has("list_sites") ||
     !toolNames.has("scan_site") ||

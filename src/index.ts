@@ -42,7 +42,6 @@ import {
   deleteProject,
   deleteSavedKeywordTag,
   domainOverview,
-  ensureDefaultProject,
   exportSavedKeywordsCsv,
   getAudit,
   getBacklinksProfile,
@@ -160,7 +159,6 @@ app.post(
       path: "/",
       maxAge: authConfig.rememberSessionTtlSeconds,
     });
-    ensureDefaultProject();
     return c.json({ success: true, user });
   }),
 );
@@ -185,7 +183,6 @@ app.post(
       path: "/",
       maxAge: ttl,
     });
-    ensureDefaultProject();
     return c.json({ success: true, user: publicUser(user) });
   }),
 );

@@ -216,28 +216,11 @@ async function searchWeb(query: string, limit: number) {
 }
 
 export function listProjects() {
-  const rows = all<Project>("SELECT * FROM projects ORDER BY created_at DESC");
-  if (rows.length > 0) return rows;
-  ensureDefaultProject();
   return all<Project>("SELECT * FROM projects ORDER BY created_at DESC");
 }
 
 export function getProject(projectId: string) {
   return get<Project>("SELECT * FROM projects WHERE id = ?", [projectId]);
-}
-
-export function ensureDefaultProject() {
-  const existing = get<Project>(
-    "SELECT * FROM projects ORDER BY created_at ASC LIMIT 1",
-  );
-  if (existing) return existing;
-  return createProject({
-    name: "Add your site",
-    domain: "",
-    notes: "",
-    locationCode: 2840,
-    languageCode: "en",
-  });
 }
 
 export function createProject(input: {
@@ -260,31 +243,6 @@ export function createProject(input: {
     input.crawlProtocol ?? input.crawl_protocol ?? getConfigValue("default_crawl_protocol"),
   );
   const crawlHost = normalizeCrawlHost(input.crawlHost ?? input.crawl_host ?? getConfigValue("default_crawl_host"));
-  const placeholder = domain
-    ? get<Project>(
-        "SELECT * FROM projects WHERE domain = '' AND name = 'Add your site' ORDER BY created_at ASC LIMIT 1",
-      )
-    : undefined;
-  if (placeholder) {
-    run(
-      `
-      UPDATE projects
-      SET name = ?, domain = ?, notes = ?, location_code = ?, language_code = ?, crawl_protocol = ?, crawl_host = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      [
-        name,
-        domain,
-        input.notes?.trim() || "",
-        locationCode,
-        languageCode,
-        crawlProtocol,
-        crawlHost,
-        placeholder.id,
-      ],
-    );
-    return getProject(placeholder.id)!;
-  }
   run(
     `
     INSERT INTO projects (id, name, domain, notes, location_code, language_code, crawl_protocol, crawl_host)
@@ -3998,14 +3956,31 @@ async function runLocalAudit(auditId: string) {
 }
 
 export function dashboardSummary(projectId?: string) {
-  const project = projectId ? getProject(projectId) || ensureDefaultProject() : ensureDefaultProject();
+  const projects = listProjects();
+  const project = projectId ? getProject(projectId) || projects[0] : projects[0];
+  if (!project) {
+    return {
+      activeProject: null,
+      projects: [],
+      savedKeywordCount: 0,
+      trackerCount: 0,
+      auditCount: 0,
+      serpRunCount: 0,
+      brandLookupCount: 0,
+      promptExplorerCount: 0,
+      gscImportCount: 0,
+      latestGscImport: null,
+      latestAudits: [],
+      latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT 5"),
+    };
+  }
   const latestGscImport = get<any>(
     "SELECT * FROM gsc_imports WHERE project_id = ? ORDER BY created_at DESC LIMIT 1",
     [project.id],
   );
   return {
     activeProject: project,
-    projects: listProjects(),
+    projects,
     savedKeywordCount: get<{ count: number }>(
       "SELECT count(*) AS count FROM saved_keywords WHERE project_id = ?",
       [project.id],
