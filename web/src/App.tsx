@@ -516,6 +516,17 @@ function maxCount(...values: unknown[]) {
   return numbers.length ? Math.max(...numbers) : 0;
 }
 
+function hasIndexabilityEvidence(page: any) {
+  return typeof page?.indexable === "boolean";
+}
+
+function IndexabilityBadge({ page }: { page: any }) {
+  if (!hasIndexabilityEvidence(page)) {
+    return <Badge variant="outline">Unknown</Badge>;
+  }
+  return <Badge variant={page.indexable ? "good" : "bad"}>{page.indexable ? "Yes" : "No"}</Badge>;
+}
+
 function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
   const pages = Array.isArray(result.pages) ? result.pages : [];
   const links = Array.isArray(result.links) ? result.links : [];
@@ -525,7 +536,8 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
   const assets = Array.isArray(result.assets) ? result.assets : [];
   const sitemapUrls = Array.isArray(result.sitemap?.urls) ? result.sitemap.urls : [];
   const pageCount = maxCount(summary.pages, audit?.pages_crawled, pages.length);
-  const indexablePages = maxCount(summary.indexablePages, pages.filter((page: any) => page.indexable).length);
+  const indexabilityKnownPages = pages.filter(hasIndexabilityEvidence).length;
+  const indexablePages = maxCount(summary.indexablePages, pages.filter((page: any) => page.indexable === true).length);
   const nonIndexablePages = maxCount(summary.nonIndexablePages, pages.filter((page: any) => page.indexable === false).length);
   const checkedLinks = maxCount(summary.checkedLinks, links.length);
   const checkedImages = maxCount(summary.checkedImages, images.length);
@@ -535,6 +547,7 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
     pages: pageCount,
     indexablePages,
     nonIndexablePages,
+    unknownIndexabilityPages: Math.max(0, pageCount - indexabilityKnownPages),
     sitemapUrls: maxCount(summary.sitemapUrls, sitemapUrls.length, pages.filter((page: any) => page.sitemapListed).length),
     pagesMissingFromSitemap: maxCount(summary.pagesMissingFromSitemap, pages.filter((page: any) => page.sitemapListed === false).length),
     noindexPagesInSitemap: maxCount(summary.noindexPagesInSitemap, pages.filter((page: any) => page.sitemapListed && page.indexable === false).length),
@@ -851,6 +864,8 @@ function Overview({
   const [scanError, setScanError] = useState("");
   const [firstDomain, setFirstDomain] = useState("");
   const [firstName, setFirstName] = useState("");
+  const [firstCrawlProtocol, setFirstCrawlProtocol] = useState<Project["crawl_protocol"]>("auto");
+  const [firstCrawlHost, setFirstCrawlHost] = useState<Project["crawl_host"]>("auto");
   const [firstScanError, setFirstScanError] = useState("");
   const navigate = useNavigate();
 
@@ -894,6 +909,8 @@ function Overview({
         domain,
         locationCode: project.location_code || 2840,
         languageCode: project.language_code || "en",
+        crawlProtocol: firstCrawlProtocol,
+        crawlHost: firstCrawlHost,
       } as any);
       selectProject(created.id);
       const result = await api.scanProject(created.id);
@@ -936,12 +953,32 @@ function Overview({
             <h2 className="text-lg font-semibold">Start with a site scan</h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the domain once. The scan report opens automatically and stays saved locally.</p>
           </div>
-          <form className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]" onSubmit={createSiteAndScan}>
-            <Input value={firstDomain} onChange={(event) => setFirstDomain(event.target.value)} placeholder="example.com" required />
-            <Input value={firstName} onChange={(event) => setFirstName(event.target.value)} placeholder="Site name (optional)" />
-            <Button type="submit" disabled={scanning}>
-              <FileSearch /> {scanning ? "Starting" : "Add site and scan"}
-            </Button>
+          <form className="space-y-3" onSubmit={createSiteAndScan}>
+            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+              <Input value={firstDomain} onChange={(event) => setFirstDomain(event.target.value)} placeholder="example.com" required />
+              <Input value={firstName} onChange={(event) => setFirstName(event.target.value)} placeholder="Site name (optional)" />
+              <Button type="submit" disabled={scanning}>
+                <FileSearch /> {scanning ? "Starting" : "Add site and scan"}
+              </Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Protocol">
+                <Select value={firstCrawlProtocol} onValueChange={(value) => setFirstCrawlProtocol(value as Project["crawl_protocol"])}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Hostname">
+                <Select value={firstCrawlHost} onValueChange={(value) => setFirstCrawlHost(value as Project["crawl_host"])}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
           </form>
           {firstScanError && <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{firstScanError}</p>}
         </section>
@@ -997,19 +1034,7 @@ function Overview({
           </div>
         </section>
       )}
-      <StatsBand
-        title="Workspace totals"
-        text="Everything here is stored locally for the selected site."
-        items={[
-          { title: "Saved keywords", value: summary?.savedKeywordCount || 0, icon: Search },
-          { title: "Trackers", value: summary?.trackerCount || 0, icon: Target },
-          { title: "Audits", value: summary?.auditCount || 0, icon: FileSearch },
-          { title: "SERP runs", value: summary?.serpRunCount || 0, icon: Activity },
-          { title: "Brand lookups", value: summary?.brandLookupCount || 0, icon: Sparkles },
-          { title: "Prompt runs", value: summary?.promptExplorerCount || 0, icon: Bot },
-          { title: "AI jobs", value: summary?.latestAiJobs?.length || 0, icon: Bot },
-        ]}
-      />
+      <SiteCommandCenter project={project} summary={summary} scanning={scanning} onScan={scanSite} />
       <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]">
         <section className="rounded-md border bg-background">
           <div className="border-b px-5 py-4">
@@ -1055,6 +1080,126 @@ function Overview({
         </section>
       </div>
     </>
+  );
+}
+
+function SiteCommandCenter({
+  project,
+  summary,
+  scanning,
+  onScan,
+}: {
+  project: Project;
+  summary: any;
+  scanning: boolean;
+  onScan: () => void;
+}) {
+  const latestAudit = summary?.latestAudits?.[0];
+  const latestAuditSummary = latestAudit?.result?.summary || {};
+  const rows = [
+    {
+      key: "audit",
+      area: "Technical audit",
+      status: latestAudit ? latestAudit.status : "not run",
+      evidence: latestAudit
+        ? `${formatNumber(latestAudit.pages_crawled)} pages · ${formatNumber(latestAudit.issue_count)} issues · ${formatNumber(latestAuditSummary.checkedLinks || 0)} links checked`
+        : "No crawl evidence saved yet.",
+      action: project.domain ? (
+        <Button size="sm" onClick={onScan} disabled={scanning}>
+          <FileSearch /> {scanning ? "Starting" : "Scan site"}
+        </Button>
+      ) : (
+        <Button asChild size="sm"><Link to="/sites"><Plus /> Add site</Link></Button>
+      ),
+      secondary: latestAudit ? (
+        <Button asChild size="sm" variant="outline">
+          <Link to={`/audits/${latestAudit.id}`}><FileSearch /> Open report</Link>
+        </Button>
+      ) : null,
+    },
+    {
+      key: "organic",
+      area: "Organic research",
+      status: summary?.savedKeywordCount ? "has keywords" : "ready",
+      evidence: `${formatNumber(summary?.savedKeywordCount || 0)} saved keywords · local crawl pages feed this screen`,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/domain"><Globe2 /> Open</Link></Button>,
+      secondary: null,
+    },
+    {
+      key: "links",
+      area: "Links",
+      status: latestAudit ? "local graph" : "needs scan",
+      evidence: latestAudit
+        ? `${formatNumber(latestAuditSummary.linkTags || 0)} link tags · ${formatNumber(latestAuditSummary.brokenLinks || 0)} broken`
+        : "Run a site scan to build the local link graph.",
+      action: <Button asChild size="sm" variant="secondary"><Link to="/backlinks"><Link2 /> Open</Link></Button>,
+      secondary: null,
+    },
+    {
+      key: "rank",
+      area: "Rank tracking",
+      status: summary?.trackerCount ? "tracking" : "manual",
+      evidence: `${formatNumber(summary?.trackerCount || 0)} trackers · ${formatNumber(summary?.serpRunCount || 0)} SERP runs`,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/rank"><Target /> Open</Link></Button>,
+      secondary: null,
+    },
+    {
+      key: "gsc",
+      area: "Search Console",
+      status: "local OAuth",
+      evidence: "Connect a real Google property for performance and inspection data.",
+      action: <Button asChild size="sm" variant="secondary"><Link to="/gsc"><BarChart3 /> Open</Link></Button>,
+      secondary: null,
+    },
+    {
+      key: "ai",
+      area: "AI lab",
+      status: summary?.latestAiJobs?.length ? "has jobs" : "ready",
+      evidence: `${formatNumber(summary?.latestAiJobs?.length || 0)} recent Codex jobs · runs locally with medium reasoning`,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/ai"><Bot /> Open</Link></Button>,
+      secondary: null,
+    },
+  ];
+
+  return (
+    <section className="rounded-md border bg-background">
+      <div className="border-b px-5 py-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Site control</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              One selected site feeds audits, local link evidence, rankings, Search Console, and AI work.
+            </p>
+          </div>
+          {project.domain ? <Badge variant="outline">{preferredAuditUrl(project)}</Badge> : null}
+        </div>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Area</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Local evidence</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.key}>
+              <TableCell className="font-medium">{row.area}</TableCell>
+              <TableCell><Badge variant={row.status === "needs scan" || row.status === "not run" ? "warn" : "outline"}>{row.status}</Badge></TableCell>
+              <TableCell className="text-sm text-muted-foreground">{row.evidence}</TableCell>
+              <TableCell>
+                <div className="flex justify-end gap-2">
+                  {row.secondary}
+                  {row.action}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
   );
 }
 
@@ -1247,7 +1392,7 @@ function ProjectsPage({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add site</DialogTitle>
-                <DialogDescription>Add the root domain and start a local audit immediately.</DialogDescription>
+                <DialogDescription>Add the website once, choose the crawl variant when needed, and start a local audit immediately.</DialogDescription>
               </DialogHeader>
               <form className="space-y-4" onSubmit={submit}>
                 <Field label="Site name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Optional" /></Field>
@@ -2191,7 +2336,8 @@ function LocalOrganicEvidence({
   const rows = [...pages]
     .sort((a, b) => auditIssueCount(b) - auditIssueCount(a))
     .slice(0, 25);
-  const indexableCount = pages.filter((page: any) => page.indexable).length;
+  const indexableCount = pages.filter((page: any) => page.indexable === true).length;
+  const unknownIndexabilityCount = pages.filter((page: any) => !hasIndexabilityEvidence(page)).length;
   const missingTitleCount = pages.filter((page: any) => !page.title).length;
   const missingDescriptionCount = pages.filter((page: any) => !page.description).length;
   const h1IssueCount = pages.reduce((total: number, page: any) => total + pageIssueTypesCount(page, ["h1-count", "h1-empty"]), 0);
@@ -2227,6 +2373,7 @@ function LocalOrganicEvidence({
               {[
                 ["Pages crawled", pages.length],
                 ["Indexable pages", indexableCount],
+                ["Indexability unknown", unknownIndexabilityCount],
                 ["Missing titles", missingTitleCount],
                 ["Missing descriptions", missingDescriptionCount],
                 ["H1 issues", h1IssueCount],
@@ -2270,7 +2417,7 @@ function LocalOrganicPagesTable({ rows }: { rows: any[] }) {
               <div className="truncate font-medium">{page.finalUrl || page.url}</div>
               <div className="text-xs text-muted-foreground">{page.discovery || "crawl"} · depth {page.depth ?? 0}</div>
             </TableCell>
-            <TableCell><Badge variant={page.indexable ? "good" : "bad"}>{page.indexable ? "Yes" : "No"}</Badge></TableCell>
+            <TableCell><IndexabilityBadge page={page} /></TableCell>
             <TableCell className="min-w-56">
               <div className="line-clamp-2">{page.title || "Missing"}</div>
               <LengthBadge value={page.title} savedLength={page.titleLength} min={30} max={60} />
@@ -2995,6 +3142,14 @@ function AuditReportRoute() {
         const row = await api.audit(auditId);
         if (!cancelled) {
           setAudit(row);
+          if (!row) {
+            localStorage.removeItem(selectedAuditStorageKey);
+            if (interval) {
+              window.clearInterval(interval);
+              interval = undefined;
+            }
+            return;
+          }
           localStorage.setItem(selectedAuditStorageKey, row.id);
           if (row.status !== "queued" && row.status !== "running" && interval) {
             window.clearInterval(interval);
@@ -3028,7 +3183,13 @@ function AuditReportRoute() {
         action={<Button asChild variant="outline"><Link to="/audits"><FileSearch /> Back to audits</Link></Button>}
       />
       {error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
-      {loading ? <EmptyState title="Loading report" text="Reading the saved audit from local SQLite." /> : audit ? <AuditDetail audit={audit} /> : null}
+      {loading ? (
+        <EmptyState title="Loading report" text="Reading the saved audit from local SQLite." />
+      ) : audit ? (
+        <AuditDetail audit={audit} />
+      ) : (
+        <EmptyState title="Scan not found" text="This saved scan no longer exists in local SQLite." action={<Button asChild><Link to="/audits"><FileSearch /> Open audits</Link></Button>} />
+      )}
     </>
   );
 }
@@ -3644,6 +3805,7 @@ function AuditReportOverview({
     ["Pages crawled", coverage.pages],
     ["Indexable", coverage.indexablePages],
     ["Noindex/non-indexable", coverage.nonIndexablePages],
+    ["Indexability unknown", coverage.unknownIndexabilityPages],
     ["Sitemap-listed pages", coverage.sitemapUrls],
     ["Orphan pages", coverage.orphanPages],
     ["Deep pages", coverage.deepPages],
@@ -3773,11 +3935,11 @@ function AuditActionBoard({
     { label: "Descriptions", value: Number(summary.missingDescriptions || 0) + Number(summary.descriptionLengthIssues || 0) + issueTypeCount(issues, "duplicate-description"), detail: `${formatNumber(coverage.pages)} pages checked`, tone: "bad" },
     { label: "Images", value: Number(summary.imageIssues || 0) + Number(coverage.brokenImages || 0), detail: `${formatNumber(coverage.imageTags)} tags · ${formatNumber(coverage.checkedImages)} URLs checked`, tone: "warn" },
     { label: "Links", value: Number(coverage.brokenLinks || 0) + Number(coverage.redirectedLinks || 0) + Number(summary.emptyAnchorLinks || 0), detail: `${formatNumber(coverage.linkTags)} tags · ${formatNumber(coverage.checkedLinks)} checked`, tone: "warn" },
-    { label: "Indexing", value: Number(coverage.nonIndexablePages || 0) + Number((summary.byCategory || {}).canonicals || 0), detail: `${formatNumber(coverage.indexablePages)} of ${formatNumber(coverage.pages)} indexable`, tone: "bad" },
+    { label: "Indexing", value: Number(coverage.nonIndexablePages || 0) + Number(coverage.unknownIndexabilityPages || 0) + Number((summary.byCategory || {}).canonicals || 0), detail: coverage.unknownIndexabilityPages ? `${formatNumber(coverage.unknownIndexabilityPages)} pages need a fresh scan` : `${formatNumber(coverage.indexablePages)} of ${formatNumber(coverage.pages)} indexable`, tone: "bad" },
     { label: "Speed", value: Number(summary.performanceIssues || 0) + Number(coverage.largeImages || 0), detail: `${formatNumber(coverage.checkedAssets)} CSS/JS checked`, tone: "warn" },
   ];
   const coverageRows = [
-    { label: "Pages crawled", value: coverage.pages, detail: `${formatNumber(coverage.indexablePages)} indexable` },
+    { label: "Pages crawled", value: coverage.pages, detail: coverage.unknownIndexabilityPages ? `${formatNumber(coverage.unknownIndexabilityPages)} unknown indexability` : `${formatNumber(coverage.indexablePages)} indexable` },
     { label: "Sitemap URLs reached", value: coverage.sitemapUrls, detail: `${formatNumber(coverage.pagesMissingFromSitemap)} missing from sitemap` },
     { label: "Links checked", value: coverage.checkedLinks, detail: `${formatNumber(coverage.brokenLinks)} failing` },
     { label: "Image URLs checked", value: coverage.checkedImages, detail: `${formatNumber(coverage.brokenImages)} failing` },
@@ -4196,7 +4358,7 @@ function AuditMetadataTable({ rows }: { rows: any[] }) {
               <div className="truncate text-xs text-muted-foreground">{page.canonical || "Missing"}</div>
               <Badge variant={page.canonical ? "good" : "warn"}>{page.canonicalCount || 0}</Badge>
             </TableCell>
-            <TableCell><Badge variant={page.indexable ? "good" : "bad"}>{page.indexable ? "Yes" : "No"}</Badge></TableCell>
+            <TableCell><IndexabilityBadge page={page} /></TableCell>
           </TableRow>
         );
         })}
@@ -4217,7 +4379,7 @@ function AuditPagesTable({ rows }: { rows: any[] }) {
               <div className="truncate text-xs text-muted-foreground">{page.url}</div>
             </TableCell>
             <TableCell><Badge variant={page.status >= 400 ? "bad" : page.status >= 300 ? "warn" : "good"}>{page.status}</Badge></TableCell>
-            <TableCell><Badge variant={page.indexable ? "good" : "bad"}>{page.indexable ? "Yes" : "No"}</Badge></TableCell>
+            <TableCell><IndexabilityBadge page={page} /></TableCell>
             <TableCell className="nums">{page.depth ?? 0}</TableCell>
             <TableCell><Badge variant={page.discovery === "sitemap" ? "warn" : "outline"}>{page.discovery || "crawl"}</Badge></TableCell>
             <TableCell className="nums">{formatNumber(page.internalInlinks || 0)}</TableCell>
