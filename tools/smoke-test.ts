@@ -260,6 +260,9 @@ try {
   if (webAppClient.includes("rows.slice(0, 350)") || webAppClient.includes("Showing {formatNumber(visible.length)}")) {
     throw new Error("Audit evidence tables should not silently cap local link or image inventory rows.");
   }
+  if (webAppClient.includes(".slice(0, 150)") || webAppClient.includes(".slice(0, 100)")) {
+    throw new Error("Local link graph should not silently cap audit-derived local evidence rows.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",

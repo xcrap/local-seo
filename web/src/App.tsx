@@ -3063,11 +3063,10 @@ function LocalLinkEvidence({
   const checkedLinks = result.links || [];
   const pages = result.pages || [];
   const checkedByUrl = new Map(checkedLinks.map((link: any) => [link.url, link]));
-  const externalLinks = linkInventory.filter((link: any) => link.type === "external").slice(0, 150);
-  const brokenLinks = checkedLinks.filter((link: any) => !link.ok).slice(0, 150);
+  const externalLinks = linkInventory.filter((link: any) => link.type === "external");
+  const brokenLinks = checkedLinks.filter((link: any) => !link.ok);
   const pageRows = [...pages]
-    .sort((a, b) => Number(b.internalInlinks || 0) - Number(a.internalInlinks || 0))
-    .slice(0, 100);
+    .sort((a, b) => Number(b.internalInlinks || 0) - Number(a.internalInlinks || 0));
   return (
     <section className="rounded-md border bg-background">
       <div className="border-b px-5 py-4">
