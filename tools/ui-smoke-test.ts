@@ -172,6 +172,8 @@ try {
     await page.getByRole("columnheader", { name: /^Recommended fix$/ }).waitFor();
     await page.getByRole("button", { name: /Review/i }).first().click();
     await page.getByRole("button", { name: /Clear filters/i }).waitFor();
+    await page.getByRole("columnheader", { name: /^Fix$/ }).waitFor();
+    await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("button", { name: /Open images/i }).click();
     await page.getByText("Image tag inventory").waitFor();

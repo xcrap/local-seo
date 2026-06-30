@@ -3873,9 +3873,7 @@ function AuditDetail({ audit }: { audit: any }) {
               </Button>
             ) : null}
           </div>
-          {filteredIssues.length ? filteredIssues.map((issue: any, index: number) => (
-            <IssueCard key={issue.id || `${issue.url}:${issue.message}:${index}`} issue={issue} />
-          )) : <EmptyState title="No matching issues" text={audit.status === "completed" ? "This filter has no issues." : "Issues will appear while the scan runs."} />}
+          {filteredIssues.length ? <AuditIssuesTable rows={filteredIssues} /> : <EmptyState title="No matching issues" text={audit.status === "completed" ? "This filter has no issues." : "Issues will appear while the scan runs."} />}
         </TabsContent>
         <TabsContent value="checks">
           <AuditCheckMatrix summary={summary} coverage={coverage} issues={issues} onSelectCheck={selectAuditCheck} />
@@ -4664,30 +4662,60 @@ function AuditSection({ title, text, children }: { title: string; text: string; 
   );
 }
 
-function IssueCard({ issue }: { issue: any }) {
+function AuditIssuesTable({ rows }: { rows: any[] }) {
   return (
-    <div className="rounded-md border bg-background p-4 text-sm">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <AlertTriangle className={cn("size-4", issue.severity === "high" ? "text-destructive" : "text-muted-foreground")} />
-          <Badge variant={issue.severity === "high" ? "bad" : issue.severity === "medium" ? "warn" : "outline"}>{issue.severity}</Badge>
-          <Badge variant="outline">{issueCategoryLabel(issue.category)}</Badge>
-          <Badge variant="outline">{issue.type}</Badge>
-          <span className="font-medium">{issue.message}</span>
-        </div>
-        {issue.url ? (
-          <a className="inline-flex items-center gap-1 text-xs text-primary" href={issue.url} target="_blank" rel="noreferrer">
-            Open <ExternalLink className="size-3" />
-          </a>
-        ) : null}
-      </div>
-      <div className="mt-2 break-all text-xs text-muted-foreground">{issue.url}</div>
-      <div className="mt-3 rounded-md bg-muted/50 p-3">
-        <div className="text-xs font-semibold uppercase text-muted-foreground">Fix</div>
-        <div className="mt-1">{issue.recommendation || "Review this item and update the affected page."}</div>
-      </div>
-      {issue.evidence ? <EvidenceList value={issue.evidence} /> : null}
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Severity</TableHead>
+          <TableHead>Page</TableHead>
+          <TableHead>Issue</TableHead>
+          <TableHead>Fix</TableHead>
+          <TableHead>Evidence</TableHead>
+          <TableHead className="text-right">Open</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((issue, index) => {
+          const evidence = Object.entries(issue.evidence || {}).slice(0, 4);
+          return (
+            <TableRow key={issue.id || `${issue.url}:${issue.message}:${index}`}>
+              <TableCell><Badge variant={severityVariant(issue.severity) as any}>{issue.severity}</Badge></TableCell>
+              <TableCell className="min-w-72">
+                <div className="break-all font-medium">{issue.url || "-"}</div>
+              </TableCell>
+              <TableCell className="min-w-72">
+                <div className="font-medium">{issue.message}</div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <Badge variant="outline">{issueCategoryLabel(issue.category)}</Badge>
+                  <Badge variant="outline">{String(issue.type || "").replaceAll("-", " ")}</Badge>
+                </div>
+              </TableCell>
+              <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">
+                {issue.recommendation || "Review this item and update the affected page."}
+              </TableCell>
+              <TableCell className="min-w-80 text-xs leading-5 text-muted-foreground">
+                {evidence.length ? evidence.map(([key, value]) => (
+                  <div key={key} className="grid gap-1 py-0.5 sm:grid-cols-[120px_1fr]">
+                    <span className="font-medium text-foreground">{key}</span>
+                    <span className="break-all">{evidenceText(value)}</span>
+                  </div>
+                )) : "-"}
+              </TableCell>
+              <TableCell className="text-right">
+                {issue.url ? (
+                  <Button asChild size="sm" variant="outline">
+                    <a href={issue.url} target="_blank" rel="noreferrer">
+                      <ExternalLink /> Page
+                    </a>
+                  </Button>
+                ) : null}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -4698,24 +4726,6 @@ function evidenceText(value: unknown) {
   }
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
-}
-
-function EvidenceList({ value }: { value: Record<string, unknown> }) {
-  const entries = Object.entries(value || {});
-  if (!entries.length) return null;
-  return (
-    <div className="mt-3 rounded-md border bg-muted/25 p-3">
-      <div className="text-xs font-semibold uppercase text-muted-foreground">Evidence</div>
-      <div className="mt-2 grid gap-2">
-        {entries.map(([key, entry]) => (
-          <div key={key} className="grid gap-1 text-xs sm:grid-cols-[150px_1fr]">
-            <span className="font-medium text-foreground">{key}</span>
-            <span className="break-all text-muted-foreground">{evidenceText(entry)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 function AuditMetadataTable({ rows }: { rows: any[] }) {
