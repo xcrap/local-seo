@@ -3992,6 +3992,10 @@ async function runLocalAudit(auditId: string) {
 
 export function dashboardSummary(projectId?: string) {
   const project = projectId ? getProject(projectId) || ensureDefaultProject() : ensureDefaultProject();
+  const latestGscImport = get<any>(
+    "SELECT * FROM gsc_imports WHERE project_id = ? ORDER BY created_at DESC LIMIT 1",
+    [project.id],
+  );
   return {
     activeProject: project,
     projects: listProjects(),
@@ -4021,6 +4025,20 @@ export function dashboardSummary(projectId?: string) {
         "SELECT count(*) AS count FROM prompt_explorer_runs WHERE project_id = ?",
         [project.id],
       )?.count || 0,
+    gscImportCount:
+      get<{ count: number }>("SELECT count(*) AS count FROM gsc_imports WHERE project_id = ?", [
+        project.id,
+      ])?.count || 0,
+    latestGscImport: latestGscImport
+      ? {
+          id: latestGscImport.id,
+          siteUrl: latestGscImport.site_url,
+          sourceName: latestGscImport.source_name,
+          rowCount: latestGscImport.row_count,
+          totals: jsonParse(latestGscImport.totals_json, {}),
+          createdAt: latestGscImport.created_at,
+        }
+      : null,
     latestAudits: listAudits(project.id).slice(0, 5),
     latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT 5"),
   };

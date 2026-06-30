@@ -256,6 +256,13 @@ try {
     await page.getByRole("tab", { name: /^Performance$/ }).click();
     await page.getByRole("cell", { name: "fixture seo" }).waitFor();
     await page.getByRole("cell", { name: "local crawler" }).waitFor();
+    await page.getByRole("navigation").getByRole("link", { name: /^Overview$/ }).click();
+    await page.getByRole("heading", { name: /Site control/i }).waitFor();
+    await page.getByRole("row", { name: /Search Console/i }).getByText("local import").waitFor();
+    await page.getByRole("row", { name: /Search Console/i }).getByText(/CSV imports/i).waitFor();
+    if (await page.getByText("local OAuth").count()) {
+      throw new Error("Overview still labels Search Console as local OAuth.");
+    }
 
     await page.getByRole("link", { name: /Sites/i }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();

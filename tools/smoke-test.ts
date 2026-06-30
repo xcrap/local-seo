@@ -439,6 +439,10 @@ try {
   if (!gscImports.length || gscImports[0].id !== gscImport.id) {
     throw new Error("GSC import was not persisted in SQLite.");
   }
+  const dashboardWithGsc = await request(`/api/dashboard?projectId=${project.id}`);
+  if (dashboardWithGsc.gscImportCount !== 1 || dashboardWithGsc.latestGscImport?.rowCount !== 2) {
+    throw new Error(`Dashboard did not expose local GSC import evidence: ${JSON.stringify(dashboardWithGsc.latestGscImport)}`);
+  }
   const mcp = await request("/mcp", {
     method: "POST",
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),

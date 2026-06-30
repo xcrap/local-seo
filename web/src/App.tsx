@@ -1289,6 +1289,7 @@ function SiteCommandCenter({
 }) {
   const latestAudit = summary?.latestAudits?.[0];
   const latestAuditSummary = latestAudit?.result?.summary || {};
+  const latestGscImport = summary?.latestGscImport;
   const rows = [
     {
       key: "audit",
@@ -1339,8 +1340,10 @@ function SiteCommandCenter({
     {
       key: "gsc",
       area: "Search Console",
-      status: "local OAuth",
-      evidence: "Connect a real Google property for performance and inspection data.",
+      status: summary?.gscImportCount ? "local import" : "ready",
+      evidence: summary?.gscImportCount
+        ? `${formatNumber(summary.gscImportCount)} CSV imports · latest has ${formatNumber(latestGscImport?.rowCount || 0)} rows and ${formatNumber(latestGscImport?.totals?.clicks || 0)} clicks`
+        : "Import a Search Console CSV locally, or connect Google for live performance and inspection.",
       action: <Button asChild size="sm" variant="secondary"><Link to="/gsc"><BarChart3 /> Open</Link></Button>,
       secondary: null,
     },
