@@ -1252,7 +1252,7 @@ function Overview({
               </Button>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Protocol">
+              <Field label="Scan protocol">
                 <Select value={firstCrawlProtocol} onValueChange={(value) => setFirstCrawlProtocol(value as Project["crawl_protocol"])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -1260,7 +1260,7 @@ function Overview({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Hostname">
+              <Field label="Host variant">
                 <Select value={firstCrawlHost} onValueChange={(value) => setFirstCrawlHost(value as Project["crawl_host"])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -1726,7 +1726,7 @@ function ProjectsPage({
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Protocol">
+                  <Field label="Scan protocol">
                     <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Project["crawl_protocol"] })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -1734,7 +1734,7 @@ function ProjectsPage({
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Hostname">
+                  <Field label="Host variant">
                     <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Project["crawl_host"] })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -1774,7 +1774,7 @@ function ProjectsPage({
               </Button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Protocol">
+              <Field label="Scan protocol">
                 <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Project["crawl_protocol"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -1782,7 +1782,7 @@ function ProjectsPage({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Hostname">
+              <Field label="Host variant">
                 <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Project["crawl_host"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -1800,8 +1800,7 @@ function ProjectsPage({
               <TableRow>
                 <TableHead>Site</TableHead>
                 <TableHead>Scan targets</TableHead>
-                <TableHead>Search market</TableHead>
-                <TableHead>Keyword language</TableHead>
+                <TableHead>Search defaults</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1818,8 +1817,10 @@ function ProjectsPage({
                     <div className="font-medium">{preferredAuditUrl(project) || "Set domain"}</div>
                     <div className="line-clamp-2 max-w-md break-all text-xs text-muted-foreground">{scanTargetDetail(project)}</div>
                   </TableCell>
-                  <TableCell><Badge variant="outline">{marketLabel(project.location_code)}</Badge></TableCell>
-                  <TableCell><Badge variant="outline">{languageLabel(project.language_code)}</Badge></TableCell>
+                  <TableCell className="min-w-44">
+                    <div className="font-medium">{marketLabel(project.location_code)}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{languageLabel(project.language_code)} keywords</div>
+                  </TableCell>
                   <TableCell className="max-w-md">
                     <div className="line-clamp-2 text-sm text-muted-foreground">{project.notes || "No notes yet."}</div>
                   </TableCell>
@@ -1891,7 +1892,7 @@ function ProjectsPage({
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Protocol">
+              <Field label="Scan protocol">
                 <Select value={editForm.crawl_protocol} onValueChange={(value) => setEditForm({ ...editForm, crawl_protocol: value as Project["crawl_protocol"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -1899,7 +1900,7 @@ function ProjectsPage({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Hostname">
+              <Field label="Host variant">
                 <Select value={editForm.crawl_host} onValueChange={(value) => setEditForm({ ...editForm, crawl_host: value as Project["crawl_host"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -6128,7 +6129,7 @@ function SettingsPage() {
               </Field>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Default protocol">
+              <Field label="Default scan protocol">
                 <Select value={form.default_crawl_protocol || "auto"} onValueChange={(value) => setForm({ ...form, default_crawl_protocol: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -6136,7 +6137,7 @@ function SettingsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Default hostname">
+              <Field label="Default host variant">
                 <Select value={form.default_crawl_host || "auto"} onValueChange={(value) => setForm({ ...form, default_crawl_host: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

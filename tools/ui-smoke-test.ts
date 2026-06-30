@@ -155,8 +155,8 @@ try {
     await page.getByRole("heading", { name: /Start with a site scan/i }).waitFor();
     await page.getByPlaceholder("example.com").fill(`localhost:${fixtureServer.port}`);
     await page.getByPlaceholder("Site name (optional)").fill("Fixture Site");
-    await page.getByText("Protocol").waitFor();
-    await page.getByText("Hostname").waitFor();
+    await page.getByText("Scan protocol").waitFor();
+    await page.getByText("Host variant").waitFor();
     await page.getByRole("button", { name: /Add site and scan/i }).click();
 
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
@@ -276,11 +276,12 @@ try {
     await page.getByRole("link", { name: /Sites/i }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
     await page.getByRole("columnheader", { name: /Scan targets/i }).waitFor();
+    await page.getByRole("columnheader", { name: /^Search defaults$/ }).waitFor();
     await page.getByText(/tries 2 targets/i).first().waitFor();
     await page.getByRole("button", { name: /Edit Fixture Site/i }).click();
     await page.getByRole("heading", { name: /Edit site/i }).waitFor();
-    await page.getByText("Protocol").waitFor();
-    await page.getByText("Hostname").waitFor();
+    await page.getByText("Scan protocol").waitFor();
+    await page.getByText("Host variant").waitFor();
     await page.keyboard.press("Escape");
 
     await page.getByRole("navigation").getByRole("link", { name: /^Audits$/ }).click();
@@ -323,6 +324,8 @@ try {
       throw new Error("Settings page should not force a hard-coded Codex model override.");
     }
     const appPreferences = page.locator("section", { hasText: "App preferences" });
+    await appPreferences.getByText("Default scan protocol").waitFor();
+    await appPreferences.getByText("Default host variant").waitFor();
     await appPreferences.getByRole("combobox").nth(0).click();
     await page.getByRole("option", { name: "Portugal" }).click();
     await appPreferences.getByRole("combobox").nth(1).click();
