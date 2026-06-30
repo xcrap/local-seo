@@ -331,6 +331,21 @@ try {
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "Portuguese" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "HTTPS only" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "With www" }).first().waitFor();
+    await addSiteDialog.getByLabel("Domain").fill("second.test");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("/api/sites") && response.request().method() === "POST"),
+      addSiteDialog.getByRole("button", { name: /^Save site only$/ }).click(),
+    ]);
+    await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
+    await page.getByLabel("Organic target").waitFor();
+    if (await page.getByLabel("Organic target").inputValue() !== "second.test") {
+      throw new Error("Organic research target did not follow the newly selected site.");
+    }
+    await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
+    await page.getByLabel("External backlink target").waitFor();
+    if (await page.getByLabel("External backlink target").inputValue() !== "second.test") {
+      throw new Error("Links target did not follow the newly selected site.");
+    }
   } finally {
     await browser.close();
   }

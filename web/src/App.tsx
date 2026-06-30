@@ -297,6 +297,41 @@ function Field({
   );
 }
 
+function SiteTargetField({
+  label,
+  value,
+  siteDomain,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  siteDomain: string;
+  onChange: (value: string) => void;
+}) {
+  const usingSelectedSite = cleanSiteDomain(value) === cleanSiteDomain(siteDomain);
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Label>{label}</Label>
+        {siteDomain ? (
+          <div className="flex items-center gap-2">
+            <Badge variant={usingSelectedSite ? "good" : "outline"}>
+              {usingSelectedSite ? "Selected site" : "Custom target"}
+            </Badge>
+            {!usingSelectedSite ? (
+              <Button type="button" size="sm" variant="ghost" onClick={() => onChange(siteDomain)}>
+                Use {siteDomain}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      <Input aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} placeholder={siteDomain || "example.com"} />
+      {siteDomain ? <p className="text-xs text-muted-foreground">Selected site: {siteDomain}</p> : null}
+    </div>
+  );
+}
+
 function parseDateInput(value: string) {
   if (!value) return undefined;
   const date = new Date(`${value}T00:00:00`);
@@ -1860,6 +1895,10 @@ function KeywordsPage({ project }: { project: Project }) {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const selectedCount = Object.values(selected).filter(Boolean).length;
 
+  useEffect(() => {
+    setQuery(project.domain || "");
+  }, [project.id, project.domain]);
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
@@ -2132,6 +2171,10 @@ function SerpPage({ project }: { project: Project }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    setTarget(project.domain);
+  }, [project.id, project.domain]);
+
   async function load() {
     try {
       setRuns(await api.serpRuns(project.id));
@@ -2225,6 +2268,10 @@ function RankPage({ project }: { project: Project }) {
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setForm((current) => ({ ...current, domain: project.domain }));
+  }, [project.id, project.domain]);
 
   async function load() {
     try {
@@ -2465,6 +2512,14 @@ function DomainPage({ project }: { project: Project }) {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    setTarget(project.domain);
+    setOverview(null);
+    setKeywords(null);
+    setPages(null);
+    setError("");
+  }, [project.id, project.domain]);
+
   async function loadHistory() {
     const [snapshots, audits] = await Promise.all([
       api.domainSnapshots(project.id),
@@ -2526,9 +2581,7 @@ function DomainPage({ project }: { project: Project }) {
       <PageHeader eyebrow="Competitive" title="Organic research" description="Ranked keywords and top pages for the selected site or a competitor target." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
-          <Field label="Target domain">
-            <Input value={target} onChange={(event) => setTarget(event.target.value)} placeholder={project.domain || "example.com"} />
-          </Field>
+          <SiteTargetField label="Organic target" value={target} siteDomain={project.domain} onChange={setTarget} />
           <div className="flex items-end">
             <Button disabled={loading || !target.trim()}><Globe2 /> {loading ? "Analyzing" : "Analyze target"}</Button>
           </div>
@@ -2776,6 +2829,13 @@ function BacklinksPage({ project }: { project: Project }) {
   const [error, setError] = useState("");
   const backlinkIndexConnected = Boolean(config?.dataforseo_api_key);
 
+  useEffect(() => {
+    setTarget(project.domain);
+    setOverview(null);
+    setProfile(null);
+    setError("");
+  }, [project.id, project.domain]);
+
   async function loadHistory() {
     const [snapshots, audits, appConfig] = await Promise.all([
       api.backlinkSnapshots(project.id),
@@ -2852,9 +2912,7 @@ function BacklinksPage({ project }: { project: Project }) {
       <PageHeader eyebrow="Authority" title="Links" description="Local crawl links are available from audits. Web-wide backlinks are shown only when a real backlink index is connected." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
-          <Field label="External backlink target">
-            <Input value={target} onChange={(event) => setTarget(event.target.value)} placeholder={project.domain || "example.com"} />
-          </Field>
+          <SiteTargetField label="External backlink target" value={target} siteDomain={project.domain} onChange={setTarget} />
           <div className="flex items-end">
             <Button disabled={loading || !target.trim() || !backlinkIndexConnected}><Link2 /> {loading ? "Checking" : backlinkIndexConnected ? "Check backlink index" : "Backlink index not connected"}</Button>
           </div>
@@ -3178,8 +3236,10 @@ function BrandLookupPage({ project }: { project: Project }) {
     setRuns(await api.brandLookupRuns(project.id));
   }
   useEffect(() => {
+    setQuery(project.domain || project.name);
+    setResult(null);
     load().catch(console.error);
-  }, [project.id]);
+  }, [project.id, project.domain, project.name]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -3309,8 +3369,11 @@ function PromptExplorerPage({ project }: { project: Project }) {
     setRuns(await api.promptExplorerRuns(project.id));
   }
   useEffect(() => {
+    setPrompt(`What are the best options for ${project.domain || project.name}?`);
+    setHighlightBrand(project.domain || project.name);
+    setResult(null);
     load().catch(console.error);
-  }, [project.id]);
+  }, [project.id, project.domain, project.name]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -5759,8 +5822,9 @@ function AiPage({ project }: { project: Project }) {
     setJobs(await api.aiJobs());
   }
   useEffect(() => {
+    setContext(`Site: ${project.name}\nDomain: ${project.domain}`);
     load().catch(console.error);
-  }, [project.id]);
+  }, [project.id, project.name, project.domain]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
