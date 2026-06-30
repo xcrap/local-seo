@@ -403,7 +403,7 @@ function mapGscImport(row: GscImportRecord) {
 
 export function listGscImports(projectId: string) {
   return all<GscImportRecord>(
-    "SELECT * FROM gsc_imports WHERE project_id = ? ORDER BY created_at DESC LIMIT 20",
+    "SELECT * FROM gsc_imports WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
   ).map(mapGscImport);
 }

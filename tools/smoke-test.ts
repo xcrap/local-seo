@@ -676,8 +676,32 @@ try {
   if (!gscImports.length || gscImports[0].id !== gscImport.id) {
     throw new Error("GSC import was not persisted in SQLite.");
   }
+  const gscHistoryDb = new Database(serverDbPath);
+  try {
+    const insertGscImport = gscHistoryDb.prepare(`
+      INSERT INTO gsc_imports
+        (id, project_id, site_url, source_name, dimensions_json, row_count, totals_json, rows_json, created_at)
+      VALUES (?, ?, 'sc-domain:example.com', ?, '["query"]', 1, '{"clicks":1,"impressions":2}', '[]', ?)
+    `);
+    const insertedGscImportIds: string[] = [];
+    for (let index = 0; index < 25; index += 1) {
+      const id = randomUUID();
+      const timestamp = `2026-06-30 14:${String(index).padStart(2, "0")}:00`;
+      insertedGscImportIds.push(id);
+      insertGscImport.run(id, project.id, `search-console-${index}.csv`, timestamp);
+    }
+    const allGscImports = await request(`/api/gsc/imports/${project.id}`);
+    const allGscImportIds = new Set((allGscImports || []).map((row: any) => row.id));
+    for (const id of [gscImport.id, ...insertedGscImportIds]) {
+      if (!allGscImportIds.has(id)) {
+        throw new Error("Search Console import history should show every local CSV import until the user deletes it.");
+      }
+    }
+  } finally {
+    gscHistoryDb.close();
+  }
   const dashboardWithGsc = await request(`/api/dashboard?siteId=${project.id}`);
-  if (dashboardWithGsc.gscImportCount !== 1 || dashboardWithGsc.latestGscImport?.rowCount !== 2) {
+  if (dashboardWithGsc.gscImportCount !== 26 || dashboardWithGsc.latestGscImport?.rowCount !== 2) {
     throw new Error(`Dashboard did not expose local GSC import evidence: ${JSON.stringify(dashboardWithGsc.latestGscImport)}`);
   }
   const mcp = await request("/mcp", {
