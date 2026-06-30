@@ -556,6 +556,29 @@ try {
   if (deletionEvidence.generatedFallbackRows !== 0) {
     throw new Error(`Provider-not-configured requests created generated fallback snapshots: ${deletionEvidence.generatedFallbackRows}`);
   }
+  const aiHistoryDb = new Database(serverDbPath);
+  try {
+    const insertAiJob = aiHistoryDb.prepare(`
+      INSERT INTO ai_jobs (id, type, prompt, status, message, result_text, created_at, finished_at)
+      VALUES (?, 'smoke.ai', ?, 'completed', 'Completed', ?, ?, ?)
+    `);
+    const insertedAiJobIds: string[] = [];
+    for (let index = 0; index < 55; index += 1) {
+      const id = randomUUID();
+      const timestamp = `2026-06-30 13:${String(index).padStart(2, "0")}:00`;
+      insertedAiJobIds.push(id);
+      insertAiJob.run(id, `Prompt ${index}`, `Result ${index}`, timestamp, timestamp);
+    }
+    const aiJobs = await request("/api/ai/jobs");
+    const aiJobIds = new Set((aiJobs || []).map((row: any) => row.id));
+    for (const id of insertedAiJobIds) {
+      if (!aiJobIds.has(id)) {
+        throw new Error("AI lab should show every saved local Codex job until the user deletes it.");
+      }
+    }
+  } finally {
+    aiHistoryDb.close();
+  }
   await request("/api/backlinks/profile", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, target: "example.com", tab: "domains", pageSize: 10 }),

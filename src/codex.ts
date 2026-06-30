@@ -102,8 +102,11 @@ export function createAiJob(input: { type: string; prompt: string }) {
   return getAiJob(id)!;
 }
 
-export function listAiJobs(limit = 50) {
-  return all<AiJob>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT ?", [limit]);
+export function listAiJobs(limit?: number) {
+  if (limit && limit > 0) {
+    return all<AiJob>("SELECT * FROM ai_jobs ORDER BY created_at DESC LIMIT ?", [limit]);
+  }
+  return all<AiJob>("SELECT * FROM ai_jobs ORDER BY created_at DESC");
 }
 
 export function getAiJob(id: string) {
