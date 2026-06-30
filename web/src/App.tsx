@@ -1954,7 +1954,7 @@ function KeywordsPage({ project }: { project: Project }) {
     setError("");
     setMessage("");
     try {
-      const data = await api.researchKeywords({ projectId: project.id, query, limit });
+      const data = await api.researchKeywords({ siteId: project.id, query, limit });
       setResult(data);
       setSelected(Object.fromEntries(data.rows.slice(0, 10).map((row) => [row.keyword, true])));
     } catch (err) {
@@ -1970,7 +1970,7 @@ function KeywordsPage({ project }: { project: Project }) {
     setError("");
     setMessage("");
     try {
-      await api.saveKeywords({ projectId: project.id, keywords: rows, source: result?.source || "research" });
+      await api.saveKeywords({ siteId: project.id, keywords: rows, source: result?.source || "research" });
       setMessage(`Saved ${rows.length} keywords.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save selected keywords");
@@ -2240,7 +2240,7 @@ function SerpPage({ project }: { project: Project }) {
     setLoading(true);
     setError("");
     try {
-      const data = await api.analyzeSerp({ projectId: project.id, keyword, target, depth: 20 });
+      const data = await api.analyzeSerp({ siteId: project.id, keyword, target, depth: 20 });
       setResult(data);
       await load();
     } catch (err) {
@@ -2340,7 +2340,7 @@ function RankPage({ project }: { project: Project }) {
     setMessage("");
     try {
       await api.createRankTracker({
-        projectId: project.id,
+        siteId: project.id,
         domain: form.domain,
         keywords: form.keywords.split(/\n|,/).map((item) => item.trim()).filter(Boolean),
       });
@@ -2585,7 +2585,7 @@ function DomainPage({ project }: { project: Project }) {
     event?.preventDefault();
     setLoading(true);
     setError("");
-    const body = { projectId: project.id, domain: target, target, pageSize: 50 };
+    const body = { siteId: project.id, domain: target, target, pageSize: 50 };
     try {
       const [overviewData, keywordData, pageData] = await Promise.all([
         api.domainOverview(body),
@@ -2908,7 +2908,7 @@ function BacklinksPage({ project }: { project: Project }) {
     }
     setLoading(true);
     setError("");
-    const body = { projectId: project.id, target, tab: nextTab, pageSize: 50 };
+    const body = { siteId: project.id, target, tab: nextTab, pageSize: 50 };
     try {
       const [overviewData, profileData] = await Promise.all([
         api.backlinksOverview(body),
@@ -3294,7 +3294,7 @@ function BrandLookupPage({ project }: { project: Project }) {
     event.preventDefault();
     setLoading(true);
     try {
-      const data = await api.brandLookup({ projectId: project.id, query, competitors });
+      const data = await api.brandLookup({ siteId: project.id, query, competitors });
       setResult(data);
       await load();
     } finally {
@@ -3429,7 +3429,7 @@ function PromptExplorerPage({ project }: { project: Project }) {
     setLoading(true);
     try {
       const selectedModels = Object.entries(models).filter(([, enabled]) => enabled).map(([model]) => model);
-      const data = await api.promptExplorer({ projectId: project.id, prompt, highlightBrand, models: selectedModels });
+      const data = await api.promptExplorer({ siteId: project.id, prompt, highlightBrand, models: selectedModels });
       setResult(data);
       await load();
     } finally {
@@ -3669,7 +3669,7 @@ function AuditsPage({ project }: { project: Project }) {
     setError("");
     setStarting(true);
     try {
-      const audit = await api.startAudit({ projectId: project.id, url });
+      const audit = await api.startAudit({ siteId: project.id, url });
       setDetail(audit);
       setAudits((rows) => upsertAuditRow(rows, audit));
       if (audit?.id) setSelectedAuditId(project.id, audit.id);
@@ -5537,7 +5537,7 @@ function GscPage({ project }: { project: Project }) {
     setError("");
     try {
       setPerformance(await api.gscPerformance({
-        projectId: project.id,
+        siteId: project.id,
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
         dimensions: [dimension],
@@ -5558,7 +5558,7 @@ function GscPage({ project }: { project: Project }) {
     try {
       const csv = await file.text();
       const result = await api.gscImport({
-        projectId: project.id,
+        siteId: project.id,
         siteUrl: importSiteUrl || project.domain,
         sourceName: file.name,
         csv,
@@ -5576,7 +5576,7 @@ function GscPage({ project }: { project: Project }) {
     setLoading("inspection");
     setError("");
     try {
-      setInspection(await api.gscInspect({ projectId: project.id, urls: inspectUrls }));
+      setInspection(await api.gscInspect({ siteId: project.id, urls: inspectUrls }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not inspect URLs");
     } finally {

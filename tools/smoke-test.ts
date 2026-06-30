@@ -233,6 +233,13 @@ try {
   if (webApiClient.includes("/api/projects")) {
     throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");
   }
+  if (webApiClient.includes("JSON.stringify({ projectId")) {
+    throw new Error("The web client should send siteId in request bodies instead of projectId.");
+  }
+  const webAppClient = await readFile(path.join(rootDir, "web/src/App.tsx"), "utf8");
+  if (webAppClient.includes("projectId: project.id")) {
+    throw new Error("The app should send siteId for selected-site actions.");
+  }
   const project = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),
@@ -389,7 +396,7 @@ try {
   }
   const keywordResearch = await request("/api/keywords/research", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, query: "seo software", limit: 8 }),
+    body: JSON.stringify({ siteId: project.id, query: "seo software", limit: 8 }),
   });
   const keywordRows = keywordResearch.rows?.length
     ? keywordResearch.rows
@@ -401,7 +408,7 @@ try {
   await request("/api/keywords/save", {
     method: "POST",
     body: JSON.stringify({
-      projectId: project.id,
+      siteId: project.id,
       keywords: keywordRows.slice(0, 3),
       tags: ["smoke", "research"],
       source: "smoke",
@@ -418,11 +425,11 @@ try {
   });
   await request("/api/serp/analyze", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, keyword: "seo software", target: "example.com" }),
+    body: JSON.stringify({ siteId: project.id, keyword: "seo software", target: "example.com" }),
   });
   const organicOverview = await request("/api/domain/overview", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, target: "example.com" }),
+    body: JSON.stringify({ siteId: project.id, target: "example.com" }),
   });
   if (
     organicOverview.source === "provider-not-configured" &&
@@ -434,15 +441,15 @@ try {
   }
   await request("/api/domain/keywords", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, domain: "example.com", pageSize: 10 }),
+    body: JSON.stringify({ siteId: project.id, domain: "example.com", pageSize: 10 }),
   });
   await request("/api/domain/pages", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, domain: "example.com", pageSize: 10 }),
+    body: JSON.stringify({ siteId: project.id, domain: "example.com", pageSize: 10 }),
   });
   const backlinkOverview = await request("/api/backlinks/overview", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, target: "example.com" }),
+    body: JSON.stringify({ siteId: project.id, target: "example.com" }),
   });
   if (
     backlinkOverview.source === "provider-not-configured" &&
@@ -459,7 +466,7 @@ try {
   await request("/api/keywords/save", {
     method: "POST",
     body: JSON.stringify({
-      projectId: deleteTarget.id,
+      siteId: deleteTarget.id,
       keywords: [{ keyword: "delete me keyword", intent: "manual" }],
       source: "smoke-delete",
     }),
@@ -496,26 +503,26 @@ try {
   }
   await request("/api/backlinks/profile", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, target: "example.com", tab: "domains", pageSize: 10 }),
+    body: JSON.stringify({ siteId: project.id, target: "example.com", tab: "domains", pageSize: 10 }),
   });
   const tracker = await request("/api/rank-trackers", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, domain: "example.com", keywords: ["seo software", "seo tools"] }),
+    body: JSON.stringify({ siteId: project.id, domain: "example.com", keywords: ["seo software", "seo tools"] }),
   });
   await request(`/api/rank-trackers/${tracker.id}/refresh-metrics`, { method: "POST" });
   await request(`/api/rank-trackers/${tracker.id}/check`, { method: "POST" });
   await request(`/api/rank-trackers/${tracker.id}/trend`);
   await request("/api/brand-lookup", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, query: "Example", competitors: "competitor.com" }),
+    body: JSON.stringify({ siteId: project.id, query: "Example", competitors: "competitor.com" }),
   });
   await request("/api/prompt-explorer", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, prompt: "best seo software", highlightBrand: "Example" }),
+    body: JSON.stringify({ siteId: project.id, prompt: "best seo software", highlightBrand: "Example" }),
   });
   const audit = await request("/api/audits", {
     method: "POST",
-    body: JSON.stringify({ projectId: project.id, url: "https://example.com" }),
+    body: JSON.stringify({ siteId: project.id, url: "https://example.com" }),
   });
   await request(`/api/audits/${audit.id}`);
   const projectAuditsAfterSecondScan = await request(`/api/sites/${project.id}/audits`);
@@ -539,7 +546,7 @@ try {
       insertedAuditIds.push(id);
       insertAudit.run(id, project.id, `https://example.com/history-${index}`, timestamp, timestamp);
     }
-    const dashboardWithFullHistory = await request(`/api/dashboard?projectId=${project.id}`);
+    const dashboardWithFullHistory = await request(`/api/dashboard?siteId=${project.id}`);
     const dashboardAuditIds = new Set((dashboardWithFullHistory.latestAudits || []).map((row: any) => row.id));
     for (const id of [siteScan.audit.id, audit.id, ...insertedAuditIds]) {
       if (!dashboardAuditIds.has(id)) {
@@ -553,7 +560,7 @@ try {
   const gscImport = await request("/api/gsc/import", {
     method: "POST",
     body: JSON.stringify({
-      projectId: project.id,
+      siteId: project.id,
       siteUrl: "sc-domain:example.com",
       sourceName: "search-console.csv",
       csv: "Top queries,Clicks,Impressions,CTR,Position\nseo software,10,100,10%,3.2\nlocal seo,5,50,10%,4.8\n",
@@ -566,7 +573,7 @@ try {
   if (!gscImports.length || gscImports[0].id !== gscImport.id) {
     throw new Error("GSC import was not persisted in SQLite.");
   }
-  const dashboardWithGsc = await request(`/api/dashboard?projectId=${project.id}`);
+  const dashboardWithGsc = await request(`/api/dashboard?siteId=${project.id}`);
   if (dashboardWithGsc.gscImportCount !== 1 || dashboardWithGsc.latestGscImport?.rowCount !== 2) {
     throw new Error(`Dashboard did not expose local GSC import evidence: ${JSON.stringify(dashboardWithGsc.latestGscImport)}`);
   }

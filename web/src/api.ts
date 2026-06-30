@@ -46,7 +46,7 @@ export const auth = {
 };
 
 export const api = {
-  dashboard: (projectId?: string) => request<any>(projectId ? `/api/dashboard?projectId=${encodeURIComponent(projectId)}` : "/api/dashboard"),
+  dashboard: (siteId?: string) => request<any>(siteId ? `/api/dashboard?siteId=${encodeURIComponent(siteId)}` : "/api/dashboard"),
   config: () => request<any>("/api/config"),
   saveConfig: (body: Record<string, string>) =>
     request<any>("/api/config", { method: "PUT", body: JSON.stringify(body) }),
@@ -126,32 +126,32 @@ export const api = {
   promptExplorerRuns: (siteId: string) => request<any[]>(`/api/sites/${siteId}/prompt-explorer`),
   promptExplorer: (body: any) =>
     request<any>("/api/prompt-explorer", { method: "POST", body: JSON.stringify(body) }),
-  audits: (projectId: string) => request<any[]>(`/api/sites/${projectId}/audits`),
+  audits: (siteId: string) => request<any[]>(`/api/sites/${siteId}/audits`),
   audit: (id: string) => request<any>(`/api/audits/${id}`),
   startAudit: (body: any) =>
     request<any>("/api/audits", { method: "POST", body: JSON.stringify(body) }),
-  clearAudits: (projectId: string) =>
-    request<any>(`/api/sites/${projectId}/audits`, { method: "DELETE" }),
-  deleteAudit: (projectId: string, auditId: string) =>
-    request<any>(`/api/sites/${projectId}/audits/${auditId}`, { method: "DELETE" }),
+  clearAudits: (siteId: string) =>
+    request<any>(`/api/sites/${siteId}/audits`, { method: "DELETE" }),
+  deleteAudit: (siteId: string, auditId: string) =>
+    request<any>(`/api/sites/${siteId}/audits/${auditId}`, { method: "DELETE" }),
   aiPrompts: () => request<any[]>("/api/ai/prompts"),
   aiJobs: () => request<any[]>("/api/ai/jobs"),
   createAiJob: (body: any) =>
     request<any>("/api/ai/jobs", { method: "POST", body: JSON.stringify(body) }),
-  gscStatus: (projectId: string) => request<any>(`/api/gsc/status/${projectId}`),
-  gscImports: (projectId: string) => request<any[]>(`/api/gsc/imports/${projectId}`),
-  gscStart: (projectId: string) =>
-    request<{ url: string }>("/api/gsc/start", { method: "POST", body: JSON.stringify({ projectId }) }),
-  gscSites: (projectId: string) => request<any[]>(`/api/gsc/sites/${projectId}`),
-  gscSetSite: (projectId: string, siteUrl: string) =>
-    request<any>("/api/gsc/site", { method: "POST", body: JSON.stringify({ projectId, siteUrl }) }),
+  gscStatus: (siteId: string) => request<any>(`/api/gsc/status/${siteId}`),
+  gscImports: (siteId: string) => request<any[]>(`/api/gsc/imports/${siteId}`),
+  gscStart: (siteId: string) =>
+    request<{ url: string }>("/api/gsc/start", { method: "POST", body: JSON.stringify({ siteId }) }),
+  gscSites: (siteId: string) => request<any[]>(`/api/gsc/sites/${siteId}`),
+  gscSetSite: (siteId: string, siteUrl: string) =>
+    request<any>("/api/gsc/site", { method: "POST", body: JSON.stringify({ siteId, siteUrl }) }),
   gscPerformance: (body: any) =>
     request<any>("/api/gsc/performance", { method: "POST", body: JSON.stringify(body) }),
   gscImport: (body: any) =>
     request<any>("/api/gsc/import", { method: "POST", body: JSON.stringify(body) }),
   gscInspect: (body: any) =>
     request<any>("/api/gsc/inspect", { method: "POST", body: JSON.stringify(body) }),
-  gscDisconnect: (projectId: string) =>
-    request<any>("/api/gsc/disconnect", { method: "POST", body: JSON.stringify({ projectId }) }),
+  gscDisconnect: (siteId: string) =>
+    request<any>("/api/gsc/disconnect", { method: "POST", body: JSON.stringify({ siteId }) }),
   mcpTools: () => request<any>("/api/mcp/tools"),
 };

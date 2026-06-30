@@ -97,6 +97,23 @@ async function readJson(c: any) {
   return (await c.req.json().catch(() => ({}))) as Record<string, any>;
 }
 
+function siteScopedBody(body: Record<string, any>) {
+  if (body.siteId && !body.projectId) return { ...body, projectId: body.siteId };
+  return body;
+}
+
+async function readSiteScopedJson(c: any) {
+  return siteScopedBody(await readJson(c));
+}
+
+function siteQueryId(c: any) {
+  return c.req.query("siteId") || c.req.query("projectId");
+}
+
+function siteBodyId(body: Record<string, any>) {
+  return String(body.siteId || body.projectId || "");
+}
+
 function baseUrl(c: any) {
   const configured = process.env.APP_URL?.trim();
   if (configured) return configured;
@@ -207,7 +224,7 @@ app.use("/api/*", async (c, next) => {
 app.post("/mcp", handleMcp);
 app.get("/api/mcp/tools", (c) => c.json({ tools: mcpToolList() }));
 
-app.get("/api/dashboard", safe((c) => c.json(dashboardSummary(c.req.query("projectId")))));
+app.get("/api/dashboard", safe((c) => c.json(dashboardSummary(siteQueryId(c)))));
 
 app.get("/api/config", safe((c) => c.json(listPublicConfig())));
 app.put(
@@ -301,7 +318,7 @@ app.post("/api/sites/:id/scan", safe(startSavedSiteScan));
 
 app.post(
   "/api/keywords/research",
-  safe(async (c) => c.json(await researchKeywords((await readJson(c)) as any))),
+  safe(async (c) => c.json(await researchKeywords((await readSiteScopedJson(c)) as any))),
 );
 app.get(
   "/api/projects/:id/keywords",
@@ -399,7 +416,7 @@ app.get(
 );
 app.post(
   "/api/keywords/save",
-  safe(async (c) => c.json(saveKeywords((await readJson(c)) as any))),
+  safe(async (c) => c.json(saveKeywords((await readSiteScopedJson(c)) as any))),
 );
 app.get(
   "/api/projects/:id/serp",
@@ -411,7 +428,7 @@ app.get(
 );
 app.post(
   "/api/serp/analyze",
-  safe(async (c) => c.json(await getSerpAnalysis((await readJson(c)) as any))),
+  safe(async (c) => c.json(await getSerpAnalysis((await readSiteScopedJson(c)) as any))),
 );
 
 app.get(
@@ -424,7 +441,7 @@ app.get(
 );
 app.post(
   "/api/rank-trackers",
-  safe(async (c) => c.json(createRankTracker((await readJson(c)) as any))),
+  safe(async (c) => c.json(createRankTracker((await readSiteScopedJson(c)) as any))),
 );
 app.post(
   "/api/rank-trackers/:id/keywords",
@@ -466,7 +483,7 @@ app.post(
   safe(async (c) => c.json(await runRankCheck(c.req.param("id")))),
 );
 
-app.post("/api/domain/overview", safe(async (c) => c.json(await domainOverview((await readJson(c)) as any))));
+app.post("/api/domain/overview", safe(async (c) => c.json(await domainOverview((await readSiteScopedJson(c)) as any))));
 app.get(
   "/api/projects/:id/domain-snapshots",
   safe((c) => c.json(listDomainSnapshots(c.req.param("id")))),
@@ -477,19 +494,19 @@ app.get(
 );
 app.post(
   "/api/domain/keyword-suggestions",
-  safe(async (c) => c.json(await getDomainKeywordSuggestions((await readJson(c)) as any))),
+  safe(async (c) => c.json(await getDomainKeywordSuggestions((await readSiteScopedJson(c)) as any))),
 );
 app.post(
   "/api/domain/keywords",
-  safe(async (c) => c.json(await getDomainKeywordsPage((await readJson(c)) as any))),
+  safe(async (c) => c.json(await getDomainKeywordsPage((await readSiteScopedJson(c)) as any))),
 );
 app.post(
   "/api/domain/pages",
-  safe(async (c) => c.json(await getDomainPagesPage((await readJson(c)) as any))),
+  safe(async (c) => c.json(await getDomainPagesPage((await readSiteScopedJson(c)) as any))),
 );
 app.post(
   "/api/backlinks/overview",
-  safe(async (c) => c.json(await backlinksOverview((await readJson(c)) as any))),
+  safe(async (c) => c.json(await backlinksOverview((await readSiteScopedJson(c)) as any))),
 );
 app.get(
   "/api/projects/:id/backlink-snapshots",
@@ -501,7 +518,7 @@ app.get(
 );
 app.post(
   "/api/backlinks/profile",
-  safe(async (c) => c.json(await getBacklinksProfile((await readJson(c)) as any))),
+  safe(async (c) => c.json(await getBacklinksProfile((await readSiteScopedJson(c)) as any))),
 );
 app.get(
   "/api/projects/:id/brand-lookup",
@@ -513,7 +530,7 @@ app.get(
 );
 app.post(
   "/api/brand-lookup",
-  safe(async (c) => c.json(await brandLookup((await readJson(c)) as any))),
+  safe(async (c) => c.json(await brandLookup((await readSiteScopedJson(c)) as any))),
 );
 app.get(
   "/api/projects/:id/prompt-explorer",
@@ -525,7 +542,7 @@ app.get(
 );
 app.post(
   "/api/prompt-explorer",
-  safe(async (c) => c.json(await promptExplorer((await readJson(c)) as any))),
+  safe(async (c) => c.json(await promptExplorer((await readSiteScopedJson(c)) as any))),
 );
 
 app.get("/api/projects/:id/audits", safe((c) => c.json(listAudits(c.req.param("id")))));
@@ -544,8 +561,8 @@ app.delete(
 app.post(
   "/api/audits",
   safe(async (c) => {
-    const body = await readJson(c);
-    return c.json(startAudit(String(body.projectId), String(body.url)));
+    const body = await readSiteScopedJson(c);
+    return c.json(startAudit(siteBodyId(body), String(body.url)));
   }),
 );
 
@@ -570,8 +587,8 @@ app.get("/api/gsc/imports/:projectId", safe((c) => c.json(listGscImports(c.req.p
 app.post(
   "/api/gsc/start",
   safe(async (c) => {
-    const body = await readJson(c);
-    return c.json({ url: createGscAuthUrl(String(body.projectId), baseUrl(c)) });
+    const body = await readSiteScopedJson(c);
+    return c.json({ url: createGscAuthUrl(siteBodyId(body), baseUrl(c)) });
   }),
 );
 app.get(
@@ -590,27 +607,27 @@ app.get("/api/gsc/sites/:projectId", safe(async (c) => c.json(await listGscSites
 app.post(
   "/api/gsc/site",
   safe(async (c) => {
-    const body = await readJson(c);
-    return c.json(setGscSite(String(body.projectId), String(body.siteUrl)));
+    const body = await readSiteScopedJson(c);
+    return c.json(setGscSite(siteBodyId(body), String(body.siteUrl)));
   }),
 );
 app.post(
   "/api/gsc/performance",
-  safe(async (c) => c.json(await queryGscPerformance((await readJson(c)) as any))),
+  safe(async (c) => c.json(await queryGscPerformance((await readSiteScopedJson(c)) as any))),
 );
 app.post(
   "/api/gsc/import",
-  safe(async (c) => c.json(importGscPerformance((await readJson(c)) as any))),
+  safe(async (c) => c.json(importGscPerformance((await readSiteScopedJson(c)) as any))),
 );
 app.post(
   "/api/gsc/inspect",
-  safe(async (c) => c.json(await inspectGscUrls((await readJson(c)) as any))),
+  safe(async (c) => c.json(await inspectGscUrls((await readSiteScopedJson(c)) as any))),
 );
 app.post(
   "/api/gsc/disconnect",
   safe(async (c) => {
-    const body = await readJson(c);
-    return c.json(disconnectGsc(String(body.projectId || "")));
+    const body = await readSiteScopedJson(c);
+    return c.json(disconnectGsc(siteBodyId(body)));
   }),
 );
 
