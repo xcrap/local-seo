@@ -159,7 +159,26 @@ function defaultCrawlHostFromConfig(config?: any): Project["crawl_host"] {
 
 const activeSiteStorageKey = "local-seo:site";
 const legacyProjectStorageKey = "local-seo:project";
-const selectedAuditStorageKey = "local-seo:selected-audit";
+const legacySelectedAuditStorageKey = "local-seo:selected-audit";
+const selectedAuditStoragePrefix = "local-seo:selected-audit";
+
+function selectedAuditStorageKey(projectId: string) {
+  return `${selectedAuditStoragePrefix}:${projectId}`;
+}
+
+function getSelectedAuditId(projectId: string) {
+  return localStorage.getItem(selectedAuditStorageKey(projectId)) || localStorage.getItem(legacySelectedAuditStorageKey) || "";
+}
+
+function setSelectedAuditId(projectId: string, auditId: string) {
+  localStorage.setItem(selectedAuditStorageKey(projectId), auditId);
+  localStorage.removeItem(legacySelectedAuditStorageKey);
+}
+
+function clearSelectedAuditId(projectId?: string) {
+  if (projectId) localStorage.removeItem(selectedAuditStorageKey(projectId));
+  localStorage.removeItem(legacySelectedAuditStorageKey);
+}
 
 function marketLabel(code: number) {
   return marketOptions.find((item) => item.code === Number(code))?.label || `Market ${code}`;
@@ -956,7 +975,7 @@ function Workspace() {
     try {
       const result = await api.scanProject(activeProject.id);
       if (result.audit?.id) {
-        localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+        setSelectedAuditId(activeProject.id, result.audit.id);
         window.location.href = `/audits/${result.audit.id}`;
       } else {
         window.location.href = "/audits";
@@ -1150,7 +1169,7 @@ function Overview({
       setScan(result);
       setScanAudit(result.audit);
       if (result.audit?.id) {
-        localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+        setSelectedAuditId(project.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
       }
       setSummary(await api.dashboard(project.id));
@@ -1162,7 +1181,7 @@ function Overview({
   }
 
   function openAuditReport(auditId: string) {
-    localStorage.setItem(selectedAuditStorageKey, auditId);
+    setSelectedAuditId(project.id, auditId);
     navigate(`/audits/${auditId}`);
   }
 
@@ -1184,7 +1203,7 @@ function Overview({
       selectProject(created.id);
       const result = await api.scanProject(created.id);
       if (result.audit?.id) {
-        localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+        setSelectedAuditId(created.id, result.audit.id);
       }
       await reloadProjects();
       if (result.audit?.id) navigate(`/audits/${result.audit.id}`);
@@ -1584,7 +1603,7 @@ function ProjectsPage({
       if (scanAfterCreate) {
         const result = await api.scanProject(created.id);
         if (result.audit?.id) {
-          localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+          setSelectedAuditId(created.id, result.audit.id);
         }
         await reloadProjects();
         if (result.audit?.id) navigate(`/audits/${result.audit.id}`);
@@ -1648,7 +1667,7 @@ function ProjectsPage({
     try {
       const result = await api.scanProject(project.id);
       if (result.audit?.id) {
-        localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+        setSelectedAuditId(project.id, result.audit.id);
       }
       setScanningSiteId("");
       selectProject(project.id);
@@ -2552,7 +2571,7 @@ function DomainPage({ project }: { project: Project }) {
     try {
       const result = await api.scanProject(project.id);
       if (result.audit?.id) {
-        localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+        setSelectedAuditId(project.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
       } else {
         navigate("/audits");
@@ -2883,7 +2902,7 @@ function BacklinksPage({ project }: { project: Project }) {
     try {
       const result = await api.scanProject(project.id);
       if (result.audit?.id) {
-        localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+        setSelectedAuditId(project.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
       } else {
         navigate("/audits");
@@ -3491,14 +3510,14 @@ function AuditReportRoute() {
         if (!cancelled) {
           setAudit(row);
           if (!row) {
-            localStorage.removeItem(selectedAuditStorageKey);
+            clearSelectedAuditId();
             if (interval) {
               window.clearInterval(interval);
               interval = undefined;
             }
             return;
           }
-          localStorage.setItem(selectedAuditStorageKey, row.id);
+          setSelectedAuditId(row.project_id, row.id);
           if (row.status !== "queued" && row.status !== "running" && interval) {
             window.clearInterval(interval);
             interval = undefined;
@@ -3556,14 +3575,13 @@ function AuditsPage({ project }: { project: Project }) {
   async function load() {
     const rows = sortAuditRows(await api.audits(project.id));
     setAudits(rows);
-    if (detail?.id) {
-      const nextDetail = rows.find((row) => row.id === detail.id);
-      if (nextDetail) setDetail(nextDetail);
-    } else {
-      const selectedAuditId = localStorage.getItem(selectedAuditStorageKey);
-      const selectedAudit = rows.find((row) => row.id === selectedAuditId);
-      if (selectedAudit) setDetail(selectedAudit);
-    }
+    const currentDetail = detail?.id ? rows.find((row) => row.id === detail.id) : null;
+    const selectedAuditId = getSelectedAuditId(project.id);
+    const selectedAudit = selectedAuditId ? rows.find((row) => row.id === selectedAuditId) : null;
+    const nextDetail = currentDetail || selectedAudit || rows[0] || null;
+    setDetail(nextDetail);
+    if (nextDetail?.id) setSelectedAuditId(project.id, nextDetail.id);
+    else clearSelectedAuditId(project.id);
     return rows;
   }
   useEffect(() => {
@@ -3612,7 +3630,7 @@ function AuditsPage({ project }: { project: Project }) {
       const audit = await api.startAudit({ projectId: project.id, url });
       setDetail(audit);
       setAudits((rows) => upsertAuditRow(rows, audit));
-      if (audit?.id) localStorage.setItem(selectedAuditStorageKey, audit.id);
+      if (audit?.id) setSelectedAuditId(project.id, audit.id);
       load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start scan");
@@ -3628,7 +3646,7 @@ function AuditsPage({ project }: { project: Project }) {
       const result = await api.scanProject(project.id);
       setDetail(result.audit);
       setAudits((rows) => upsertAuditRow(rows, result.audit));
-      if (result.audit?.id) localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+      if (result.audit?.id) setSelectedAuditId(project.id, result.audit.id);
       load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start site scan");
@@ -3637,13 +3655,13 @@ function AuditsPage({ project }: { project: Project }) {
     }
   }
   async function inspect(id: string) {
-    localStorage.setItem(selectedAuditStorageKey, id);
+    setSelectedAuditId(project.id, id);
     setDetail(await api.audit(id));
   }
   async function remove(id: string) {
     await api.deleteAudit(project.id, id);
-    if (localStorage.getItem(selectedAuditStorageKey) === id) {
-      localStorage.removeItem(selectedAuditStorageKey);
+    if (getSelectedAuditId(project.id) === id) {
+      clearSelectedAuditId(project.id);
     }
     setDetail(null);
     await load();
@@ -3653,7 +3671,7 @@ function AuditsPage({ project }: { project: Project }) {
     setClearingAudits(true);
     try {
       await api.clearAudits(project.id);
-      localStorage.removeItem(selectedAuditStorageKey);
+      clearSelectedAuditId(project.id);
       setDetail(null);
       setConfirmClearAudits(false);
       await load();
@@ -3888,7 +3906,7 @@ function AuditTable({
                         to={`/audits/${row.id}`}
                         onClick={(event) => {
                           event.stopPropagation();
-                          localStorage.setItem(selectedAuditStorageKey, row.id);
+                          setSelectedAuditId(row.project_id, row.id);
                         }}
                       >
                         <FileSearch /> Open report

@@ -456,6 +456,14 @@ try {
     body: JSON.stringify({ projectId: project.id, url: "https://example.com" }),
   });
   await request(`/api/audits/${audit.id}`);
+  const projectAuditsAfterSecondScan = await request(`/api/sites/${project.id}/audits`);
+  if (
+    projectAuditsAfterSecondScan.length < 2 ||
+    !projectAuditsAfterSecondScan.some((row: any) => row.id === siteScan.audit.id) ||
+    !projectAuditsAfterSecondScan.some((row: any) => row.id === audit.id)
+  ) {
+    throw new Error("Site audits endpoint should keep every scan for the site until the user deletes it.");
+  }
   await request(`/api/gsc/status/${project.id}`);
   const gscImport = await request("/api/gsc/import", {
     method: "POST",
