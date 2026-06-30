@@ -5417,14 +5417,16 @@ function AuditLinkInventoryTable({ rows }: { rows: any[] }) {
 }
 
 function GscPage({ project }: { project: Project }) {
+  const defaultInspectionUrl = project.domain ? `${preferredAuditUrl(project).replace(/\/$/, "")}/` : "";
+  const defaultGscProperty = project.domain ? `sc-domain:${cleanSiteDomain(project.domain).replace(/^www\./i, "")}` : "";
   const [status, setStatus] = useState<any>(null);
   const [sites, setSites] = useState<any[]>([]);
   const [imports, setImports] = useState<any[]>([]);
   const [performance, setPerformance] = useState<any>(null);
-  const [inspectUrls, setInspectUrls] = useState(project.domain ? `https://${project.domain}/` : "");
+  const [inspectUrls, setInspectUrls] = useState(defaultInspectionUrl);
   const [inspection, setInspection] = useState<any>(null);
   const [dimension, setDimension] = useState("query");
-  const [importSiteUrl, setImportSiteUrl] = useState(project.domain ? `sc-domain:${cleanSiteDomain(project.domain).replace(/^www\./i, "")}` : "");
+  const [importSiteUrl, setImportSiteUrl] = useState(defaultGscProperty);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState("");
   const today = new Date();
@@ -5447,10 +5449,10 @@ function GscPage({ project }: { project: Project }) {
     }
   }
   useEffect(() => {
-    setImportSiteUrl(project.domain ? `sc-domain:${cleanSiteDomain(project.domain).replace(/^www\./i, "")}` : "");
-    setInspectUrls(project.domain ? `https://${project.domain}/` : "");
+    setImportSiteUrl(defaultGscProperty);
+    setInspectUrls(defaultInspectionUrl);
     load().catch(console.error);
-  }, [project.id, project.domain]);
+  }, [project.id, project.domain, project.crawl_protocol, project.crawl_host]);
 
   function showImport(row: any) {
     setPerformance({ source: "import", import: row, rows: row.rows || [] });

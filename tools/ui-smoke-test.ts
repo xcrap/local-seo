@@ -251,6 +251,10 @@ try {
     );
     await page.getByRole("navigation").getByRole("link", { name: /^Search Console$/ }).click();
     await page.getByRole("heading", { name: /^Search Console$/ }).waitFor();
+    await page.getByRole("tab", { name: /^URL inspection$/ }).click();
+    if (await page.getByPlaceholder("https://example.com/page").inputValue() !== `${fixtureUrl}/`) {
+      throw new Error("Search Console inspection URL did not use the selected site's saved crawl target.");
+    }
     await page.getByRole("tab", { name: /^Local import$/ }).click();
     await page.getByLabel("CSV file").setInputFiles(gscCsvPath);
     await page.getByRole("cell", { name: "search-console-ui.csv", exact: true }).waitFor();

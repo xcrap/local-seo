@@ -551,6 +551,10 @@ try {
   if (projectRequiredTool) {
     throw new Error(`Visible MCP tool still requires projectId: ${projectRequiredTool.name}`);
   }
+  const projectPropertyTool = visibleMcpTools.find((tool: any) => tool.inputSchema?.properties?.projectId);
+  if (projectPropertyTool) {
+    throw new Error(`Visible MCP tool still exposes projectId: ${projectPropertyTool.name}`);
+  }
   const mcpGsc = await request("/mcp", {
     method: "POST",
     body: JSON.stringify({

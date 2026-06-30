@@ -36,7 +36,6 @@ type JsonRpcRequest = {
 
 const siteIdInput = {
   siteId: { type: "string", description: "Local site id." },
-  projectId: { type: "string", description: "Legacy alias for siteId." },
 };
 
 const tools = [
