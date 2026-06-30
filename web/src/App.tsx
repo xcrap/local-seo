@@ -5053,7 +5053,7 @@ function AuditCheckMatrix({
 function AuditCheckRow({ row, onSelect }: { row: AuditCheckRowModel & { area?: string; areaText?: string }; onSelect: (row: AuditCheckRowModel) => void }) {
   const value = Number(row.value || 0);
   const variant = row.problem ? (value > 0 ? row.severity || "warn" : "good") : "outline";
-  const clickable = Boolean(row.problem && row.types?.length);
+  const clickable = Boolean(row.problem && value > 0 && row.types?.length);
   return (
     <TableRow>
       <TableCell className="min-w-44">
@@ -5080,10 +5080,14 @@ function AuditCheckRow({ row, onSelect }: { row: AuditCheckRowModel & { area?: s
       </TableCell>
       <TableCell className="text-right">
         {clickable ? (
-          <Button size="sm" variant={value ? "outline" : "ghost"} onClick={() => onSelect(row)}>
+          <Button size="sm" variant="outline" onClick={() => onSelect(row)}>
             <ListChecks /> Review
           </Button>
-        ) : null}
+        ) : row.problem ? (
+          <Badge variant="good">No issues</Badge>
+        ) : (
+          <Badge variant="outline">Evidence</Badge>
+        )}
       </TableCell>
     </TableRow>
   );

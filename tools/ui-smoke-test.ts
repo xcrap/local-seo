@@ -185,8 +185,13 @@ try {
     await page.getByRole("tab", { name: /^Checks$/ }).click();
     await page.getByRole("heading", { name: /^Audit checks$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Issue types$/ }).waitFor();
-    await page.getByRole("row", { name: /Broken CSS\/JS/i }).getByRole("button", { name: /Review/i }).click();
-    await page.getByText("Showing Broken CSS/JS").waitFor();
+    const clearAuditCheckRow = page.getByRole("row").filter({ hasText: "No issues" }).first();
+    await clearAuditCheckRow.waitFor();
+    if (await clearAuditCheckRow.getByRole("button", { name: /Review/i }).count()) {
+      throw new Error("Clear audit checks should not expose a Review button.");
+    }
+    await page.getByRole("row", { name: /Broken links/i }).getByRole("button", { name: /Review/i }).click();
+    await page.getByText("Showing Broken links").waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Robots\/Sitemap$/ }).click();
     await page.getByRole("heading", { name: /^Robots and sitemap evidence$/ }).waitFor();
