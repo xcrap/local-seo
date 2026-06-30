@@ -716,6 +716,8 @@ function Workspace() {
   const [activeProjectId, setActiveProjectId] = useState(
     localStorage.getItem(activeSiteStorageKey) || localStorage.getItem(legacyProjectStorageKey) || "",
   );
+  const [shellScanning, setShellScanning] = useState(false);
+  const [shellScanError, setShellScanError] = useState("");
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) || projects[0],
     [projects, activeProjectId],
@@ -741,6 +743,29 @@ function Workspace() {
     setActiveProjectId(id);
     localStorage.setItem(activeSiteStorageKey, id);
     localStorage.removeItem(legacyProjectStorageKey);
+    setShellScanError("");
+  }
+
+  async function scanActiveSite() {
+    if (!activeProject?.domain) {
+      window.location.href = "/sites";
+      return;
+    }
+    setShellScanning(true);
+    setShellScanError("");
+    try {
+      const result = await api.scanProject(activeProject.id);
+      if (result.audit?.id) {
+        localStorage.setItem(selectedAuditStorageKey, result.audit.id);
+        window.location.href = `/audits/${result.audit.id}`;
+      } else {
+        window.location.href = "/audits";
+      }
+    } catch (err) {
+      setShellScanError(err instanceof Error ? err.message : "Could not start site scan");
+    } finally {
+      setShellScanning(false);
+    }
   }
 
   async function logout() {
@@ -766,6 +791,22 @@ function Workspace() {
             <Label>Active site</Label>
             <ActiveSiteSelect sites={visibleSites} activeSiteId={activeProject?.id || ""} onSelect={selectProject} />
           </div>
+
+          {activeProject?.domain ? (
+            <div className="mt-3 rounded-md border bg-card p-3">
+              <div className="text-xs font-medium text-muted-foreground">Scan target</div>
+              <div className="mt-1 break-all text-sm font-medium">{preferredAuditUrl(activeProject)}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{crawlPreferenceLabel(activeProject)}</div>
+              <Button className="mt-3 w-full justify-start" size="sm" onClick={scanActiveSite} disabled={shellScanning}>
+                <FileSearch /> {shellScanning ? "Starting scan" : "Scan website"}
+              </Button>
+              {shellScanError ? <p className="mt-2 text-xs text-destructive">{shellScanError}</p> : null}
+            </div>
+          ) : (
+            <Button asChild className="mt-3 w-full justify-start" size="sm">
+              <Link to="/sites"><Plus /> Add website</Link>
+            </Button>
+          )}
 
           <nav className="mt-6 space-y-1">
             {nav.map(({ to, label, icon: Icon, end }) => (
@@ -801,6 +842,15 @@ function Workspace() {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <ActiveSiteSelect sites={visibleSites} activeSiteId={activeProject?.id || ""} onSelect={selectProject} />
+            {activeProject?.domain ? (
+              <Button size="sm" onClick={scanActiveSite} disabled={shellScanning}>
+                <FileSearch /> {shellScanning ? "Starting" : "Scan"}
+              </Button>
+            ) : (
+              <Button asChild size="sm"><Link to="/sites"><Plus /> Add</Link></Button>
+            )}
+          </div>
+          <div className="mt-2">
             <Select onValueChange={(path) => (window.location.href = path)}>
               <SelectTrigger>
                 <SelectValue placeholder="Navigate" />
@@ -814,6 +864,7 @@ function Workspace() {
               </SelectContent>
             </Select>
           </div>
+          {shellScanError ? <p className="mt-2 text-xs text-destructive">{shellScanError}</p> : null}
         </header>
 
         <main className="relative z-10 px-4 py-6 lg:ml-64 lg:px-8 lg:py-8">

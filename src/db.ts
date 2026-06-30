@@ -3,8 +3,14 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import dotenv from "dotenv";
 
+const runtimeDbPath = process.env.DB_PATH;
+
 dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local", override: true });
+
+if (runtimeDbPath) {
+  process.env.DB_PATH = runtimeDbPath;
+}
 
 const DB_PATH = process.env.DB_PATH || "./data/local-seo.sqlite";
 const MIGRATIONS_TABLE = "schema_migrations";
