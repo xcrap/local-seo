@@ -5,6 +5,8 @@ export type Site = {
   notes: string;
   location_code: number;
   language_code: string;
+  crawl_protocol: "auto" | "https" | "http" | "both";
+  crawl_host: "auto" | "root" | "www" | "both";
 };
 
 export type Project = Site;

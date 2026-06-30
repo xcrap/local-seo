@@ -73,6 +73,7 @@ import {
   updateSavedKeywordTags,
   updateProject,
 } from "./seo";
+import type { Project } from "./seo";
 
 dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local", override: true });
@@ -153,11 +154,47 @@ async function probeScanUrl(url: string) {
   }
 }
 
-async function resolveSiteScanUrl(domain: string) {
-  const cleanDomain = domain.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
-  const candidates = localHostFirst(cleanDomain)
-    ? [`http://${cleanDomain}`, `https://${cleanDomain}`]
-    : [`https://${cleanDomain}`, `http://${cleanDomain}`];
+type SavedSiteScanTarget = Pick<Project, "domain" | "crawl_protocol" | "crawl_host">;
+
+function normalizeCrawlProtocol(value: unknown) {
+  return value === "https" || value === "http" || value === "both" ? value : "auto";
+}
+
+function normalizeCrawlHost(value: unknown) {
+  return value === "root" || value === "www" || value === "both" ? value : "auto";
+}
+
+function scanHostCandidates(domain: string, crawlHost: string) {
+  const rootDomain = domain.replace(/^www\./i, "");
+  if (!rootDomain || localHostFirst(rootDomain)) return [rootDomain];
+  const wwwDomain = `www.${rootDomain}`;
+  if (crawlHost === "root") return [rootDomain];
+  if (crawlHost === "www") return [wwwDomain];
+  return [rootDomain, wwwDomain];
+}
+
+function scanProtocolCandidates(domain: string, crawlProtocol: string) {
+  if (crawlProtocol === "https") return ["https"];
+  if (crawlProtocol === "http") return ["http"];
+  return localHostFirst(domain) ? ["http", "https"] : ["https", "http"];
+}
+
+function siteScanCandidates(site: SavedSiteScanTarget) {
+  const cleanDomain = site.domain.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+  const crawlProtocol = normalizeCrawlProtocol(site.crawl_protocol);
+  const crawlHost = normalizeCrawlHost(site.crawl_host);
+  const hosts = scanHostCandidates(cleanDomain, crawlHost);
+  const urls: string[] = [];
+  for (const protocol of scanProtocolCandidates(cleanDomain, crawlProtocol)) {
+    for (const host of hosts) {
+      if (host) urls.push(`${protocol}://${host}`);
+    }
+  }
+  return [...new Set(urls)];
+}
+
+async function resolveSavedSiteScanUrl(site: SavedSiteScanTarget) {
+  const candidates = siteScanCandidates(site);
   let firstAnswered = "";
   for (const candidate of candidates) {
     const probe = await probeScanUrl(candidate);
@@ -165,7 +202,7 @@ async function resolveSiteScanUrl(domain: string) {
     firstAnswered ||= probe.finalUrl || candidate;
     if (probe.status < 400) return probe.finalUrl || candidate;
   }
-  return firstAnswered || candidates[0];
+  return firstAnswered || candidates[0] || "";
 }
 
 function safe(handler: (c: any) => Promise<Response> | Response) {
@@ -284,7 +321,7 @@ async function startSavedSiteScan(c: any) {
   const site = getProject(c.req.param("id"));
   if (!site) return c.json({ error: "Site not found." }, 404);
   if (!site.domain) return c.json({ error: "Set a site domain first." }, 400);
-  const url = await resolveSiteScanUrl(site.domain);
+  const url = await resolveSavedSiteScanUrl(site);
   const audit = startAudit(site.id, url);
   const config = listPublicConfig();
   queueMicrotask(() => {
@@ -324,6 +361,10 @@ async function startSavedSiteScan(c: any) {
       },
     ],
     scanUrl: url,
+    scanPreferences: {
+      protocol: site.crawl_protocol || "auto",
+      host: site.crawl_host || "auto",
+    },
     message: `Started site scan for ${site.domain}.`,
   });
 }

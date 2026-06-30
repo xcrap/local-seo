@@ -122,6 +122,20 @@ const languageOptions = [
   { code: "de", label: "German" },
 ];
 
+const crawlProtocolOptions = [
+  { value: "auto", label: "Auto" },
+  { value: "https", label: "HTTPS only" },
+  { value: "http", label: "HTTP only" },
+  { value: "both", label: "Try HTTP and HTTPS" },
+] as const;
+
+const crawlHostOptions = [
+  { value: "auto", label: "Auto" },
+  { value: "root", label: "Without www" },
+  { value: "www", label: "With www" },
+  { value: "both", label: "Try both" },
+] as const;
+
 const activeSiteStorageKey = "local-seo:site";
 const legacyProjectStorageKey = "local-seo:project";
 const selectedAuditStorageKey = "local-seo:selected-audit";
@@ -147,6 +161,21 @@ function defaultAuditUrl(domain?: string) {
   const clean = String(domain || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
   if (!clean) return "";
   return `${localSiteHost(clean) ? "http" : "https"}://${clean}`;
+}
+
+function preferredAuditUrl(project?: Project | null) {
+  const clean = String(project?.domain || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+  if (!clean) return "";
+  const root = clean.replace(/^www\./i, "");
+  const protocol = project?.crawl_protocol === "http" ? "http" : localSiteHost(root) ? "http" : "https";
+  const host = project?.crawl_host === "www" && !localSiteHost(root) ? `www.${root}` : root;
+  return `${protocol}://${host}`;
+}
+
+function crawlPreferenceLabel(project?: Project | null) {
+  const protocol = crawlProtocolOptions.find((item) => item.value === (project?.crawl_protocol || "auto"))?.label || "Auto";
+  const host = crawlHostOptions.find((item) => item.value === (project?.crawl_host || "auto"))?.label || "Auto";
+  return `${protocol} · ${host}`;
 }
 
 function isPlaceholderSite(project?: Project | null) {
@@ -513,10 +542,11 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
     deepPages: maxCount(summary.deepPages, pages.filter((page: any) => Number(page.depth || 0) >= 4).length),
     linkTags: maxCount(summary.linkTags, linkInventory.length, pages.reduce((total: number, page: any) => total + Number(page.internalLinks || 0) + Number(page.externalLinks || 0), 0)),
     imageTags: maxCount(summary.imageTags, imageInventory.length, pages.reduce((total: number, page: any) => total + Number(page.images || 0), 0)),
-    assetTags: maxCount(summary.assetTags, checkedAssets),
+    assetTags: maxCount(summary.assetTags, pages.reduce((total: number, page: any) => total + Number(page.assets || 0), 0), checkedAssets),
     checkedLinks,
     checkedImages,
     checkedAssets,
+    cssImageResources: maxCount(summary.cssImageResources, images.filter((image: any) => image.purpose === "css-url" || image.purpose === "external-css-url").length),
     brokenLinks: maxCount(summary.brokenLinks, links.filter((link: any) => link.ok === false).length),
     brokenImages: maxCount(summary.brokenImages, images.filter((image: any) => image.ok === false).length),
     brokenAssets: maxCount(summary.brokenAssets, assets.filter((asset: any) => asset.ok === false).length),
@@ -924,7 +954,7 @@ function Overview({
               <div className="text-sm font-medium text-muted-foreground">Selected website</div>
               <div className="mt-1 text-2xl font-semibold">{project.domain || "Add a domain"}</div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Market: {marketLabel(project.location_code)} · Language: {languageLabel(project.language_code)}
+                Scan target: {preferredAuditUrl(project)} · {crawlPreferenceLabel(project)} · Market: {marketLabel(project.location_code)} · Language: {languageLabel(project.language_code)}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1064,11 +1094,45 @@ function ProjectsPage({
   activeProjectId: string;
   selectProject: (id: string) => void;
 }) {
+  type ProjectForm = {
+    name: string;
+    domain: string;
+    notes: string;
+    locationCode: number;
+    languageCode: string;
+    crawlProtocol: Project["crawl_protocol"];
+    crawlHost: Project["crawl_host"];
+  };
+  type ProjectEditForm = {
+    name: string;
+    domain: string;
+    notes: string;
+    location_code: number;
+    language_code: string;
+    crawl_protocol: Project["crawl_protocol"];
+    crawl_host: Project["crawl_host"];
+  };
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", domain: "", notes: "", locationCode: 2840, languageCode: "en" });
+  const [form, setForm] = useState<ProjectForm>({
+    name: "",
+    domain: "",
+    notes: "",
+    locationCode: 2840,
+    languageCode: "en",
+    crawlProtocol: "auto",
+    crawlHost: "auto",
+  });
   const [editing, setEditing] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", domain: "", notes: "", location_code: 2840, language_code: "en" });
+  const [editForm, setEditForm] = useState<ProjectEditForm>({
+    name: "",
+    domain: "",
+    notes: "",
+    location_code: 2840,
+    language_code: "en",
+    crawl_protocol: "auto",
+    crawl_host: "auto",
+  });
   const [error, setError] = useState("");
   const [scanningSiteId, setScanningSiteId] = useState("");
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
@@ -1089,7 +1153,7 @@ function ProjectsPage({
       });
       selectProject(created.id);
       setOpen(false);
-      setForm({ name: "", domain: "", notes: "", locationCode: 2840, languageCode: "en" });
+      setForm({ name: "", domain: "", notes: "", locationCode: 2840, languageCode: "en", crawlProtocol: "auto", crawlHost: "auto" });
       if (scanAfterCreate) {
         const result = await api.scanProject(created.id);
         if (result.audit?.id) {
@@ -1121,6 +1185,8 @@ function ProjectsPage({
       notes: project.notes || "",
       location_code: project.location_code || 2840,
       language_code: project.language_code || "en",
+      crawl_protocol: project.crawl_protocol || "auto",
+      crawl_host: project.crawl_host || "auto",
     });
   }
 
@@ -1204,6 +1270,24 @@ function ProjectsPage({
                     </Select>
                   </Field>
                 </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Protocol">
+                    <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Project["crawl_protocol"] })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Hostname">
+                    <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Project["crawl_host"] })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
                 <Field label="Notes"><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1232,6 +1316,7 @@ function ProjectsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Site</TableHead>
+                <TableHead>Scan target</TableHead>
                 <TableHead>Market</TableHead>
                 <TableHead>Language</TableHead>
                 <TableHead>Notes</TableHead>
@@ -1245,6 +1330,10 @@ function ProjectsPage({
                   <TableCell className="min-w-64">
                     <div className="font-medium">{project.name}</div>
                     <div className="text-xs text-muted-foreground">{project.domain || "Add a domain"}</div>
+                  </TableCell>
+                  <TableCell className="min-w-56">
+                    <div className="font-medium">{preferredAuditUrl(project) || "Set domain"}</div>
+                    <div className="text-xs text-muted-foreground">{crawlPreferenceLabel(project)}</div>
                   </TableCell>
                   <TableCell><Badge variant="outline">{marketLabel(project.location_code)}</Badge></TableCell>
                   <TableCell><Badge variant="outline">{languageLabel(project.language_code)}</Badge></TableCell>
@@ -1308,6 +1397,24 @@ function ProjectsPage({
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Protocol">
+                <Select value={editForm.crawl_protocol} onValueChange={(value) => setEditForm({ ...editForm, crawl_protocol: value as Project["crawl_protocol"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Hostname">
+                <Select value={editForm.crawl_host} onValueChange={(value) => setEditForm({ ...editForm, crawl_host: value as Project["crawl_host"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Field>
@@ -2927,7 +3034,7 @@ function AuditReportRoute() {
 }
 
 function AuditsPage({ project }: { project: Project }) {
-  const [url, setUrl] = useState(defaultAuditUrl(project.domain));
+  const [url, setUrl] = useState(preferredAuditUrl(project));
   const [audits, setAudits] = useState<any[]>([]);
   const [detail, setDetail] = useState<any>(null);
   const [deletingAudit, setDeletingAudit] = useState<any>(null);
@@ -2951,10 +3058,10 @@ function AuditsPage({ project }: { project: Project }) {
     load().catch(console.error);
   }, [project.id]);
   useEffect(() => {
-    setUrl(defaultAuditUrl(project.domain));
+    setUrl(preferredAuditUrl(project));
     setError("");
     setShowCustomUrl(false);
-  }, [project.id, project.domain]);
+  }, [project.id, project.domain, project.crawl_protocol, project.crawl_host]);
   useEffect(() => {
     const hasActiveScan = audits.some((audit) => audit.status === "queued" || audit.status === "running");
     if (!hasActiveScan) return;
@@ -3014,6 +3121,11 @@ function AuditsPage({ project }: { project: Project }) {
             <div>
               <div className="text-sm font-medium text-muted-foreground">Selected site</div>
               <div className="mt-1 text-xl font-semibold">{project.domain || "Add a domain"}</div>
+              {project.domain ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Scan target: {preferredAuditUrl(project)} · {crawlPreferenceLabel(project)}
+                </p>
+              ) : null}
             </div>
             {project.domain ? (
               <Button disabled={starting} onClick={startSelectedSite}>
@@ -3030,7 +3142,7 @@ function AuditsPage({ project }: { project: Project }) {
             {showCustomUrl ? (
               <form className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={start}>
                 <Field label="URL to scan">
-                  <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${defaultAuditUrl(project.domain) || "https://example.com"}/page`} />
+                  <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredAuditUrl(project) || "https://example.com"}/page`} />
                 </Field>
                 <div className="flex items-end">
                   <Button variant="secondary" disabled={starting || !url.trim()}><FileSearch /> Scan URL</Button>
@@ -3535,16 +3647,17 @@ function AuditReportOverview({
     ["Sitemap-listed pages", coverage.sitemapUrls],
     ["Orphan pages", coverage.orphanPages],
     ["Deep pages", coverage.deepPages],
-    ["Links found", coverage.linkTags],
-    ["Images found", coverage.imageTags],
-    ["CSS/JS found", coverage.assetTags],
+    ["Link tags found", coverage.linkTags],
+    ["Image tags found", coverage.imageTags],
+    ["CSS/JS refs found", coverage.assetTags],
   ];
   const resourceRows = [
     ["Checked links", coverage.checkedLinks, coverage.brokenLinks],
-    ["Checked images", coverage.checkedImages, coverage.brokenImages],
+    ["Checked image URLs", coverage.checkedImages, coverage.brokenImages],
     ["Checked CSS/JS", coverage.checkedAssets, coverage.brokenAssets],
     ["Redirecting links", coverage.redirectedLinks, null],
     ["Redirecting images", coverage.redirectedImages, null],
+    ["CSS image URLs", coverage.cssImageResources, null],
     ["Large images", coverage.largeImages, null],
   ];
   return (
@@ -3658,8 +3771,8 @@ function AuditActionBoard({
   const checks = [
     { label: "Titles", value: Number(summary.missingTitles || 0) + Number(summary.titleLengthIssues || 0) + issueTypeCount(issues, "duplicate-title"), detail: `${formatNumber(coverage.pages)} pages checked`, tone: "bad" },
     { label: "Descriptions", value: Number(summary.missingDescriptions || 0) + Number(summary.descriptionLengthIssues || 0) + issueTypeCount(issues, "duplicate-description"), detail: `${formatNumber(coverage.pages)} pages checked`, tone: "bad" },
-    { label: "Images", value: Number(summary.imageIssues || 0) + Number(coverage.brokenImages || 0), detail: `${formatNumber(coverage.imageTags)} found · ${formatNumber(coverage.checkedImages)} checked`, tone: "warn" },
-    { label: "Links", value: Number(coverage.brokenLinks || 0) + Number(coverage.redirectedLinks || 0) + Number(summary.emptyAnchorLinks || 0), detail: `${formatNumber(coverage.linkTags)} found · ${formatNumber(coverage.checkedLinks)} checked`, tone: "warn" },
+    { label: "Images", value: Number(summary.imageIssues || 0) + Number(coverage.brokenImages || 0), detail: `${formatNumber(coverage.imageTags)} tags · ${formatNumber(coverage.checkedImages)} URLs checked`, tone: "warn" },
+    { label: "Links", value: Number(coverage.brokenLinks || 0) + Number(coverage.redirectedLinks || 0) + Number(summary.emptyAnchorLinks || 0), detail: `${formatNumber(coverage.linkTags)} tags · ${formatNumber(coverage.checkedLinks)} checked`, tone: "warn" },
     { label: "Indexing", value: Number(coverage.nonIndexablePages || 0) + Number((summary.byCategory || {}).canonicals || 0), detail: `${formatNumber(coverage.indexablePages)} of ${formatNumber(coverage.pages)} indexable`, tone: "bad" },
     { label: "Speed", value: Number(summary.performanceIssues || 0) + Number(coverage.largeImages || 0), detail: `${formatNumber(coverage.checkedAssets)} CSS/JS checked`, tone: "warn" },
   ];
@@ -3667,7 +3780,8 @@ function AuditActionBoard({
     { label: "Pages crawled", value: coverage.pages, detail: `${formatNumber(coverage.indexablePages)} indexable` },
     { label: "Sitemap URLs reached", value: coverage.sitemapUrls, detail: `${formatNumber(coverage.pagesMissingFromSitemap)} missing from sitemap` },
     { label: "Links checked", value: coverage.checkedLinks, detail: `${formatNumber(coverage.brokenLinks)} failing` },
-    { label: "Images checked", value: coverage.checkedImages, detail: `${formatNumber(coverage.brokenImages)} failing` },
+    { label: "Image URLs checked", value: coverage.checkedImages, detail: `${formatNumber(coverage.brokenImages)} failing` },
+    { label: "CSS image URLs", value: coverage.cssImageResources, detail: "background and stylesheet URLs" },
     { label: "CSS/JS checked", value: coverage.checkedAssets, detail: `${formatNumber(coverage.brokenAssets)} failing` },
     { label: "Orphan pages", value: coverage.orphanPages, detail: `${formatNumber(coverage.deepPages)} deep URLs` },
   ];

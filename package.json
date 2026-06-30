@@ -16,7 +16,8 @@
     "db:reset": "rm -f data/local-seo.sqlite data/local-seo.sqlite-shm data/local-seo.sqlite-wal && bun run src/db.ts",
     "admin:create": "bun run tools/create-admin.ts",
     "admin:password": "bun run tools/set-password.ts",
-    "test:smoke": "bun run tools/smoke-test.ts"
+    "test:smoke": "bun run tools/smoke-test.ts",
+    "test:waka": "bun run tools/waka-audit-test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

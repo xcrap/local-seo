@@ -284,6 +284,14 @@ migrate(
   `,
 );
 
+migrate(
+  "004_project_crawl_preferences",
+  `
+  ALTER TABLE projects ADD COLUMN crawl_protocol TEXT NOT NULL DEFAULT 'auto';
+  ALTER TABLE projects ADD COLUMN crawl_host TEXT NOT NULL DEFAULT 'auto';
+  `,
+);
+
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];
 }

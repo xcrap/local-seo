@@ -4,6 +4,17 @@ import path from "node:path";
 
 const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
+process.env.DB_PATH = path.join(tempDir, "scope.sqlite");
+const { sameSiteUrl } = await import("../src/seo");
+if (!sameSiteUrl("https://www.waka.pt/about/", "https://waka.pt")) {
+  throw new Error("Root and www variants should share audit scope.");
+}
+if (!sameSiteUrl("https://waka.pt/about/", "https://www.waka.pt")) {
+  throw new Error("www and root variants should share audit scope.");
+}
+if (sameSiteUrl("https://blog.waka.pt/", "https://waka.pt")) {
+  throw new Error("Unrelated subdomains must not share audit scope.");
+}
 const port = 4131 + Math.floor(Math.random() * 400);
 const baseUrl = `http://localhost:${port}`;
 const cookieJar = new Map<string, string>();
@@ -192,6 +203,23 @@ try {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),
   });
+  if (project.crawl_protocol !== "auto" || project.crawl_host !== "auto") {
+    throw new Error("New sites should default to automatic crawl preferences.");
+  }
+  const preferenceProject = await request("/api/sites", {
+    method: "POST",
+    body: JSON.stringify({ name: "Preference", domain: "example.org", crawlProtocol: "https", crawlHost: "www" }),
+  });
+  if (preferenceProject.crawl_protocol !== "https" || preferenceProject.crawl_host !== "www") {
+    throw new Error("Site crawl preferences were not saved on create.");
+  }
+  const updatedPreference = await request(`/api/sites/${preferenceProject.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ ...preferenceProject, crawl_protocol: "both", crawl_host: "both" }),
+  });
+  if (updatedPreference.crawl_protocol !== "both" || updatedPreference.crawl_host !== "both") {
+    throw new Error("Site crawl preferences were not saved on update.");
+  }
   const siteScan = await request(`/api/sites/${project.id}/scan`, { method: "POST" });
   if (!siteScan.audit?.id) throw new Error("Site scan did not return an audit.");
   if (!siteScan.related?.some((row: any) => row.key === "technical-audit") || !siteScan.related?.some((row: any) => row.key === "backlinks")) {

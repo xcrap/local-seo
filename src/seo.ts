@@ -13,9 +13,14 @@ export type Project = {
   notes: string;
   location_code: number;
   language_code: string;
+  crawl_protocol: CrawlProtocol;
+  crawl_host: CrawlHost;
   created_at: string;
   updated_at: string;
 };
+
+export type CrawlProtocol = "auto" | "https" | "http" | "both";
+export type CrawlHost = "auto" | "root" | "www" | "both";
 
 type KeywordRow = {
   keyword: string;
@@ -42,6 +47,14 @@ function normalizeDomain(value: string) {
     .replace(/^www\./i, "")
     .replace(/\/.*$/, "")
     .toLowerCase();
+}
+
+function normalizeCrawlProtocol(value: unknown): CrawlProtocol {
+  return value === "https" || value === "http" || value === "both" ? value : "auto";
+}
+
+function normalizeCrawlHost(value: unknown): CrawlHost {
+  return value === "root" || value === "www" || value === "both" ? value : "auto";
 }
 
 function normalizeTagName(value: string) {
@@ -230,10 +243,16 @@ export function createProject(input: {
   notes?: string;
   locationCode?: number;
   languageCode?: string;
+  crawlProtocol?: CrawlProtocol | string;
+  crawlHost?: CrawlHost | string;
+  crawl_protocol?: CrawlProtocol | string;
+  crawl_host?: CrawlHost | string;
 }) {
   const id = randomUUID();
   const domain = normalizeDomain(input.domain || "");
   const name = input.name.trim() || domain || "Untitled site";
+  const crawlProtocol = normalizeCrawlProtocol(input.crawlProtocol ?? input.crawl_protocol);
+  const crawlHost = normalizeCrawlHost(input.crawlHost ?? input.crawl_host);
   const placeholder = domain
     ? get<Project>(
         "SELECT * FROM projects WHERE archived_at IS NULL AND domain = '' AND name = 'Add your site' ORDER BY created_at ASC LIMIT 1",
@@ -243,7 +262,7 @@ export function createProject(input: {
     run(
       `
       UPDATE projects
-      SET name = ?, domain = ?, notes = ?, location_code = ?, language_code = ?, updated_at = CURRENT_TIMESTAMP
+      SET name = ?, domain = ?, notes = ?, location_code = ?, language_code = ?, crawl_protocol = ?, crawl_host = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
       `,
       [
@@ -252,6 +271,8 @@ export function createProject(input: {
         input.notes?.trim() || "",
         input.locationCode || 2840,
         input.languageCode || "en",
+        crawlProtocol,
+        crawlHost,
         placeholder.id,
       ],
     );
@@ -259,8 +280,8 @@ export function createProject(input: {
   }
   run(
     `
-    INSERT INTO projects (id, name, domain, notes, location_code, language_code)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO projects (id, name, domain, notes, location_code, language_code, crawl_protocol, crawl_host)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       id,
@@ -269,6 +290,8 @@ export function createProject(input: {
       input.notes?.trim() || "",
       input.locationCode || 2840,
       input.languageCode || "en",
+      crawlProtocol,
+      crawlHost,
     ],
   );
   return getProject(id)!;
@@ -277,10 +300,14 @@ export function createProject(input: {
 export function updateProject(projectId: string, input: Partial<Project>) {
   const existing = getProject(projectId);
   if (!existing) throw new Error("Site not found.");
+  const body = input as Partial<Project> & {
+    crawlProtocol?: CrawlProtocol | string;
+    crawlHost?: CrawlHost | string;
+  };
   run(
     `
     UPDATE projects
-    SET name = ?, domain = ?, notes = ?, location_code = ?, language_code = ?, updated_at = CURRENT_TIMESTAMP
+    SET name = ?, domain = ?, notes = ?, location_code = ?, language_code = ?, crawl_protocol = ?, crawl_host = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
     `,
     [
@@ -289,6 +316,8 @@ export function updateProject(projectId: string, input: Partial<Project>) {
       input.notes ?? existing.notes,
       input.location_code ?? existing.location_code,
       input.language_code ?? existing.language_code,
+      normalizeCrawlProtocol(body.crawl_protocol ?? body.crawlProtocol ?? existing.crawl_protocol),
+      normalizeCrawlHost(body.crawl_host ?? body.crawlHost ?? existing.crawl_host),
       projectId,
     ],
   );
@@ -1855,12 +1884,30 @@ function absoluteHttpUrl(value: string, baseUrl: string) {
   }
 }
 
-function sameOriginUrl(url: string, origin: string) {
+function urlLike(value: string) {
+  const trimmed = value.trim();
+  return new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+}
+
+function rootEquivalentHostname(hostname: string) {
+  return hostname.trim().toLowerCase().replace(/^www\./i, "");
+}
+
+function siteHostKey(value: string) {
   try {
-    return new URL(url).origin === origin;
+    const url = urlLike(value);
+    const hostname = rootEquivalentHostname(url.hostname);
+    const renderedHost = hostname.includes(":") && !hostname.startsWith("[") ? `[${hostname}]` : hostname;
+    return `${renderedHost}${url.port ? `:${url.port}` : ""}`;
   } catch {
-    return false;
+    return "";
   }
+}
+
+export function sameSiteUrl(url: string, scope: string) {
+  const targetKey = siteHostKey(url);
+  const scopeKey = siteHostKey(scope);
+  return Boolean(targetKey && scopeKey && targetKey === scopeKey);
 }
 
 function normalizedUrl(value: string) {
@@ -1884,7 +1931,9 @@ function normalizedUrlKey(value: string) {
     if (url.pathname !== "/" && url.pathname.endsWith("/")) {
       url.pathname = url.pathname.replace(/\/+$/, "");
     }
-    return url.toString();
+    const hostname = rootEquivalentHostname(url.hostname);
+    const renderedHost = hostname.includes(":") && !hostname.startsWith("[") ? `[${hostname}]` : hostname;
+    return `${url.protocol.toLowerCase()}//${renderedHost}${url.port ? `:${url.port}` : ""}${url.pathname}${url.search}`;
   } catch {
     return value;
   }
@@ -2381,11 +2430,12 @@ async function runLocalAudit(auditId: string) {
   ]);
   const startUrl = /^https?:\/\//i.test(audit.url) ? audit.url : `https://${audit.url}`;
   const origin = new URL(startUrl).origin;
+  const startKey = normalizedUrlKey(startUrl);
   const visited = new Set<string>();
-  const queued = new Set<string>([startUrl]);
+  const queued = new Set<string>([startKey]);
   const queue = [startUrl];
-  const depthByUrl = new Map<string, number>([[normalizedUrlKey(startUrl), 0]]);
-  const discoveryByUrl = new Map<string, string>([[normalizedUrlKey(startUrl), "start-url"]]);
+  const depthByUrl = new Map<string, number>([[startKey, 0]]);
+  const discoveryByUrl = new Map<string, string>([[startKey, "start-url"]]);
   const internalInlinks = new Map<string, number>();
   const pages: any[] = [];
   const issues: any[] = [];
@@ -2449,12 +2499,12 @@ async function runLocalAudit(auditId: string) {
     const absoluteKey = absolute ? normalizedUrlKey(absolute) : "";
     if (
       absolute &&
-      sameOriginUrl(absolute, origin) &&
-      absoluteKey !== normalizedUrlKey(startUrl) &&
-      !queued.has(absolute) &&
+      sameSiteUrl(absolute, startUrl) &&
+      absoluteKey !== startKey &&
+      !queued.has(absoluteKey) &&
       queue.length + visited.size < auditLimits.maxQueuedUrls
     ) {
-      queued.add(absolute);
+      queued.add(absoluteKey);
       queue.push(absolute);
       depthByUrl.set(absoluteKey, 0);
       discoveryByUrl.set(absoluteKey, "sitemap");
@@ -2532,11 +2582,11 @@ async function runLocalAudit(auditId: string) {
   phase = "crawling";
   while (queue.length > 0 && visited.size < auditLimits.maxPages) {
     const current = queue.shift()!;
-    queued.delete(current);
-    if (visited.has(current)) continue;
-    visited.add(current);
-    const pageIssues = pageBucket(current);
     const currentKey = normalizedUrlKey(current);
+    queued.delete(currentKey);
+    if (visited.has(currentKey)) continue;
+    visited.add(currentKey);
+    const pageIssues = pageBucket(current);
     const currentDepth = depthByUrl.get(currentKey) ?? 0;
 
     try {
@@ -2695,7 +2745,7 @@ async function runLocalAudit(auditId: string) {
         const href = $(link).attr("href") || "";
         const absolute = absoluteHttpUrl(href, response.url || current);
         if (!absolute) return;
-        const isInternal = sameOriginUrl(absolute, origin);
+        const isInternal = sameSiteUrl(absolute, startUrl);
         const imageAlt = cleanText($(link).find("img[alt]").first().attr("alt") || "");
         const accessibleName = cleanText($(link).attr("aria-label") || $(link).attr("title") || imageAlt);
         const anchor = cleanText($(link).text());
@@ -2713,8 +2763,8 @@ async function runLocalAudit(auditId: string) {
         if (linksToCheck.size < auditLimits.maxLinksToCheck && !linksToCheck.has(absolute)) {
           linksToCheck.set(absolute, { url: absolute, from: current, type: row.type, anchor: row.anchor, rel: row.rel });
         }
+        const absoluteKey = normalizedUrlKey(absolute);
         if (isInternal) {
-          const absoluteKey = normalizedUrlKey(absolute);
           internalInlinks.set(absoluteKey, (internalInlinks.get(absoluteKey) || 0) + 1);
           const nextDepth = currentDepth + 1;
           if (!depthByUrl.has(absoluteKey) || nextDepth < Number(depthByUrl.get(absoluteKey))) {
@@ -2724,11 +2774,11 @@ async function runLocalAudit(auditId: string) {
         }
         if (
           isInternal &&
-          !visited.has(absolute) &&
-          !queued.has(absolute) &&
+          !visited.has(absoluteKey) &&
+          !queued.has(absoluteKey) &&
           queue.length + visited.size < auditLimits.maxQueuedUrls
         ) {
-          queued.add(absolute);
+          queued.add(absoluteKey);
           queue.push(absolute);
         }
       });
@@ -3000,7 +3050,7 @@ async function runLocalAudit(auditId: string) {
           recommendation: "Point canonical tags to the HTTPS version of the preferred URL.",
           evidence: { canonical },
         });
-      } else if (!sameOriginUrl(canonical, origin)) {
+      } else if (!sameSiteUrl(canonical, startUrl)) {
         pushAuditIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
