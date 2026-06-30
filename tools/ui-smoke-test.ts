@@ -184,6 +184,12 @@ try {
     await page.getByRole("row", { name: /Broken CSS\/JS/i }).getByRole("button", { name: /Review/i }).click();
     await page.getByText("Showing Broken CSS/JS").waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
+    await page.getByRole("tab", { name: /^Robots\/Sitemap$/ }).click();
+    await page.getByRole("heading", { name: /^Robots and sitemap evidence$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Sitemap files$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Crawl coverage$/ }).waitFor();
+    await page.getByRole("cell", { name: /sitemap\.xml/i }).last().waitFor();
+    await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByText("Checked image URLs").first().waitFor();
     if (await page.getByText("0 chars").count()) {
       throw new Error("Audit report still shows standalone 0 chars badges.");

@@ -3922,38 +3922,8 @@ function AuditDetail({ audit }: { audit: any }) {
             </AuditSection>
           ) : <EmptyState title="No CSS or JavaScript assets checked yet" text="Assets are checked after links and images." />}
         </TabsContent>
-        <TabsContent value="crawl" className="grid gap-4 xl:grid-cols-3">
-          <div className="rounded-md border bg-background p-4">
-            <h3 className="font-medium">Robots</h3>
-            <div className="mt-3 space-y-2 text-sm">
-              <div>Status: <Badge variant={result.robots?.exists ? "good" : "warn"}>{result.robots?.exists ? "Found" : "Missing"}</Badge></div>
-              <div className="break-all text-muted-foreground">{result.robots?.url || `${result.origin}/robots.txt`}</div>
-              <div>Disallow rules: {formatNumber(result.robots?.disallowCount || 0)}</div>
-              <div>Sitemaps declared: {formatNumber(result.robots?.sitemaps?.length || 0)}</div>
-            </div>
-          </div>
-          <div className="rounded-md border bg-background p-4">
-            <h3 className="font-medium">Sitemap</h3>
-            <div className="mt-3 space-y-2 text-sm">
-              <div>URLs found: {formatNumber(result.sitemap?.urls?.length || 0)}</div>
-              {(result.sitemap?.sitemaps || []).map((sitemap: any) => (
-                <div key={sitemap.url} className="rounded-md border p-2">
-                  <div className="break-all font-medium">{sitemap.url}</div>
-                  <div className="text-muted-foreground">status {sitemap.status || "-"} · {formatNumber(sitemap.urlCount || 0)} URLs</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-md border bg-background p-4">
-            <h3 className="font-medium">Coverage</h3>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex items-center justify-between gap-3"><span>Indexable pages</span><Badge variant="outline">{formatNumber(coverage.indexablePages)}</Badge></div>
-              <div className="flex items-center justify-between gap-3"><span>Missing from sitemap</span><Badge variant={coverage.pagesMissingFromSitemap ? "warn" : "good"}>{formatNumber(coverage.pagesMissingFromSitemap)}</Badge></div>
-              <div className="flex items-center justify-between gap-3"><span>Noindex in sitemap</span><Badge variant={coverage.noindexPagesInSitemap ? "warn" : "good"}>{formatNumber(coverage.noindexPagesInSitemap)}</Badge></div>
-              <div className="flex items-center justify-between gap-3"><span>Orphan pages</span><Badge variant={coverage.orphanPages ? "warn" : "good"}>{formatNumber(coverage.orphanPages)}</Badge></div>
-              <div className="flex items-center justify-between gap-3"><span>Deep pages</span><Badge variant={coverage.deepPages ? "warn" : "good"}>{formatNumber(coverage.deepPages)}</Badge></div>
-            </div>
-          </div>
+        <TabsContent value="crawl" className="space-y-4">
+          <AuditCrawlEvidence result={result} coverage={coverage} />
         </TabsContent>
         <TabsContent value="raw">
           <AuditSection title="Complete scan evidence" text="The full saved crawl payload for export, debugging, and MCP/AI workflows.">
@@ -3969,6 +3939,135 @@ function severityVariant(severity: string) {
   if (severity === "high") return "bad";
   if (severity === "medium") return "warn";
   return "outline";
+}
+
+function AuditCrawlEvidence({
+  result,
+  coverage,
+}: {
+  result: any;
+  coverage: ReturnType<typeof auditCoverageMetrics>;
+}) {
+  const sitemapRows = Array.isArray(result.sitemap?.sitemaps) ? result.sitemap.sitemaps : [];
+  const evidenceRows = [
+    {
+      area: "Robots.txt",
+      status: result.robots?.exists ? "Found" : "Missing",
+      tone: result.robots?.exists ? "good" : "warn",
+      evidence: result.robots?.url || `${result.origin || result.startUrl || ""}/robots.txt`,
+    },
+    {
+      area: "Disallow rules",
+      status: formatNumber(result.robots?.disallowCount || 0),
+      tone: "outline",
+      evidence: "Rules discovered in robots.txt.",
+    },
+    {
+      area: "Sitemaps declared",
+      status: formatNumber(result.robots?.sitemaps?.length || 0),
+      tone: result.robots?.sitemaps?.length ? "good" : "warn",
+      evidence: result.robots?.sitemaps?.length ? result.robots.sitemaps.join(", ") : "No sitemap directive found in robots.txt.",
+    },
+    {
+      area: "Sitemap URLs found",
+      status: formatNumber(result.sitemap?.urls?.length || 0),
+      tone: result.sitemap?.urls?.length ? "good" : "warn",
+      evidence: "URLs loaded from sitemap files and used as crawl discovery targets.",
+    },
+  ];
+  const coverageRows = [
+    { metric: "Pages crawled", count: coverage.pages, detail: `${formatNumber(coverage.sitemapUrls)} sitemap-listed pages` },
+    { metric: "Indexable pages", count: coverage.indexablePages, detail: `${formatNumber(coverage.nonIndexablePages)} noindex/non-indexable · ${formatNumber(coverage.unknownIndexabilityPages)} unknown` },
+    { metric: "Missing from sitemap", count: coverage.pagesMissingFromSitemap, detail: "Indexable crawled pages not listed in XML sitemaps", problem: true },
+    { metric: "Noindex in sitemap", count: coverage.noindexPagesInSitemap, detail: "Non-indexable pages that still appear in XML sitemaps", problem: true },
+    { metric: "Orphan pages", count: coverage.orphanPages, detail: "Sitemap-discovered pages with no internal inlinks", problem: true },
+    { metric: "Deep pages", count: coverage.deepPages, detail: "Pages at crawl depth 4 or deeper", problem: true },
+    { metric: "Link tags found", count: coverage.linkTags, detail: `${formatNumber(coverage.checkedLinks)} unique link targets checked` },
+    { metric: "Image tags found", count: coverage.imageTags, detail: `${formatNumber(coverage.checkedImages)} image URLs checked` },
+    { metric: "CSS/JS refs found", count: coverage.assetTags, detail: `${formatNumber(coverage.checkedAssets)} CSS/JS assets checked` },
+  ];
+  return (
+    <div className="space-y-4">
+      <ReportSection title="Robots and sitemap evidence" description="What the crawler actually discovered before and during the page crawl.">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Area</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Evidence</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {evidenceRows.map((row) => (
+              <TableRow key={row.area}>
+                <TableCell className="min-w-44 font-medium">{row.area}</TableCell>
+                <TableCell><Badge variant={row.tone as any}>{row.status}</Badge></TableCell>
+                <TableCell className="min-w-96 break-all text-sm text-muted-foreground">{row.evidence}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ReportSection>
+
+      <ReportSection title="Sitemap files" description="Each sitemap file fetched and parsed during the scan.">
+        {sitemapRows.length ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sitemap</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>URLs</TableHead>
+                <TableHead>Child sitemaps</TableHead>
+                <TableHead>Error</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sitemapRows.map((sitemap: any) => (
+                <TableRow key={sitemap.url}>
+                  <TableCell className="min-w-96 break-all font-medium">{sitemap.url}</TableCell>
+                  <TableCell><Badge variant={sitemap.ok === false ? "bad" : "good"}>{sitemap.status || "-"}</Badge></TableCell>
+                  <TableCell><Badge variant="outline">{sitemap.type || "-"}</Badge></TableCell>
+                  <TableCell className="nums text-lg font-semibold">{formatNumber(sitemap.urlCount || 0)}</TableCell>
+                  <TableCell className="nums">{formatNumber(sitemap.childSitemapCount || 0)}</TableCell>
+                  <TableCell className="max-w-md break-all text-sm text-muted-foreground">{sitemap.error || "-"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <EmptyState title="No sitemap files parsed" text="The crawler did not find a sitemap file for this scan." />
+        )}
+      </ReportSection>
+
+      <ReportSection title="Crawl coverage" description="Page discovery, indexability, sitemap fit, and resource inventory from this scan.">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Metric</TableHead>
+              <TableHead>Count</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Evidence</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {coverageRows.map((row) => {
+              const count = Number(row.count || 0);
+              const tone = row.problem ? (count ? "warn" : "good") : "outline";
+              return (
+                <TableRow key={row.metric}>
+                  <TableCell className="font-medium">{row.metric}</TableCell>
+                  <TableCell className="nums text-lg font-semibold">{formatNumber(row.count)}</TableCell>
+                  <TableCell><Badge variant={tone as any}>{row.problem ? (count ? "review" : "clear") : "measured"}</Badge></TableCell>
+                  <TableCell className="min-w-96 text-sm text-muted-foreground">{row.detail}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </ReportSection>
+    </div>
+  );
 }
 
 function AuditEvidenceSnapshot({
