@@ -158,24 +158,60 @@ function localSiteHost(domain: string) {
 }
 
 function defaultAuditUrl(domain?: string) {
-  const clean = String(domain || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+  const clean = cleanSiteDomain(domain);
   if (!clean) return "";
   return `${localSiteHost(clean) ? "http" : "https"}://${clean}`;
 }
 
+function cleanSiteDomain(domain?: string) {
+  return String(domain || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+}
+
+function scanHostCandidates(domain: string, crawlHost?: Project["crawl_host"]) {
+  const root = domain.replace(/^www\./i, "");
+  if (!root || localSiteHost(root)) return root ? [root] : [];
+  const www = `www.${root}`;
+  if (crawlHost === "root") return [root];
+  if (crawlHost === "www") return [www];
+  return [root, www];
+}
+
+function scanProtocolCandidates(domain: string, crawlProtocol?: Project["crawl_protocol"]) {
+  if (crawlProtocol === "https") return ["https"];
+  if (crawlProtocol === "http") return ["http"];
+  return localSiteHost(domain) ? ["http", "https"] : ["https", "http"];
+}
+
+function scanTargetCandidates(project?: Project | null) {
+  const clean = cleanSiteDomain(project?.domain);
+  if (!clean) return [];
+  const hosts = scanHostCandidates(clean, project?.crawl_host || "auto");
+  const protocols = scanProtocolCandidates(clean, project?.crawl_protocol || "auto");
+  const urls = protocols.flatMap((protocol) => hosts.map((host) => `${protocol}://${host}`));
+  return Array.from(new Set(urls));
+}
+
 function preferredAuditUrl(project?: Project | null) {
-  const clean = String(project?.domain || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
-  if (!clean) return "";
-  const root = clean.replace(/^www\./i, "");
-  const protocol = project?.crawl_protocol === "http" ? "http" : localSiteHost(root) ? "http" : "https";
-  const host = project?.crawl_host === "www" && !localSiteHost(root) ? `www.${root}` : root;
-  return `${protocol}://${host}`;
+  return scanTargetCandidates(project)[0] || "";
 }
 
 function crawlPreferenceLabel(project?: Project | null) {
   const protocol = crawlProtocolOptions.find((item) => item.value === (project?.crawl_protocol || "auto"))?.label || "Auto";
   const host = crawlHostOptions.find((item) => item.value === (project?.crawl_host || "auto"))?.label || "Auto";
   return `${protocol} · ${host}`;
+}
+
+function scanTargetDetail(project?: Project | null) {
+  const candidates = scanTargetCandidates(project);
+  if (!candidates.length) return "Set a domain to scan.";
+  if (candidates.length === 1) return crawlPreferenceLabel(project);
+  return `${crawlPreferenceLabel(project)} · tries ${formatNumber(candidates.length)} targets: ${candidates.join(" -> ")}`;
+}
+
+function scanTargetShortDetail(project?: Project | null) {
+  const candidates = scanTargetCandidates(project);
+  if (candidates.length <= 1) return crawlPreferenceLabel(project);
+  return `${crawlPreferenceLabel(project)} · tries ${formatNumber(candidates.length)} targets`;
 }
 
 function isPlaceholderSite(project?: Project | null) {
@@ -881,9 +917,9 @@ function Workspace() {
 
           {activeProject?.domain ? (
             <div className="mt-3 rounded-md border bg-card p-3">
-              <div className="text-xs font-medium text-muted-foreground">Scan target</div>
+              <div className="text-xs font-medium text-muted-foreground">First scan target</div>
               <div className="mt-1 break-all text-sm font-medium">{preferredAuditUrl(activeProject)}</div>
-              <div className="mt-1 text-xs text-muted-foreground">{crawlPreferenceLabel(activeProject)}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{scanTargetShortDetail(activeProject)}</div>
               <Button className="mt-3 w-full justify-start" size="sm" onClick={scanActiveSite} disabled={shellScanning}>
                 <FileSearch /> {shellScanning ? "Starting scan" : "Scan website"}
               </Button>
@@ -1129,8 +1165,9 @@ function Overview({
               <div className="text-sm font-medium text-muted-foreground">Selected website</div>
               <div className="mt-1 text-2xl font-semibold">{project.domain || "Add a domain"}</div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Scan target: {preferredAuditUrl(project)} · {crawlPreferenceLabel(project)} · Market: {marketLabel(project.location_code)} · Language: {languageLabel(project.language_code)}
+                First target: {preferredAuditUrl(project)} · {scanTargetShortDetail(project)} · Market: {marketLabel(project.location_code)} · Language: {languageLabel(project.language_code)}
               </p>
+              <p className="mt-1 max-w-4xl break-all text-xs text-muted-foreground">{scanTargetDetail(project)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button disabled={!project.domain || scanning} onClick={scanSite}>
@@ -1309,7 +1346,7 @@ function SiteCommandCenter({
               One selected site feeds audits, local link evidence, rankings, Search Console, and AI work.
             </p>
           </div>
-          {project.domain ? <Badge variant="outline">{preferredAuditUrl(project)}</Badge> : null}
+          {project.domain ? <Badge variant="outline">{scanTargetShortDetail(project)}</Badge> : null}
         </div>
       </div>
       <Table>
@@ -1599,7 +1636,7 @@ function ProjectsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Site</TableHead>
-                <TableHead>Scan target</TableHead>
+                <TableHead>Scan targets</TableHead>
                 <TableHead>Market</TableHead>
                 <TableHead>Language</TableHead>
                 <TableHead>Notes</TableHead>
@@ -1616,7 +1653,7 @@ function ProjectsPage({
                   </TableCell>
                   <TableCell className="min-w-56">
                     <div className="font-medium">{preferredAuditUrl(project) || "Set domain"}</div>
-                    <div className="text-xs text-muted-foreground">{crawlPreferenceLabel(project)}</div>
+                    <div className="line-clamp-2 max-w-md break-all text-xs text-muted-foreground">{scanTargetDetail(project)}</div>
                   </TableCell>
                   <TableCell><Badge variant="outline">{marketLabel(project.location_code)}</Badge></TableCell>
                   <TableCell><Badge variant="outline">{languageLabel(project.language_code)}</Badge></TableCell>
@@ -3477,9 +3514,10 @@ function AuditsPage({ project }: { project: Project }) {
               <div className="mt-1 text-xl font-semibold">{project.domain || "Add a domain"}</div>
               {project.domain ? (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Scan target: {preferredAuditUrl(project)} · {crawlPreferenceLabel(project)}
+                  First target: {preferredAuditUrl(project)} · {scanTargetShortDetail(project)}
                 </p>
               ) : null}
+              {project.domain ? <p className="mt-1 max-w-4xl break-all text-xs text-muted-foreground">{scanTargetDetail(project)}</p> : null}
             </div>
             {project.domain ? (
               <Button disabled={starting} onClick={startSelectedSite}>
