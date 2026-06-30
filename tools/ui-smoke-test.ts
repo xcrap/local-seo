@@ -210,6 +210,29 @@ try {
     await page.getByRole("heading", { name: /Edit site/i }).waitFor();
     await page.getByText("Protocol").waitFor();
     await page.getByText("Hostname").waitFor();
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("navigation").getByRole("link", { name: /^MCP$/ }).click();
+    await page.getByRole("heading", { name: /^MCP$/ }).waitFor();
+    await page.getByRole("columnheader", { name: /Required inputs/i }).first().waitFor();
+    await page.getByRole("cell", { name: "scan_site" }).waitFor();
+    if (await page.getByText(/\bprojectId\b/).count()) {
+      throw new Error("MCP page exposes legacy projectId wording.");
+    }
+    if (await page.getByText("list_projects").count()) {
+      throw new Error("MCP page exposes legacy list_projects alias.");
+    }
+    if (await page.getByText(/workspace/i).count()) {
+      throw new Error("MCP page exposes workspace wording.");
+    }
+
+    await page.getByRole("navigation").getByRole("link", { name: /^Settings$/ }).click();
+    await page.getByRole("heading", { name: /^App settings$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Data sources$/ }).waitFor();
+    await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
+    if (await page.getByText(/API key|ENV|Environment variables/i).count()) {
+      throw new Error("Settings page exposes secret/env configuration copy.");
+    }
   } finally {
     await browser.close();
   }

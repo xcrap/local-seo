@@ -380,6 +380,40 @@ function ProviderNotice({ title, text, source }: { title: string; text: string; 
   );
 }
 
+type StatusEvidenceRow = {
+  title: string;
+  status: ReactNode;
+  tone?: "default" | "secondary" | "outline" | "good" | "warn" | "bad";
+  text: ReactNode;
+};
+
+function StatusEvidenceTable({ rows }: { rows: StatusEvidenceRow[] }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Area</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Evidence</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.title}>
+            <TableCell className="min-w-48 font-medium">{row.title}</TableCell>
+            <TableCell className="min-w-40">
+              <Badge variant={(row.tone || "outline") as any} className="max-w-xs break-all whitespace-normal text-left">
+                {row.status}
+              </Badge>
+            </TableCell>
+            <TableCell className="min-w-80 text-sm leading-6 text-muted-foreground">{row.text}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
 function JsonBlock({ value }: { value: unknown }) {
   return (
     <pre className="max-h-[420px] overflow-auto rounded-md bg-secondary p-4 text-xs leading-relaxed text-secondary-foreground">
@@ -2535,14 +2569,16 @@ function OrganicSnapshot({ result, target, keywordRows, pageRows }: { result: an
       title="Snapshot"
       description={<><SourceBadge source={result.source} /> {result.createdAt ? <span className="ml-2">{formatDate(result.createdAt)}</span> : null}</>}
     >
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <SourceStatus title="Target" status={target || result.target || "-"} tone="good" text="The selected site or competitor target analyzed in this run." />
-        <SourceStatus title="Keyword rows" status={formatNumber(keywordRows)} tone={keywordRows ? "good" : "warn"} text="Rows returned by the real organic search dataset." />
-        <SourceStatus title="Page rows" status={formatNumber(pageRows)} tone={pageRows ? "good" : "warn"} text="Top pages returned for this target." />
-        <SourceStatus title="Organic keywords" status={formatNumber(result.organicKeywords || 0)} tone={result.organicKeywords ? "good" : "warn"} text="Connected data-source metric. Blank or zero when no dataset is connected." />
-        <SourceStatus title="Organic traffic" status={formatNumber(result.organicTraffic || 0)} tone={result.organicTraffic ? "good" : "warn"} text="Estimate from the connected organic dataset." />
-        <SourceStatus title="Traffic value" status={formatNumber(result.estimatedValue || 0)} tone={result.estimatedValue ? "good" : "warn"} text="Estimate from the connected organic dataset." />
-      </div>
+      <StatusEvidenceTable
+        rows={[
+          { title: "Target", status: target || result.target || "-", tone: "good", text: "The selected site or competitor target analyzed in this run." },
+          { title: "Keyword rows", status: formatNumber(keywordRows), tone: keywordRows ? "good" : "warn", text: "Rows returned by the real organic search dataset." },
+          { title: "Page rows", status: formatNumber(pageRows), tone: pageRows ? "good" : "warn", text: "Top pages returned for this target." },
+          { title: "Organic keywords", status: formatNumber(result.organicKeywords || 0), tone: result.organicKeywords ? "good" : "warn", text: "Connected data-source metric. Blank or zero when no dataset is connected." },
+          { title: "Organic traffic", status: formatNumber(result.organicTraffic || 0), tone: result.organicTraffic ? "good" : "warn", text: "Estimate from the connected organic dataset." },
+          { title: "Traffic value", status: formatNumber(result.estimatedValue || 0), tone: result.estimatedValue ? "good" : "warn", text: "Estimate from the connected organic dataset." },
+        ]}
+      />
     </ReportSection>
   );
 }
@@ -2917,14 +2953,16 @@ function BacklinkSnapshot({ result, target, rows, tab }: { result: any; target: 
       title="Snapshot"
       description={<><SourceBadge source={result.source} /> {result.createdAt ? <span className="ml-2">{formatDate(result.createdAt)}</span> : null}</>}
     >
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <SourceStatus title="Target" status={target || result.target || "-"} tone="good" text="The domain or URL analyzed in this run." />
-        <SourceStatus title="Visible rows" status={formatNumber(rows)} tone={rows ? "good" : "warn"} text={`Rows currently loaded in the ${tab} tab.`} />
-        <SourceStatus title="Backlinks" status={formatNumber(backlinks)} tone={backlinks ? "good" : "warn"} text="Total backlinks from the connected index." />
-        <SourceStatus title="Referring domains" status={formatNumber(referringDomains)} tone={referringDomains ? "good" : "warn"} text="Unique linking domains from the connected index." />
-        <SourceStatus title="Dofollow %" status={formatNumber(result.dofollowRatio || 0)} tone={result.dofollowRatio ? "good" : "warn"} text="Dofollow ratio reported by the connected index." />
-        <SourceStatus title="Source" status={sourceLabel(result.source)} tone={sourceVariant(result.source) as any} text={result.warning || "Snapshot saved locally in SQLite."} />
-      </div>
+      <StatusEvidenceTable
+        rows={[
+          { title: "Target", status: target || result.target || "-", tone: "good", text: "The domain or URL analyzed in this run." },
+          { title: "Visible rows", status: formatNumber(rows), tone: rows ? "good" : "warn", text: `Rows currently loaded in the ${tab} tab.` },
+          { title: "Backlinks", status: formatNumber(backlinks), tone: backlinks ? "good" : "warn", text: "Total backlinks from the connected index." },
+          { title: "Referring domains", status: formatNumber(referringDomains), tone: referringDomains ? "good" : "warn", text: "Unique linking domains from the connected index." },
+          { title: "Dofollow %", status: formatNumber(result.dofollowRatio || 0), tone: result.dofollowRatio ? "good" : "warn", text: "Dofollow ratio reported by the connected index." },
+          { title: "Source", status: sourceLabel(result.source), tone: sourceVariant(result.source) as any, text: result.warning || "Snapshot saved locally in SQLite." },
+        ]}
+      />
     </ReportSection>
   );
 }
@@ -3180,10 +3218,14 @@ function PromptResult({ result }: { result: any }) {
         title="Run summary"
         description={<><SourceBadge source={result.source} /> {result.highlightBrand ? <span className="ml-2">Watching: {result.highlightBrand}</span> : null}</>}
       >
-        <div className="grid gap-3 md:grid-cols-3">
-          <SourceStatus title="Prompt" status="Saved" tone="good" text={result.prompt || "Prompt saved with this run."} />
-          <SourceStatus title="Models" status={formatNumber(result.results?.length || 0)} tone="good" text="Each section below is a connected AI data-source response or a local Codex job state." />
-          <SourceStatus title="Local job" status={result.jobId ? "Queued" : "None"} tone={result.jobId ? "warn" : "good"} text={result.jobId ? "Open AI lab to read the Codex result when it finishes." : "No local Codex job was needed for this run."} />
+        <div className="space-y-4">
+          <StatusEvidenceTable
+            rows={[
+              { title: "Prompt", status: "Saved", tone: "good", text: result.prompt || "Prompt saved with this run." },
+              { title: "Models", status: formatNumber(result.results?.length || 0), tone: "good", text: "Each section below is a connected AI data-source response or a local Codex job state." },
+              { title: "Local job", status: result.jobId ? "Queued" : "None", tone: result.jobId ? "warn" : "good", text: result.jobId ? "Open AI lab to read the Codex result when it finishes." : "No local Codex job was needed for this run." },
+            ]}
+          />
           {result.jobId ? <Button asChild variant="secondary"><Link to="/ai"><Bot /> Open AI lab</Link></Button> : null}
         </div>
       </ReportSection>
@@ -5026,10 +5068,12 @@ function GscPage({ project }: { project: Project }) {
             </p>
           </div>
           <div className="space-y-3 p-5">
-            <div className="grid gap-2">
-              <SourceStatus title="Google account" status={status?.connected ? "Connected" : "Not connected"} tone={status?.connected ? "good" : "warn"} text={status?.connection?.accountEmail || "Connect once, then choose the matching property."} />
-              <SourceStatus title="Selected property" status={status?.connection?.siteUrl ? "Selected" : "None"} tone={status?.connection?.siteUrl ? "good" : "warn"} text={status?.connection?.siteUrl || "Load properties and pick the property for this site."} />
-            </div>
+            <StatusEvidenceTable
+              rows={[
+                { title: "Google account", status: status?.connected ? "Connected" : "Not connected", tone: status?.connected ? "good" : "warn", text: status?.connection?.accountEmail || "Connect once, then choose the matching property." },
+                { title: "Selected property", status: status?.connection?.siteUrl ? "Selected" : "None", tone: status?.connection?.siteUrl ? "good" : "warn", text: status?.connection?.siteUrl || "Load properties and pick the property for this site." },
+              ]}
+            />
             <Button className="w-full" onClick={connect} disabled={!status?.configured}>Connect Google</Button>
             <Button className="w-full" variant="secondary" onClick={loadSites} disabled={!status?.connected || loading === "sites"}>{loading === "sites" ? "Loading" : "Load properties"}</Button>
             <Button className="w-full" variant="outline" onClick={disconnect} disabled={!status?.connected || loading === "disconnect"}>Disconnect</Button>
@@ -5322,19 +5366,42 @@ function McpPage() {
               title={group}
               description={`${formatNumber(rows.length)} local MCP tools`}
             >
-              <div className="grid gap-3 lg:grid-cols-2">
-                {rows.map((tool) => (
-                  <div key={tool.name} className="rounded-md border bg-muted/25 p-3">
-                    <div className="font-medium">{tool.name}</div>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{tool.description}</p>
-                  </div>
-                ))}
-              </div>
+              <McpToolTable rows={rows} />
             </ReportSection>
           ))}
         </div>
       </div>
     </>
+  );
+}
+
+function McpToolTable({ rows }: { rows: any[] }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Tool</TableHead>
+          <TableHead>Required inputs</TableHead>
+          <TableHead>Description</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((tool) => {
+          const required = Array.isArray(tool.inputSchema?.required) ? tool.inputSchema.required : [];
+          return (
+            <TableRow key={tool.name}>
+              <TableCell className="min-w-52 font-medium">{tool.name}</TableCell>
+              <TableCell className="min-w-44">
+                <div className="flex flex-wrap gap-1">
+                  {required.length ? required.map((name: string) => <Badge key={name} variant="outline">{name}</Badge>) : <Badge variant="outline">none</Badge>}
+                </div>
+              </TableCell>
+              <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{tool.description}</TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -5408,28 +5475,20 @@ function SettingsPage() {
             <Button><Settings /> Save app settings</Button>
           </form>
         </ReportSection>
-        <div className="space-y-3">
-          <SourceStatus title="Technical audits" status="Active" tone="good" text="Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." />
-          <SourceStatus title="Keyword ideas" status="Active" tone="good" text="DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty are blank unless a metrics source is connected." />
-          <SourceStatus title="SERP and rank checks" status={config.openserp_url ? "OpenSERP" : "DuckDuckGo"} tone="good" text="Uses OpenSERP when available, otherwise live DuckDuckGo results. The source is shown on each report." />
-          <SourceStatus title="Search Console" status={config.google_client_id && config.google_client_secret ? "Available" : "Use Search Console page"} tone={config.google_client_id && config.google_client_secret ? "good" : "warn"} text="Connect per site from the Search Console screen to read your real GSC data." />
-          <SourceStatus title="Backlink index" status={config.dataforseo_api_key ? "Connected" : "Not connected"} tone={config.dataforseo_api_key ? "good" : "warn"} text="No generated backlink rows are shown. Backlinks require a real backlink index or imported data." />
-          <SourceStatus title="MCP endpoint" status="Local" tone="good" text="The local JSON-RPC endpoint is available from the MCP screen." />
-        </div>
+        <ReportSection title="Data sources" description="What the app can run locally now and what needs a real connected source.">
+          <StatusEvidenceTable
+            rows={[
+              { title: "Technical audits", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
+              { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless a metrics source is connected." },
+              { title: "SERP and rank checks", status: config.openserp_url ? "OpenSERP" : "DuckDuckGo", tone: "good", text: "Uses OpenSERP when available, otherwise live DuckDuckGo results. The source is shown on each report." },
+              { title: "Search Console", status: config.google_client_id && config.google_client_secret ? "Available" : "Connect on Search Console page", tone: config.google_client_id && config.google_client_secret ? "good" : "warn", text: "Connect per site from the Search Console screen to read real GSC performance and inspection data." },
+              { title: "Backlink index", status: config.dataforseo_api_key ? "Connected" : "Not connected", tone: config.dataforseo_api_key ? "good" : "warn", text: "No generated backlink rows are shown. Backlinks require a real backlink index or imported data." },
+              { title: "MCP endpoint", status: "Local", tone: "good", text: "The local JSON-RPC endpoint is available from the MCP screen." },
+            ]}
+          />
+        </ReportSection>
       </div>
     </>
-  );
-}
-
-function SourceStatus({ title, status, tone, text }: { title: string; status: string; tone: "good" | "warn" | "bad"; text: string }) {
-  return (
-    <div className="rounded-md border bg-background p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="font-medium">{title}</div>
-        <Badge variant={tone}>{status}</Badge>
-      </div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
-    </div>
   );
 }
 
