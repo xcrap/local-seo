@@ -5452,67 +5452,59 @@ function AuditImagesTable({ rows }: { rows: any[] }) {
 }
 
 function AuditImageInventoryTable({ rows }: { rows: any[] }) {
-  const visible = rows.slice(0, 350);
   return (
-    <div className="space-y-2">
-      <Table>
-        <TableHeader><TableRow><TableHead>Image</TableHead><TableHead>Problems</TableHead><TableHead>Alt</TableHead><TableHead>Class</TableHead><TableHead>Size attrs</TableHead><TableHead>Sources</TableHead><TableHead>Loading</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
-        <TableBody>
-          {visible.map((row, index) => (
-            <TableRow key={`${row.from}:${row.src}:${index}`}>
-              <TableCell className="max-w-sm break-all font-medium">{row.src || "Missing src"}</TableCell>
-              <TableCell>
-                <div className="flex flex-wrap gap-1">
-                  {row.issues?.length ? row.issues.map((issue: string) => <Badge key={issue} variant={issue.includes("missing") || issue.includes("mixed") ? "warn" : "outline"}>{issue}</Badge>) : <Badge variant="good">Clean tag</Badge>}
-                </div>
-              </TableCell>
-              <TableCell className="max-w-xs">
-                <div className="line-clamp-2 text-sm">{row.altPreview || (row.altState === "missing" ? "Missing" : "Empty")}</div>
-                <Badge variant={row.altState === "present" ? "good" : row.classification === "content" ? "warn" : "outline"}>{row.altState}</Badge>
-              </TableCell>
-              <TableCell><Badge variant="outline">{row.classification}</Badge></TableCell>
-              <TableCell className="nums">{row.width || "-"} x {row.height || "-"}</TableCell>
-              <TableCell className="nums">
-                <div className="flex flex-wrap gap-1">
-                  <Badge variant={row.srcsetCount ? "outline" : "warn"}>{row.srcsetCount || 0} srcset</Badge>
-                  {row.pictureSourceCount ? <Badge variant="outline">{row.pictureSourceCount} picture</Badge> : null}
-                </div>
-              </TableCell>
-              <TableCell className="text-muted-foreground">{row.loading || "-"}</TableCell>
-              <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {rows.length > visible.length ? <p className="text-xs text-muted-foreground">Showing {formatNumber(visible.length)} of {formatNumber(rows.length)} image tags.</p> : null}
-    </div>
+    <Table>
+      <TableHeader><TableRow><TableHead>Image</TableHead><TableHead>Problems</TableHead><TableHead>Alt</TableHead><TableHead>Class</TableHead><TableHead>Size attrs</TableHead><TableHead>Sources</TableHead><TableHead>Loading</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
+      <TableBody>
+        {rows.map((row, index) => (
+          <TableRow key={`${row.from}:${row.src}:${index}`}>
+            <TableCell className="max-w-sm break-all font-medium">{row.src || "Missing src"}</TableCell>
+            <TableCell>
+              <div className="flex flex-wrap gap-1">
+                {row.issues?.length ? row.issues.map((issue: string) => <Badge key={issue} variant={issue.includes("missing") || issue.includes("mixed") ? "warn" : "outline"}>{issue}</Badge>) : <Badge variant="good">Clean tag</Badge>}
+              </div>
+            </TableCell>
+            <TableCell className="max-w-xs">
+              <div className="line-clamp-2 text-sm">{row.altPreview || (row.altState === "missing" ? "Missing" : "Empty")}</div>
+              <Badge variant={row.altState === "present" ? "good" : row.classification === "content" ? "warn" : "outline"}>{row.altState}</Badge>
+            </TableCell>
+            <TableCell><Badge variant="outline">{row.classification}</Badge></TableCell>
+            <TableCell className="nums">{row.width || "-"} x {row.height || "-"}</TableCell>
+            <TableCell className="nums">
+              <div className="flex flex-wrap gap-1">
+                <Badge variant={row.srcsetCount ? "outline" : "warn"}>{row.srcsetCount || 0} srcset</Badge>
+                {row.pictureSourceCount ? <Badge variant="outline">{row.pictureSourceCount} picture</Badge> : null}
+              </div>
+            </TableCell>
+            <TableCell className="text-muted-foreground">{row.loading || "-"}</TableCell>
+            <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
 function AuditLinkInventoryTable({ rows }: { rows: any[] }) {
-  const visible = rows.slice(0, 350);
   return (
-    <div className="space-y-2">
-      <Table>
-        <TableHeader><TableRow><TableHead>Target</TableHead><TableHead>Type</TableHead><TableHead>Anchor</TableHead><TableHead>Rel</TableHead><TableHead>Target</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
-        <TableBody>
-          {visible.map((row, index) => (
-            <TableRow key={`${row.from}:${row.href}:${index}`}>
-              <TableCell className="max-w-sm break-all font-medium">{row.href}</TableCell>
-              <TableCell><Badge variant="outline">{row.type}</Badge></TableCell>
-              <TableCell className="max-w-xs">
-                <div className="line-clamp-2 text-sm">{row.anchor || row.accessibleName || "No readable anchor"}</div>
-                {!row.anchor && !row.accessibleName ? <Badge variant="warn">empty</Badge> : null}
-              </TableCell>
-              <TableCell className="max-w-xs truncate text-muted-foreground">{row.rel || "-"}</TableCell>
-              <TableCell className="text-muted-foreground">{row.target || "-"}</TableCell>
-              <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {rows.length > visible.length ? <p className="text-xs text-muted-foreground">Showing {formatNumber(visible.length)} of {formatNumber(rows.length)} links.</p> : null}
-    </div>
+    <Table>
+      <TableHeader><TableRow><TableHead>Target</TableHead><TableHead>Type</TableHead><TableHead>Anchor</TableHead><TableHead>Rel</TableHead><TableHead>Target</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
+      <TableBody>
+        {rows.map((row, index) => (
+          <TableRow key={`${row.from}:${row.href}:${index}`}>
+            <TableCell className="max-w-sm break-all font-medium">{row.href}</TableCell>
+            <TableCell><Badge variant="outline">{row.type}</Badge></TableCell>
+            <TableCell className="max-w-xs">
+              <div className="line-clamp-2 text-sm">{row.anchor || row.accessibleName || "No readable anchor"}</div>
+              {!row.anchor && !row.accessibleName ? <Badge variant="warn">empty</Badge> : null}
+            </TableCell>
+            <TableCell className="max-w-xs truncate text-muted-foreground">{row.rel || "-"}</TableCell>
+            <TableCell className="text-muted-foreground">{row.target || "-"}</TableCell>
+            <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 

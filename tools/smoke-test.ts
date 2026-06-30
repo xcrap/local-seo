@@ -257,6 +257,9 @@ try {
   if (!webAppClient.includes("Every saved scan is still listed below")) {
     throw new Error("Audit page should explain that all saved scans remain visible in the local ledger.");
   }
+  if (webAppClient.includes("rows.slice(0, 350)") || webAppClient.includes("Showing {formatNumber(visible.length)}")) {
+    throw new Error("Audit evidence tables should not silently cap local link or image inventory rows.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",
