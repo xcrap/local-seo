@@ -167,6 +167,12 @@ try {
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
     await page.getByRole("heading", { name: /Audit snapshot/i }).waitFor();
     await page.getByText("Links and assets").waitFor();
+    await page.getByRole("tab", { name: /^Issues$/ }).click();
+    await page.getByRole("heading", { name: /^Priority work queue$/ }).waitFor();
+    await page.getByRole("columnheader", { name: /^Recommended fix$/ }).waitFor();
+    await page.getByRole("button", { name: /Review/i }).first().click();
+    await page.getByRole("button", { name: /Clear filters/i }).waitFor();
+    await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("button", { name: /Open images/i }).click();
     await page.getByText("Image tag inventory").waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();

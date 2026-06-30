@@ -4605,34 +4605,50 @@ function AuditCheckRow({ row, onSelect }: { row: AuditCheckRowModel & { area?: s
 
 function AuditIssueGroups({ groups, onSelect }: { groups: any[]; onSelect: (group: any) => void }) {
   return (
-    <div className="rounded-md border bg-background p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="font-medium">Priority work queue</div>
-          <p className="text-sm text-muted-foreground">Grouped by issue type so repeated failures become one clear task.</p>
+    <ReportSection
+      title="Priority work queue"
+      description={
+        <div className="flex flex-wrap items-center gap-2">
+          <span>Grouped by issue type so repeated failures become one clear task.</span>
+          <Badge variant="outline">{formatNumber(groups.length)} groups</Badge>
         </div>
-        <Badge variant="outline">{formatNumber(groups.length)} groups</Badge>
-      </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        {groups.slice(0, 12).map((group) => (
-          <button
-            key={group.key}
-            type="button"
-            className="rounded-md border bg-muted/20 p-3 text-left transition-colors hover:bg-muted/45"
-            onClick={() => onSelect(group)}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge>
-              <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
-              <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
-              <span className="nums text-xs text-muted-foreground">{formatNumber(group.count)} URLs</span>
-            </div>
-            <div className="mt-2 font-medium">{group.message}</div>
-            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{group.recommendation}</div>
-          </button>
-        ))}
-      </div>
-    </div>
+      }
+    >
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Severity</TableHead>
+            <TableHead>Issue group</TableHead>
+            <TableHead>Category</TableHead>
+            <TableHead>Affected</TableHead>
+            <TableHead>Recommended fix</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {groups.slice(0, 24).map((group) => (
+            <TableRow key={group.key}>
+              <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
+              <TableCell className="min-w-72">
+                <div className="font-medium">{group.message}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{String(group.type || "").replaceAll("-", " ")}</div>
+              </TableCell>
+              <TableCell className="min-w-36">
+                <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
+              </TableCell>
+              <TableCell className="nums text-lg font-semibold">{formatNumber(group.count)}</TableCell>
+              <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
+              <TableCell className="text-right">
+                <Button size="sm" variant="outline" onClick={() => onSelect(group)}>
+                  <ListChecks /> Review
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {groups.length > 24 ? <p className="mt-3 text-xs text-muted-foreground">Showing 24 of {formatNumber(groups.length)} issue groups.</p> : null}
+    </ReportSection>
   );
 }
 
