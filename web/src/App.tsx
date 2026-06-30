@@ -3627,6 +3627,8 @@ function AuditsPage({ project }: { project: Project }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [showCustomUrl, setShowCustomUrl] = useState(false);
+  const [manualLedgerAuditId, setManualLedgerAuditId] = useState("");
+  const [manualLedgerSiteId, setManualLedgerSiteId] = useState("");
   const activeAudit = auditIsActive(detail) ? detail : allAudits.find(auditIsActive);
   async function load() {
     const [siteRows, ledgerRows] = await Promise.all([
@@ -3638,12 +3640,20 @@ function AuditsPage({ project }: { project: Project }) {
     setAudits(rows);
     setAllAudits(ledger);
     const currentDetail = detail?.id ? ledger.find((row) => row.id === detail.id) : null;
+    const currentDetailBelongsToSite = currentDetail?.project_id === project.id;
+    const manualAudit = manualLedgerAuditId && manualLedgerSiteId === project.id
+      ? ledger.find((row) => row.id === manualLedgerAuditId)
+      : null;
     const selectedAuditId = getSelectedAuditId(project.id);
-    const selectedAudit = selectedAuditId ? ledger.find((row) => row.id === selectedAuditId) : null;
-    const nextDetail = currentDetail || selectedAudit || rows[0] || ledger[0] || null;
+    const selectedAudit = selectedAuditId ? rows.find((row) => row.id === selectedAuditId) : null;
+    const nextDetail = manualAudit || (currentDetailBelongsToSite ? currentDetail : null) || selectedAudit || rows[0] || null;
     setDetail(nextDetail);
     if (nextDetail?.id) setSelectedAuditId(nextDetail.project_id || project.id, nextDetail.id);
     else clearSelectedAuditId(project.id);
+    if (manualLedgerAuditId && !manualAudit) {
+      setManualLedgerAuditId("");
+      setManualLedgerSiteId("");
+    }
     return rows;
   }
   useEffect(() => {
@@ -3689,6 +3699,8 @@ function AuditsPage({ project }: { project: Project }) {
     event.preventDefault();
     setError("");
     setStarting(true);
+    setManualLedgerAuditId("");
+    setManualLedgerSiteId("");
     try {
       const audit = await api.startAudit({ siteId: project.id, url });
       setDetail(audit);
@@ -3706,6 +3718,8 @@ function AuditsPage({ project }: { project: Project }) {
     if (!project.domain) return;
     setError("");
     setStarting(true);
+    setManualLedgerAuditId("");
+    setManualLedgerSiteId("");
     try {
       const result = await api.scanProject(project.id);
       setDetail(result.audit);
@@ -3720,6 +3734,8 @@ function AuditsPage({ project }: { project: Project }) {
     }
   }
   async function inspect(id: string, row?: any) {
+    setManualLedgerAuditId(id);
+    setManualLedgerSiteId(project.id);
     setSelectedAuditId(row?.project_id || project.id, id);
     setDetail(await api.audit(id));
   }
@@ -3730,6 +3746,10 @@ function AuditsPage({ project }: { project: Project }) {
       clearSelectedAuditId(siteId);
     }
     if (detail?.id === id) setDetail(null);
+    if (manualLedgerAuditId === id) {
+      setManualLedgerAuditId("");
+      setManualLedgerSiteId("");
+    }
     await load();
   }
   async function clearHistory() {
@@ -3738,6 +3758,8 @@ function AuditsPage({ project }: { project: Project }) {
     try {
       await api.clearAudits(project.id);
       clearSelectedAuditId(project.id);
+      setManualLedgerAuditId("");
+      setManualLedgerSiteId("");
       setDetail(null);
       setConfirmClearAudits(false);
       await load();
@@ -3801,8 +3823,8 @@ function AuditsPage({ project }: { project: Project }) {
           </div>
           {detail ? <AuditDetail audit={detail} /> : (
             <EmptyState
-              title={allAudits.length ? "No scan selected" : "No scan report yet"}
-              text={allAudits.length ? "Open any saved scan below." : "Start a local site scan to fill this report with crawl evidence."}
+              title={allAudits.length ? "No selected-site scan open" : "No scan report yet"}
+              text={allAudits.length ? "Every saved scan is still listed below. Open a row to inspect it, or run a scan for the selected site." : "Start a local site scan to fill this report with crawl evidence."}
               action={
                 !allAudits.length
                   ? project.domain

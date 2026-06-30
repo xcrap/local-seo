@@ -251,6 +251,12 @@ try {
   if (webAppClient.includes("window.location.href")) {
     throw new Error("The app shell should use React Router navigation instead of full-page window.location.href route changes.");
   }
+  if (webAppClient.includes("rows[0] || ledger[0]")) {
+    throw new Error("Audit report selection should not hide context by auto-opening the newest global scan.");
+  }
+  if (!webAppClient.includes("Every saved scan is still listed below")) {
+    throw new Error("Audit page should explain that all saved scans remain visible in the local ledger.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",
