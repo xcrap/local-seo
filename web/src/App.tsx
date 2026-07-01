@@ -3610,22 +3610,41 @@ function BrandLookupResult({ result }: { result: any }) {
 
 function CitationList({ rows }: { rows: any[] }) {
   return (
-    <div className="space-y-2">
-      {rows.slice(0, 12).map((citation, index) => (
-        <a
-          key={`${citation.url || citation.link || citation.title}:${index}`}
-          href={citation.url || citation.link}
-          target="_blank"
-          rel="noreferrer"
-          className="block rounded-md border bg-background p-3 transition-colors hover:bg-muted/35"
-        >
-          <div className="line-clamp-1 font-medium">{citation.title || citation.url || citation.link || "Citation"}</div>
-          <div className="mt-1 break-all text-xs text-muted-foreground">{citation.url || citation.link || "-"}</div>
-          {citation.snippet || citation.description ? <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{citation.snippet || citation.description}</p> : null}
-        </a>
-      ))}
-      {rows.length > 12 ? <p className="text-xs text-muted-foreground">Showing 12 of {formatNumber(rows.length)} citations.</p> : null}
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Citation</TableHead>
+          <TableHead>URL</TableHead>
+          <TableHead>Evidence</TableHead>
+          <TableHead className="text-right">Open</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((citation, index) => {
+          const href = citation.url || citation.link || "";
+          return (
+            <TableRow key={`${href || citation.title}:${index}`}>
+              <TableCell className="min-w-72">
+                <div className="font-medium">{citation.title || href || "Citation"}</div>
+              </TableCell>
+              <TableCell className="min-w-72 break-all text-xs text-muted-foreground">{href || "-"}</TableCell>
+              <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">
+                {citation.snippet || citation.description || "-"}
+              </TableCell>
+              <TableCell className="text-right">
+                {href ? (
+                  <Button asChild size="sm" variant="outline">
+                    <a href={href} target="_blank" rel="noreferrer">
+                      <ExternalLink /> Open
+                    </a>
+                  </Button>
+                ) : null}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -5083,8 +5102,7 @@ function AuditActionBoard({
   onSelectGroup: (group: any) => void;
 }) {
   const priorityGroups = issueGroups
-    .filter((group) => group.severity === "high" || group.severity === "medium")
-    .slice(0, 5);
+    .filter((group) => group.severity === "high" || group.severity === "medium");
   const checks = [
     { label: "Titles", value: Number(summary.missingTitles || 0) + Number(summary.titleLengthIssues || 0) + issueTypeCount(issues, "duplicate-title"), detail: `${formatNumber(coverage.pages)} pages checked`, tone: "bad" },
     { label: "Descriptions", value: Number(summary.missingDescriptions || 0) + Number(summary.descriptionLengthIssues || 0) + issueTypeCount(issues, "duplicate-description"), detail: `${formatNumber(coverage.pages)} pages checked`, tone: "bad" },
@@ -5413,7 +5431,7 @@ function AuditIssueGroups({ groups, onSelect }: { groups: any[]; onSelect: (grou
           </TableRow>
         </TableHeader>
         <TableBody>
-          {groups.slice(0, 24).map((group) => (
+          {groups.map((group) => (
             <TableRow key={group.key}>
               <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
               <TableCell className="min-w-72">
@@ -5434,7 +5452,6 @@ function AuditIssueGroups({ groups, onSelect }: { groups: any[]; onSelect: (grou
           ))}
         </TableBody>
       </Table>
-      {groups.length > 24 ? <p className="mt-3 text-xs text-muted-foreground">Showing 24 of {formatNumber(groups.length)} issue groups.</p> : null}
     </ReportSection>
   );
 }
@@ -5466,7 +5483,7 @@ function AuditIssuesTable({ rows }: { rows: any[] }) {
       </TableHeader>
       <TableBody>
         {rows.map((issue, index) => {
-          const evidence = Object.entries(issue.evidence || {}).slice(0, 4);
+          const evidence = Object.entries(issue.evidence || {});
           return (
             <TableRow key={issue.id || `${issue.url}:${issue.message}:${index}`}>
               <TableCell><Badge variant={severityVariant(issue.severity) as any}>{issue.severity}</Badge></TableCell>

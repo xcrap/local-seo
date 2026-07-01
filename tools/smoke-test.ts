@@ -316,6 +316,18 @@ try {
   if (webAppClient.includes("rows.slice(0, 6)") || webAppClient.includes("runs.slice(0, 8)")) {
     throw new Error("Local history widgets should not silently cap saved history rows.");
   }
+  for (const hiddenEvidencePattern of [
+    "rows.slice(0, 12)",
+    "Showing 12 of",
+    ".slice(0, 5);",
+    "groups.slice(0, 24)",
+    "Showing 24 of",
+    "Object.entries(issue.evidence || {}).slice(0, 4)",
+  ]) {
+    if (webAppClient.includes(hiddenEvidencePattern)) {
+      throw new Error(`Readable evidence UI should not hide saved rows with ${hiddenEvidencePattern}.`);
+    }
+  }
   if (webAppClient.includes("rounded-md border bg-background p-3 text-sm") || !webAppClient.includes("HistoryTable")) {
     throw new Error("Local history widgets should render as readable tables instead of mini card stacks.");
   }
