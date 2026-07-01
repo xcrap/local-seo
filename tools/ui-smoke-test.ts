@@ -186,23 +186,23 @@ try {
     await page.getByRole("tab", { name: /^Issues$/ }).click();
     await page.getByRole("heading", { name: /^Priority work queue$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Recommended fix$/ }).waitFor();
-	    await page.getByRole("button", { name: /Show \d+ issues/i }).first().click();
-	    await page.getByText(/Issue results/i).waitFor();
-	    await page.getByText(/Showing \d+ of \d+ saved issues for/i).waitFor();
-	    const issueResultsTable = page.locator("table").last();
-	    const issueResultsTableBox = await issueResultsTable.boundingBox();
-	    const issueResultsViewport = page.viewportSize();
-	    if (
-	      !issueResultsTableBox ||
-	      !issueResultsViewport ||
-	      issueResultsTableBox.x + issueResultsTableBox.width > issueResultsViewport.width
-	    ) {
-	      throw new Error(`Issue results table should fit the viewport, got ${JSON.stringify(issueResultsTableBox)} in ${JSON.stringify(issueResultsViewport)}.`);
-	    }
-	    await page.getByRole("button", { name: /Clear filters/i }).waitFor();
-	    await page.getByRole("button", { name: /Clear filters/i }).click();
-	    await page.getByRole("columnheader", { name: /^Fix$/ }).waitFor();
-	    await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
+    await page.getByRole("button", { name: /Show \d+ issues/i }).first().click();
+    await page.getByText(/Issue results/i).waitFor();
+    await page.getByText(/Showing \d+ of \d+ saved issues for/i).waitFor();
+    const issueResultsTable = page.locator("table").last();
+    const issueResultsTableBox = await issueResultsTable.boundingBox();
+    const issueResultsViewport = page.viewportSize();
+    if (
+      !issueResultsTableBox ||
+      !issueResultsViewport ||
+      issueResultsTableBox.x + issueResultsTableBox.width > issueResultsViewport.width
+    ) {
+      throw new Error(`Issue results table should fit the viewport, got ${JSON.stringify(issueResultsTableBox)} in ${JSON.stringify(issueResultsViewport)}.`);
+    }
+    await page.getByRole("button", { name: /Clear filters/i }).waitFor();
+    await page.getByRole("button", { name: /Clear filters/i }).click();
+    await page.getByRole("columnheader", { name: /^Fix$/ }).waitFor();
+    await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Images$/ }).click();
     await page.getByText("Image tag inventory").waitFor();
@@ -271,6 +271,18 @@ try {
     await siteControl.getByRole("link", { name: /^Open ranks$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open AI lab$/ }).waitFor();
+
+    await page.setViewportSize({ width: 1280, height: 820 });
+    const desktopNavigation = page.getByRole("navigation").first();
+    const signOutButton = page.getByRole("button", { name: /^Sign out$/ });
+    const desktopNavigationBox = await desktopNavigation.boundingBox();
+    const signOutBox = await signOutButton.boundingBox();
+    if (!desktopNavigationBox || !signOutBox || desktopNavigationBox.y + desktopNavigationBox.height > signOutBox.y) {
+      throw new Error(`Desktop sidebar navigation overlaps sign out: nav=${JSON.stringify(desktopNavigationBox)} signOut=${JSON.stringify(signOutBox)}.`);
+    }
+    await desktopNavigation.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    await desktopNavigation.getByRole("link", { name: /^Settings$/ }).waitFor();
+    await desktopNavigation.evaluate((element) => { element.scrollTop = 0; });
 
     await page.setViewportSize({ width: 1600, height: 1000 });
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();

@@ -405,15 +405,18 @@ try {
       throw new Error(`The app should call site-named API helpers, not ${legacyWebCall}.`);
     }
   }
-	  if (/type=["']date["']/.test(webAppClient) || !webAppClient.includes("function DatePicker") || !webAppClient.includes("<Calendar")) {
-	    throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
-	  }
-	  if (!webAppClient.includes("function EvidenceValue") || !webAppClient.includes("more in saved evidence")) {
-	    throw new Error("Audit issue evidence should summarize long sample lists without crushing table columns.");
-	  }
-	  if (webAppClient.includes("projectId:")) {
-	    throw new Error("The app should send siteId for active-site actions, not projectId.");
-	  }
+  if (/type=["']date["']/.test(webAppClient) || !webAppClient.includes("function DatePicker") || !webAppClient.includes("<Calendar")) {
+    throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
+  }
+  if (!webAppClient.includes("function EvidenceValue") || !webAppClient.includes("more in saved evidence")) {
+    throw new Error("Audit issue evidence should summarize long sample lists without crushing table columns.");
+  }
+  if (webAppClient.includes("projectId:")) {
+    throw new Error("The app should send siteId for active-site actions, not projectId.");
+  }
+  if (webAppClient.includes("absolute bottom-5") || !webAppClient.includes("min-h-0 flex-1 space-y-1 overflow-y-auto")) {
+    throw new Error("Desktop sidebar navigation should scroll above a real footer instead of overlapping the sign-out button.");
+  }
   if (/selected-site/i.test(webAppClient)) {
     throw new Error("The app should use active-site wording instead of selected-site implementation copy.");
   }

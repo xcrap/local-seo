@@ -1267,8 +1267,8 @@ function AppShell() {
 
   return (
     <div className="grain min-h-screen">
-        <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 border-r bg-background/90 px-4 py-6 backdrop-blur lg:block">
-          <Link to="/" className="flex items-center gap-3 px-2">
+        <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col overflow-hidden border-r bg-background/90 px-4 py-5 backdrop-blur lg:flex">
+          <Link to="/" className="flex shrink-0 items-center gap-3 px-2">
             <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Activity className="size-4" />
             </div>
@@ -1278,13 +1278,13 @@ function AppShell() {
             </div>
           </Link>
 
-          <div className="mt-6 space-y-2">
+          <div className="mt-5 shrink-0 space-y-2">
             <Label>Active site</Label>
             <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={selectSite} />
           </div>
 
           {activeSite?.domain ? (
-            <div className="mt-3 rounded-md border bg-card p-3">
+            <div className="mt-3 shrink-0 rounded-md border bg-card p-3">
               <div className="text-xs font-medium text-muted-foreground">Scan plan</div>
               <div className="mt-2">
                 <ScanPlanSummary site={activeSite} compact />
@@ -1300,7 +1300,7 @@ function AppShell() {
             </Button>
           )}
 
-          <nav className="mt-6 space-y-1">
+          <nav className="mt-5 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
             {nav.map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
@@ -1308,7 +1308,7 @@ function AppShell() {
                 end={end}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                     isActive ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:bg-card/70 hover:text-foreground",
                   )
                 }
@@ -1319,7 +1319,7 @@ function AppShell() {
             ))}
           </nav>
 
-          <Button variant="ghost" className="absolute bottom-5 left-4 right-4 justify-start" onClick={logout}>
+          <Button variant="ghost" className="mt-4 shrink-0 justify-start" onClick={logout}>
             <LogOut />
             Sign out
           </Button>
@@ -4561,19 +4561,19 @@ function AuditTable({
               className={cn(onInspect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
               onClick={() => onInspect?.(row.id, row)}
             >
-              <TableCell className="max-w-lg">
-                <div className="break-all font-medium">{row.url}</div>
+              <TableCell className="min-w-56 max-w-sm">
+                <div className="truncate font-medium">{row.url}</div>
                 <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
                 </div>
               </TableCell>
               {showSite ? (
-                <TableCell className="min-w-48">
+                <TableCell className="min-w-40">
                   <div className="font-medium">{auditSiteName(row)}</div>
                   <div className="mt-1 break-all text-xs text-muted-foreground">{auditSiteDetail(row)}</div>
                 </TableCell>
               ) : null}
-              <TableCell className="min-w-48">
+              <TableCell className="min-w-44">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge>
                   <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
@@ -4583,7 +4583,7 @@ function AuditTable({
                   <div className="mt-1 text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
                 </div>
               </TableCell>
-              <TableCell className="min-w-72">
+              <TableCell className="min-w-52">
                 <div className="text-sm text-muted-foreground">
                   {formatNumber(row.pages_crawled)} pages crawled
                 </div>
@@ -4594,7 +4594,7 @@ function AuditTable({
                 </div>
               </TableCell>
               {(onInspect || onDelete) && (
-                <TableCell className="min-w-64 text-right">
+                <TableCell className={cn("text-right", onDelete ? "min-w-56" : "min-w-40")}>
                   <div className="flex flex-wrap justify-end gap-2">
                     {onInspect && (
                       <Button size="sm" variant="outline" asChild>
