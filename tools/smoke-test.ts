@@ -246,6 +246,9 @@ try {
     if (!tables.has("sites") || tables.has("projects")) {
       throw new Error(`Fresh SQLite schema should create sites, not projects: ${JSON.stringify([...tables].sort())}`);
     }
+    if (tables.has("schema_migrations")) {
+      throw new Error("Fresh SQLite schema should be final-state tables, not a migration ledger.");
+    }
     const siteColumns = schemaDb.query<{ name: string }, []>("PRAGMA table_info(sites)").all().map((row) => row.name);
     if (siteColumns.includes("archived_at")) {
       throw new Error("Fresh sites schema should not keep unused archive state.");
@@ -277,10 +280,24 @@ try {
     throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
   }
   for (const removedSchemaBridge of [
+    "schema_migrations",
+    "MIGRATIONS_TABLE",
+    "function migrate",
+    "migrateStep(",
+    "001_local_seo_init",
+    "002_feature_depth",
+    "003_openseo_local_parity",
     "004_project_crawl_preferences",
+    "004_site_crawl_preferences",
+    "005_gsc_imports",
+    "006_remove_generated_fallback_snapshots",
     "007_site_schema_names",
+    "007_remove_unused_site_archive_state",
     "ALTER TABLE projects RENAME TO sites",
     "idx_projects_active",
+    "idx_sites_active",
+    "archived_at",
+    "local-fallback",
     "project_id",
   ]) {
     if (dbSource.includes(removedSchemaBridge)) {
@@ -381,8 +398,8 @@ try {
   if (/type=["']date["']/.test(webAppClient) || !webAppClient.includes("function DatePicker") || !webAppClient.includes("<Calendar")) {
     throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
   }
-  if (webAppClient.includes("projectId: project.id")) {
-    throw new Error("The app should send siteId for active-site actions.");
+  if (webAppClient.includes("projectId:")) {
+    throw new Error("The app should send siteId for active-site actions, not projectId.");
   }
   if (/selected-site/i.test(webAppClient)) {
     throw new Error("The app should use active-site wording instead of selected-site implementation copy.");
@@ -566,23 +583,23 @@ try {
   if (!webAppClient.includes("show as unavailable unless a real metrics source is connected")) {
     throw new Error("Keyword research copy should explain unavailable metric values clearly.");
   }
-  const project = await request("/api/sites", {
+  const site = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),
   });
-  if (project.crawl_protocol !== "auto" || project.crawl_host !== "auto") {
+  if (site.crawl_protocol !== "auto" || site.crawl_host !== "auto") {
     throw new Error("New sites should default to automatic crawl preferences.");
   }
-  const preferenceProject = await request("/api/sites", {
+  const preferenceSite = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Preference", domain: "example.org", crawlProtocol: "https", crawlHost: "www" }),
   });
-  if (preferenceProject.crawl_protocol !== "https" || preferenceProject.crawl_host !== "www") {
+  if (preferenceSite.crawl_protocol !== "https" || preferenceSite.crawl_host !== "www") {
     throw new Error("Site crawl preferences were not saved on create.");
   }
-  const updatedPreference = await request(`/api/sites/${preferenceProject.id}`, {
+  const updatedPreference = await request(`/api/sites/${preferenceSite.id}`, {
     method: "PUT",
-    body: JSON.stringify({ ...preferenceProject, crawl_protocol: "both", crawl_host: "both" }),
+    body: JSON.stringify({ ...preferenceSite, crawl_protocol: "both", crawl_host: "both" }),
   });
   if (updatedPreference.crawl_protocol !== "both" || updatedPreference.crawl_host !== "both") {
     throw new Error("Site crawl preferences were not saved on update.");
@@ -605,17 +622,17 @@ try {
   if (!/App settings cannot save/i.test(String(rejectedSecretConfig.data?.error || ""))) {
     throw new Error(`App settings API should reject secret/data-source keys: ${JSON.stringify(rejectedSecretConfig)}`);
   }
-  const defaultsProject = await request("/api/sites", {
+  const defaultsSite = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Configured Defaults", domain: "defaults.example" }),
   });
   if (
-    defaultsProject.location_code !== 2620 ||
-    defaultsProject.language_code !== "pt" ||
-    defaultsProject.crawl_protocol !== "https" ||
-    defaultsProject.crawl_host !== "www"
+    defaultsSite.location_code !== 2620 ||
+    defaultsSite.language_code !== "pt" ||
+    defaultsSite.crawl_protocol !== "https" ||
+    defaultsSite.crawl_host !== "www"
   ) {
-    throw new Error(`New site did not use app defaults: ${JSON.stringify(defaultsProject)}`);
+    throw new Error(`New site did not use app defaults: ${JSON.stringify(defaultsSite)}`);
   }
   const localConfigStatus = await request("/api/config");
   if (
@@ -624,7 +641,7 @@ try {
   ) {
     throw new Error(`Config should expose the local SQLite source of truth and counts: ${JSON.stringify(localConfigStatus)}`);
   }
-  const siteScan = await request(`/api/sites/${project.id}/scan`, { method: "POST" });
+  const siteScan = await request(`/api/sites/${site.id}/scan`, { method: "POST" });
   if (!siteScan.audit?.id) throw new Error("Site scan did not return an audit.");
   if (!Array.isArray(siteScan.candidateUrls) || !siteScan.candidateUrls.includes("https://example.com")) {
     throw new Error(`Site scan should return its scan-plan candidate URLs: ${JSON.stringify(siteScan)}`);
@@ -635,11 +652,11 @@ try {
   if (!siteScan.related?.some((row: any) => row.key === "links" && row.route === "/links")) {
     throw new Error(`Site scan should send users to the Links route, not a legacy route: ${JSON.stringify(siteScan.related)}`);
   }
-  const localProject = await request("/api/sites", {
+  const localSite = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Local fixture", domain: `localhost:${fixtureServer.port}`, crawlProtocol: "http", crawlHost: "root" }),
   });
-  const localSiteScan = await request(`/api/sites/${localProject.id}/scan`, { method: "POST" });
+  const localSiteScan = await request(`/api/sites/${localSite.id}/scan`, { method: "POST" });
   if (!localSiteScan.audit?.id) throw new Error("Local saved-site scan did not return an audit.");
   if (!String(localSiteScan.scanUrl || "").startsWith(fixtureUrl)) {
     throw new Error(`Local saved-site scan did not resolve to the reachable HTTP fixture: ${localSiteScan.scanUrl}`);
@@ -653,7 +670,7 @@ try {
       jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
-      params: { name: "scan_site", arguments: { siteId: localProject.id } },
+      params: { name: "scan_site", arguments: { siteId: localSite.id } },
     }),
   });
   const mcpScan = localMcpScan.result?.structuredContent || {};
@@ -708,7 +725,7 @@ try {
   }
   const localOrganicPages = await request("/api/domain/pages", {
     method: "POST",
-    body: JSON.stringify({ siteId: localProject.id, domain: `localhost:${fixtureServer.port}`, pageSize: 10 }),
+    body: JSON.stringify({ siteId: localSite.id, domain: `localhost:${fixtureServer.port}`, pageSize: 10 }),
   });
   if (
     localOrganicPages.source !== "local-audit" ||
@@ -719,7 +736,7 @@ try {
   }
   const emptyEvidenceAudit = await request("/api/audits", {
     method: "POST",
-    body: JSON.stringify({ siteId: localProject.id, url: emptyEvidenceUrl }),
+    body: JSON.stringify({ siteId: localSite.id, url: emptyEvidenceUrl }),
   });
   const emptyEvidenceResult = await waitForAudit(emptyEvidenceAudit.id);
   const emptyEvidenceIssueTypes = new Set((emptyEvidenceResult.result?.issues || []).map((issue: any) => issue.type));
@@ -774,25 +791,25 @@ try {
   if (mcpFixtureAuditId) {
     await waitForAudit(mcpFixtureAuditId);
   }
-  const fixtureAuditsBeforeClear = await request(`/api/sites/${localProject.id}/audits`);
+  const fixtureAuditsBeforeClear = await request(`/api/sites/${localSite.id}/audits`);
   if (fixtureAuditsBeforeClear.length < 2) {
     throw new Error("Fixture site should have multiple scans before clear-history verification.");
   }
-  const clearedFixtureAudits = await request(`/api/sites/${localProject.id}/audits`, { method: "DELETE" });
+  const clearedFixtureAudits = await request(`/api/sites/${localSite.id}/audits`, { method: "DELETE" });
   if (clearedFixtureAudits.deleted < 2) {
     throw new Error(`Clear history should delete fixture scans, got ${clearedFixtureAudits.deleted}.`);
   }
-  const fixtureAuditsAfterClear = await request(`/api/sites/${localProject.id}/audits`);
+  const fixtureAuditsAfterClear = await request(`/api/sites/${localSite.id}/audits`);
   if (fixtureAuditsAfterClear.length !== 0) {
     throw new Error("Clear history did not remove all fixture scans from local SQLite.");
   }
-  const siteAudits = await request(`/api/sites/${project.id}/audits`);
+  const siteAudits = await request(`/api/sites/${site.id}/audits`);
   if (!siteAudits.some((row: any) => row.id === siteScan.audit.id)) {
     throw new Error("Site audits endpoint did not return the scan.");
   }
   const keywordResearch = await request("/api/keywords/research", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, query: "seo software", limit: 8 }),
+    body: JSON.stringify({ siteId: site.id, query: "seo software", limit: 8 }),
   });
   const keywordRows = keywordResearch.rows?.length
     ? keywordResearch.rows
@@ -804,24 +821,24 @@ try {
   await request("/api/keywords/save", {
     method: "POST",
     body: JSON.stringify({
-      siteId: project.id,
+      siteId: site.id,
       keywords: keywordRows.slice(0, 3),
       tags: ["smoke", "research"],
       source: "smoke",
     }),
   });
-  const saved = await request(`/api/sites/${project.id}/keywords/query`, {
+  const saved = await request(`/api/sites/${site.id}/keywords/query`, {
     method: "POST",
     body: JSON.stringify({ tagNames: ["smoke"], pageSize: 50 }),
   });
   if (!saved.rows?.length || !saved.tags?.length) throw new Error("Saved keyword assertions failed.");
-  await request(`/api/sites/${project.id}/keywords/tags`, {
+  await request(`/api/sites/${site.id}/keywords/tags`, {
     method: "POST",
     body: JSON.stringify({ savedKeywordIds: [saved.rows[0].id], addTags: ["priority"] }),
   });
   const serpAnalysis = await request("/api/serp/analyze", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, keyword: "seo software", domain: "example.com" }),
+    body: JSON.stringify({ siteId: site.id, keyword: "seo software", domain: "example.com" }),
   });
   if (
     serpAnalysis.domain !== "example.com" ||
@@ -833,7 +850,7 @@ try {
   }
   const organicOverview = await request("/api/domain/overview", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, domain: "example.com" }),
+    body: JSON.stringify({ siteId: site.id, domain: "example.com" }),
   });
   if (organicOverview.domain !== "example.com" || "target" in organicOverview) {
     throw new Error(`Organic research should expose domain, not target: ${JSON.stringify(organicOverview)}`);
@@ -851,15 +868,15 @@ try {
   }
   await request("/api/domain/keywords", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, domain: "example.com", pageSize: 10 }),
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", pageSize: 10 }),
   });
   await request("/api/domain/pages", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, domain: "example.com", pageSize: 10 }),
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", pageSize: 10 }),
   });
   const backlinkOverview = await request("/api/backlinks/overview", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, domain: "example.com" }),
+    body: JSON.stringify({ siteId: site.id, domain: "example.com" }),
   });
   if (backlinkOverview.domain !== "example.com" || "target" in backlinkOverview) {
     throw new Error(`Backlink overview should expose domain, not target: ${JSON.stringify(backlinkOverview)}`);
@@ -935,7 +952,7 @@ try {
         throw new Error("AI lab should show every saved local Codex job until the user deletes it.");
       }
     }
-    const dashboardWithAiJobs = await request(`/api/dashboard?siteId=${project.id}`);
+    const dashboardWithAiJobs = await request(`/api/dashboard?siteId=${site.id}`);
     const dashboardAiJobIds = new Set((dashboardWithAiJobs.latestAiJobs || []).map((row: any) => row.id));
     for (const id of insertedAiJobIds) {
       if (!dashboardAiJobIds.has(id)) {
@@ -947,21 +964,21 @@ try {
   }
   const backlinkProfile = await request("/api/backlinks/profile", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, domain: "example.com", tab: "domains", pageSize: 10 }),
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", tab: "domains", pageSize: 10 }),
   });
   if (backlinkProfile.domain !== "example.com" || "target" in backlinkProfile) {
     throw new Error(`Backlink profile should expose domain, not target: ${JSON.stringify(backlinkProfile)}`);
   }
   const tracker = await request("/api/rank-trackers", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, domain: "example.com", keywords: ["seo software", "seo tools"] }),
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", keywords: ["seo software", "seo tools"] }),
   });
   await request(`/api/rank-trackers/${tracker.id}/refresh-metrics`, { method: "POST" });
   await request(`/api/rank-trackers/${tracker.id}/check`, { method: "POST" });
   await request(`/api/rank-trackers/${tracker.id}/trend`);
   const brandLookupResult = await request("/api/brand-lookup", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, query: "Example", competitors: "competitor.com" }),
+    body: JSON.stringify({ siteId: site.id, query: "Example", competitors: "competitor.com" }),
   });
   if (
     "resolvedTarget" in brandLookupResult ||
@@ -973,7 +990,7 @@ try {
   }
   const promptExplorerResult = await request("/api/prompt-explorer", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, prompt: "best seo software", highlightBrand: "Example" }),
+    body: JSON.stringify({ siteId: site.id, prompt: "best seo software", highlightBrand: "Example" }),
   });
   if (
     promptExplorerResult.source !== "codex" ||
@@ -986,7 +1003,7 @@ try {
   try {
     const savedPromptRun = localHistoryDb
       .query<{ source: string; models: string }, [string]>("SELECT source, models FROM prompt_explorer_runs WHERE site_id = ? ORDER BY created_at DESC LIMIT 1")
-      .get(project.id);
+      .get(site.id);
     if (
       !savedPromptRun ||
       savedPromptRun.source !== "codex" ||
@@ -1024,7 +1041,7 @@ try {
         INSERT INTO rank_trackers (id, site_id, domain, location_code, language_code, created_at, updated_at)
         VALUES (?, ?, 'example.com', 2840, 'en', '2026-06-30 15:00:00', '2026-06-30 15:00:00')
       `)
-      .run(trackerId, project.id);
+      .run(trackerId, site.id);
     const insertRankRun = localHistoryDb.prepare(`
       INSERT INTO rank_runs (id, tracker_id, status, message, started_at, finished_at)
       VALUES (?, ?, 'completed', 'smoke-history', ?, ?)
@@ -1054,16 +1071,16 @@ try {
       insertedHistoryIds.prompt.push(promptId);
       insertedHistoryIds.keyword.push(keywordId);
       insertedHistoryIds.rankRun.push(rankRunId);
-      insertDomainSnapshot.run(domainId, project.id, `domain-history-${index}.example`, timestamp);
-      insertBacklinkSnapshot.run(backlinkId, project.id, `backlink-history-${index}.example`, timestamp);
-      insertSerpRun.run(serpId, project.id, `serp history ${index}`, timestamp);
-      insertBrandRun.run(brandId, project.id, `Brand history ${index}`, timestamp);
-      insertPromptRun.run(promptId, project.id, `Prompt history ${index}`, timestamp);
-      insertSavedKeyword.run(keywordId, project.id, `smoke history keyword ${index}`, timestamp);
+      insertDomainSnapshot.run(domainId, site.id, `domain-history-${index}.example`, timestamp);
+      insertBacklinkSnapshot.run(backlinkId, site.id, `backlink-history-${index}.example`, timestamp);
+      insertSerpRun.run(serpId, site.id, `serp history ${index}`, timestamp);
+      insertBrandRun.run(brandId, site.id, `Brand history ${index}`, timestamp);
+      insertPromptRun.run(promptId, site.id, `Prompt history ${index}`, timestamp);
+      insertSavedKeyword.run(keywordId, site.id, `smoke history keyword ${index}`, timestamp);
       insertRankRun.run(rankRunId, trackerId, timestamp, timestamp);
     }
-    const domainHistoryRows = await request(`/api/sites/${project.id}/domain-snapshots`);
-    const backlinkHistoryRows = await request(`/api/sites/${project.id}/backlink-snapshots`);
+    const domainHistoryRows = await request(`/api/sites/${site.id}/domain-snapshots`);
+    const backlinkHistoryRows = await request(`/api/sites/${site.id}/backlink-snapshots`);
     for (const row of [...domainHistoryRows, ...backlinkHistoryRows]) {
       if ("target" in row || "project_id" in row || "result_json" in row || "target" in (row.result || {})) {
         throw new Error(`Organic/backlink history should expose domain/site fields, not target/project internals: ${JSON.stringify(row)}`);
@@ -1075,9 +1092,9 @@ try {
     const historyChecks = [
       { ids: insertedHistoryIds.domain, rows: domainHistoryRows, label: "organic research" },
       { ids: insertedHistoryIds.backlink, rows: backlinkHistoryRows, label: "backlink" },
-      { ids: insertedHistoryIds.serp, rows: await request(`/api/sites/${project.id}/serp`), label: "SERP" },
-      { ids: insertedHistoryIds.brand, rows: await request(`/api/sites/${project.id}/brand-lookup`), label: "brand lookup" },
-      { ids: insertedHistoryIds.prompt, rows: await request(`/api/sites/${project.id}/prompt-explorer`), label: "prompt explorer" },
+      { ids: insertedHistoryIds.serp, rows: await request(`/api/sites/${site.id}/serp`), label: "SERP" },
+      { ids: insertedHistoryIds.brand, rows: await request(`/api/sites/${site.id}/brand-lookup`), label: "brand lookup" },
+      { ids: insertedHistoryIds.prompt, rows: await request(`/api/sites/${site.id}/prompt-explorer`), label: "prompt explorer" },
     ];
     for (const check of historyChecks) {
       const rowIds = new Set((check.rows || []).map((row: any) => row.id));
@@ -1087,7 +1104,7 @@ try {
         }
       }
     }
-    const siteSummaryWithFullHistory = await request(`/api/sites/${project.id}`);
+    const siteSummaryWithFullHistory = await request(`/api/sites/${site.id}`);
     if (!siteSummaryWithFullHistory.site || "project" in siteSummaryWithFullHistory) {
       throw new Error(`Site summary response should expose site, not project: ${JSON.stringify(siteSummaryWithFullHistory)}`);
     }
@@ -1126,7 +1143,7 @@ try {
         }
       }
     }
-    const trackerRows = await request(`/api/sites/${project.id}/rank-trackers`);
+    const trackerRows = await request(`/api/sites/${site.id}/rank-trackers`);
     const smokeTracker = (trackerRows || []).find((row: any) => row.id === trackerId);
     const rankRunIds = new Set((smokeTracker?.runs || []).map((row: any) => row.id));
     for (const id of insertedHistoryIds.rankRun) {
@@ -1139,14 +1156,14 @@ try {
   }
   const audit = await request("/api/audits", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, url: "https://example.com" }),
+    body: JSON.stringify({ siteId: site.id, url: "https://example.com" }),
   });
   await request(`/api/audits/${audit.id}`);
-  const projectAuditsAfterSecondScan = await request(`/api/sites/${project.id}/audits`);
+  const siteAuditsAfterSecondScan = await request(`/api/sites/${site.id}/audits`);
   if (
-    projectAuditsAfterSecondScan.length < 2 ||
-    !projectAuditsAfterSecondScan.some((row: any) => row.id === siteScan.audit.id) ||
-    !projectAuditsAfterSecondScan.some((row: any) => row.id === audit.id)
+    siteAuditsAfterSecondScan.length < 2 ||
+    !siteAuditsAfterSecondScan.some((row: any) => row.id === siteScan.audit.id) ||
+    !siteAuditsAfterSecondScan.some((row: any) => row.id === audit.id)
   ) {
     throw new Error("Site audits endpoint should keep every scan for the site until the user deletes it.");
   }
@@ -1182,9 +1199,9 @@ try {
       const id = randomUUID();
       const timestamp = `2026-06-30 12:0${index}:00`;
       insertedAuditIds.push(id);
-      insertAudit.run(id, project.id, `https://example.com/history-${index}`, timestamp, timestamp);
+      insertAudit.run(id, site.id, `https://example.com/history-${index}`, timestamp, timestamp);
     }
-    const dashboardWithFullHistory = await request(`/api/dashboard?siteId=${project.id}`);
+    const dashboardWithFullHistory = await request(`/api/dashboard?siteId=${site.id}`);
     const dashboardAuditIds = new Set((dashboardWithFullHistory.latestAudits || []).map((row: any) => row.id));
     for (const id of [siteScan.audit.id, audit.id, ...insertedAuditIds]) {
       if (!dashboardAuditIds.has(id)) {
@@ -1198,7 +1215,7 @@ try {
   } finally {
     scanHistoryDb.close();
   }
-  await request(`/api/gsc/status/${project.id}`);
+  await request(`/api/gsc/status/${site.id}`);
   const fullCsvRows = Array.from(
     { length: 5025 },
     (_, index) => `seo query ${index + 1},1,2,50%,${(index % 10) + 1}`,
@@ -1206,7 +1223,7 @@ try {
   const fullGscImport = await request("/api/gsc/import", {
     method: "POST",
     body: JSON.stringify({
-      siteId: project.id,
+      siteId: site.id,
       siteUrl: "sc-domain:example.com",
       sourceName: "full-search-console.csv",
       csv: `Top queries,Clicks,Impressions,CTR,Position\n${fullCsvRows}\n`,
@@ -1217,7 +1234,7 @@ try {
     fullGscImport.rows?.length !== 5025 ||
     fullGscImport.totals?.clicks !== 5025 ||
     fullGscImport.totals?.impressions !== 10050 ||
-    fullGscImport.siteId !== project.id ||
+    fullGscImport.siteId !== site.id ||
     "projectId" in fullGscImport
   ) {
     throw new Error(`GSC CSV import silently dropped rows: ${JSON.stringify({
@@ -1231,7 +1248,7 @@ try {
   const gscImport = await request("/api/gsc/import", {
     method: "POST",
     body: JSON.stringify({
-      siteId: project.id,
+      siteId: site.id,
       siteUrl: "sc-domain:example.com",
       sourceName: "search-console.csv",
       csv: "Top queries,Clicks,Impressions,CTR,Position\nseo software,10,100,10%,3.2\nlocal seo,5,50,10%,4.8\n",
@@ -1248,11 +1265,11 @@ try {
   } finally {
     gscOrderDb.close();
   }
-  const gscImports = await request(`/api/gsc/imports/${project.id}`);
+  const gscImports = await request(`/api/gsc/imports/${site.id}`);
   if (!gscImports.length || gscImports[0].id !== gscImport.id || !gscImports.some((row: any) => row.id === fullGscImport.id)) {
     throw new Error("GSC import was not persisted in SQLite.");
   }
-  if (gscImports.some((row: any) => row.projectId || row.siteId !== project.id)) {
+  if (gscImports.some((row: any) => row.projectId || row.siteId !== site.id)) {
     throw new Error(`GSC import history should expose siteId, not projectId: ${JSON.stringify(gscImports[0])}`);
   }
   const gscHistoryDb = new Database(serverDbPath);
@@ -1267,9 +1284,9 @@ try {
       const id = randomUUID();
       const timestamp = `2026-06-30 14:${String(index).padStart(2, "0")}:00`;
       insertedGscImportIds.push(id);
-      insertGscImport.run(id, project.id, `search-console-${index}.csv`, timestamp);
+      insertGscImport.run(id, site.id, `search-console-${index}.csv`, timestamp);
     }
-    const allGscImports = await request(`/api/gsc/imports/${project.id}`);
+    const allGscImports = await request(`/api/gsc/imports/${site.id}`);
     const allGscImportIds = new Set((allGscImports || []).map((row: any) => row.id));
     for (const id of [gscImport.id, ...insertedGscImportIds]) {
       if (!allGscImportIds.has(id)) {
@@ -1279,7 +1296,7 @@ try {
   } finally {
     gscHistoryDb.close();
   }
-  const dashboardWithGsc = await request(`/api/dashboard?siteId=${project.id}`);
+  const dashboardWithGsc = await request(`/api/dashboard?siteId=${site.id}`);
   if (dashboardWithGsc.gscImportCount !== 27 || dashboardWithGsc.latestGscImport?.rowCount !== 2) {
     throw new Error(`Dashboard did not expose local GSC import evidence: ${JSON.stringify(dashboardWithGsc.latestGscImport)}`);
   }
@@ -1367,7 +1384,7 @@ try {
       method: "tools/call",
       params: {
         name: "get_domain_overview",
-        arguments: { siteId: project.id, domain: "example.com" },
+        arguments: { siteId: site.id, domain: "example.com" },
       },
     }),
   });
@@ -1386,7 +1403,7 @@ try {
       method: "tools/call",
       params: {
         name: "analyze_serp",
-        arguments: { siteId: project.id, keyword: "seo software", domain: "example.com" },
+        arguments: { siteId: site.id, keyword: "seo software", domain: "example.com" },
       },
     }),
   });
@@ -1408,7 +1425,7 @@ try {
       method: "tools/call",
       params: {
         name: "research_keywords",
-        arguments: { siteId: project.id, query: "seo software", limit: 5 },
+        arguments: { siteId: site.id, query: "seo software", limit: 5 },
       },
     }),
   });
@@ -1434,7 +1451,7 @@ try {
       method: "tools/call",
       params: {
         name: "get_gsc_performance",
-        arguments: { siteId: project.id, startDate: "2026-01-01", endDate: "2026-01-31", dimensions: ["query"] },
+        arguments: { siteId: site.id, startDate: "2026-01-01", endDate: "2026-01-31", dimensions: ["query"] },
       },
     }),
   });

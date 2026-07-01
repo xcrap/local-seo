@@ -14,7 +14,6 @@ if (runtimeDbPath) {
 
 const DB_PATH = process.env.DB_PATH || "./data/local-seo.sqlite";
 export const dbPath = resolve(DB_PATH);
-const MIGRATIONS_TABLE = "schema_migrations";
 
 if (!existsSync(dirname(DB_PATH))) {
   mkdirSync(dirname(DB_PATH), { recursive: true });
@@ -24,70 +23,7 @@ export const db = new Database(DB_PATH);
 db.exec("PRAGMA journal_mode = WAL");
 db.exec("PRAGMA foreign_keys = ON");
 
-function migrate(name: string, sql: string) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  const existing = db
-    .prepare(`SELECT name FROM ${MIGRATIONS_TABLE} WHERE name = ?`)
-    .get(name);
-  if (existing) return;
-
-  const apply = db.transaction(() => {
-    db.exec(sql);
-    db.prepare(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?)`).run(name);
-  });
-  apply();
-}
-
-function migrateStep(name: string, applyMigration: () => void) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  const existing = db
-    .prepare(`SELECT name FROM ${MIGRATIONS_TABLE} WHERE name = ?`)
-    .get(name);
-  if (existing) return;
-
-  const apply = db.transaction(() => {
-    applyMigration();
-    db.prepare(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?)`).run(name);
-  });
-  apply();
-}
-
-function tableExists(name: string) {
-  return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
-}
-
-function columnExists(table: string, column: string) {
-  if (!tableExists(table)) return false;
-  return db.prepare(`PRAGMA table_info(${table})`).all().some((row: any) => row.name === column);
-}
-
-function addColumnIfMissing(table: string, column: string, definition: string) {
-  if (!columnExists(table, column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
-  }
-}
-
-function dropColumnIfPresent(table: string, column: string) {
-  if (columnExists(table, column)) {
-    db.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`);
-  }
-}
-
-migrate(
-  "001_local_seo_init",
-  `
+db.exec(`
   CREATE TABLE IF NOT EXISTS admin_users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
@@ -111,6 +47,8 @@ migrate(
     notes TEXT NOT NULL DEFAULT '',
     location_code INTEGER NOT NULL DEFAULT 2840,
     language_code TEXT NOT NULL DEFAULT 'en',
+    crawl_protocol TEXT NOT NULL DEFAULT 'auto',
+    crawl_host TEXT NOT NULL DEFAULT 'auto',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -153,6 +91,8 @@ migrate(
     device TEXT NOT NULL DEFAULT 'desktop',
     serp_depth INTEGER NOT NULL DEFAULT 50,
     schedule_interval TEXT NOT NULL DEFAULT 'manual',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    next_check_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -161,6 +101,10 @@ migrate(
     id TEXT PRIMARY KEY,
     tracker_id TEXT NOT NULL REFERENCES rank_trackers(id) ON DELETE CASCADE,
     keyword TEXT NOT NULL,
+    search_volume INTEGER,
+    keyword_difficulty INTEGER,
+    cpc REAL,
+    metrics_fetched_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(tracker_id, keyword)
   );
@@ -260,12 +204,7 @@ migrate(
     expires_at INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
-  `,
-);
 
-migrate(
-  "002_feature_depth",
-  `
   CREATE TABLE IF NOT EXISTS serp_runs (
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
@@ -304,12 +243,7 @@ migrate(
   );
 
   CREATE INDEX IF NOT EXISTS idx_prompt_explorer_site_created ON prompt_explorer_runs(site_id, created_at DESC);
-  `,
-);
 
-migrate(
-  "003_openseo_local_parity",
-  `
   CREATE TABLE IF NOT EXISTS saved_keyword_tags (
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
@@ -322,23 +256,6 @@ migrate(
 
   CREATE INDEX IF NOT EXISTS idx_saved_keyword_tags_site ON saved_keyword_tags(site_id, name);
 
-  ALTER TABLE rank_trackers ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;
-  ALTER TABLE rank_trackers ADD COLUMN next_check_at TEXT;
-  ALTER TABLE rank_keywords ADD COLUMN search_volume INTEGER;
-  ALTER TABLE rank_keywords ADD COLUMN keyword_difficulty INTEGER;
-  ALTER TABLE rank_keywords ADD COLUMN cpc REAL;
-  ALTER TABLE rank_keywords ADD COLUMN metrics_fetched_at TEXT;
-  `,
-);
-
-migrateStep("004_site_crawl_preferences", () => {
-  addColumnIfMissing("sites", "crawl_protocol", "crawl_protocol TEXT NOT NULL DEFAULT 'auto'");
-  addColumnIfMissing("sites", "crawl_host", "crawl_host TEXT NOT NULL DEFAULT 'auto'");
-});
-
-migrate(
-  "005_gsc_imports",
-  `
   CREATE TABLE IF NOT EXISTS gsc_imports (
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
@@ -352,22 +269,7 @@ migrate(
   );
 
   CREATE INDEX IF NOT EXISTS idx_gsc_imports_site_created ON gsc_imports(site_id, created_at DESC);
-  `,
-);
-
-migrate(
-  "006_remove_generated_fallback_snapshots",
-  `
-  DELETE FROM domain_snapshots WHERE source = 'local-fallback';
-  DELETE FROM backlink_snapshots WHERE source = 'local-fallback';
-  `,
-);
-
-migrateStep("007_remove_unused_site_archive_state", () => {
-  db.exec("DROP INDEX IF EXISTS idx_sites_active");
-  dropColumnIfPresent("sites", "archived_at");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_sites_created ON sites(created_at DESC)");
-});
+`);
 
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];
