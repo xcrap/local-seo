@@ -1675,7 +1675,7 @@ function Overview({
                 action={
                   site.domain ? (
                     <Button onClick={scanSite} disabled={scanning}>
-                      <FileSearch /> {scanning ? "Starting" : "Scan site now"}
+                      <FileSearch /> {scanning ? "Starting" : "Scan website"}
                     </Button>
                   ) : (
                     <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
@@ -1768,7 +1768,7 @@ function SiteCommandCenter({
         </Button>
       ) : site.domain ? (
         <Button size="sm" variant="secondary" onClick={onScan} disabled={scanning}>
-          <Zap /> {scanning ? "Starting" : "Scan speed"}
+          <Zap /> {scanning ? "Starting" : "Scan website"}
         </Button>
       ) : (
         <Button asChild size="sm" variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
@@ -2153,7 +2153,7 @@ function SitesPage({
             disabled={scanningSiteId === site.id}
             onClick={() => scanSite(site)}
           >
-            <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan site"}
+            <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan website"}
           </Button>
         ) : null}
         <Button size={mobile ? "default" : "sm"} variant="outline" className={buttonClass} aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
@@ -4599,7 +4599,7 @@ function ScansPage({ site }: { site: Site }) {
                   ? site.domain
                     ? (
                       <Button onClick={startSelectedSite} disabled={starting}>
-                        <FileSearch /> {starting ? "Starting" : "Scan site now"}
+                        <FileSearch /> {starting ? "Starting" : "Scan website"}
                       </Button>
                     )
                     : <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
@@ -4638,7 +4638,7 @@ function ScansPage({ site }: { site: Site }) {
                 text={site.domain ? "Start a technical scan for this site." : "Add a website address before running a scan."}
                 action={site.domain ? (
                   <Button onClick={startSelectedSite} disabled={starting}>
-                    <FileSearch /> {starting ? "Starting" : "Scan site now"}
+                    <FileSearch /> {starting ? "Starting" : "Scan website"}
                   </Button>
                 ) : (
                   <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>

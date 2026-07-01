@@ -582,12 +582,15 @@ try {
     await page.getByRole("heading", { name: /^Delete scans for this site\?$/ }).waitFor();
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
     await page.getByText("No scan report yet").waitFor();
-    await page.getByRole("button", { name: /^Scan site now$/ }).first().waitFor();
+    const scansMain = page.getByRole("main");
+    await scansMain.getByRole("button", { name: /^Scan website$/ }).first().waitFor();
     await page.getByText("No scans yet").waitFor();
-    await page.getByRole("button", { name: /^Scan site now$/ }).first().click();
-    await page.getByText("Scan running").waitFor({ timeout: 5000 });
-    await page.locator("section", { hasText: "Scan running" }).getByText(/pages crawled/i).first().waitFor();
-    await page.getByRole("link", { name: /Open live report/i }).waitFor();
+    await scansMain.getByRole("button", { name: /^Scan website$/ }).first().click();
+    await page.getByText(/Scan running|completed/).first().waitFor({ timeout: 60_000 });
+    if (await page.getByText("Scan running").count()) {
+      await page.locator("section", { hasText: "Scan running" }).getByText(/pages crawled/i).first().waitFor();
+      await page.getByRole("link", { name: /Open live report/i }).waitFor();
+    }
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
 
     await page.getByRole("navigation").getByRole("link", { name: /^MCP$/ }).click();

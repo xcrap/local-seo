@@ -518,8 +518,13 @@ try {
   if (!webAppClient.includes('<Field label="Website address">') || !webAppClient.includes('<Field label="Site name">')) {
     throw new Error("First-run site forms should use visible labels, not only placeholders.");
   }
-  if (!webAppClient.includes("<Pencil /> Edit") || !webAppClient.includes("<Trash2 /> Delete") || !webAppClient.includes('"Scan site"')) {
+  if (!webAppClient.includes("<Pencil /> Edit") || !webAppClient.includes("<Trash2 /> Delete") || !webAppClient.includes('"Scan website"')) {
     throw new Error("Saved-site table actions should be visible text buttons for scan, edit, and delete.");
+  }
+  for (const oldScanActionLabel of ['"Scan site"', '"Scan site now"', '"Scan speed"']) {
+    if (webAppClient.includes(oldScanActionLabel)) {
+      throw new Error(`Primary scan buttons should consistently say Scan website, not ${oldScanActionLabel}.`);
+    }
   }
   if (!webAppClient.includes("saved locally.") || !webAppClient.includes("updated locally.") || !webAppClient.includes("deleted locally.")) {
     throw new Error("Saved-site create, edit, and delete actions should show explicit local confirmations.");
