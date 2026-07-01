@@ -459,7 +459,7 @@ try {
   if (webAppClient.includes("Keyword/rank defaults") || webAppClient.includes("Keyword result language")) {
     throw new Error("Site forms should not make saved websites look like they have one required search language.");
   }
-  if (!webAppClient.includes("Keyword tool defaults") || !webAppClient.includes("Audits crawl every page language they find") || !webAppClient.includes('Field label="Result language"')) {
+  if (!webAppClient.includes("Keyword tool defaults") || !webAppClient.includes("Site scans crawl every page language they find") || !webAppClient.includes('Field label="Result language"')) {
     throw new Error("Keyword market/language controls should be optional keyword-tool defaults, not primary site fields.");
   }
   if (!webAppClient.includes("App settings saved locally.") || !webAppClient.includes("Could not save app settings")) {
@@ -486,9 +486,14 @@ try {
   if (!webAppClient.includes('siteActions(site, "mobile")')) {
     throw new Error("Saved-site rows should expose scan, edit, and delete actions in the mobile layout.");
   }
-  for (const explicitDashboardAction of ["Open site audits", "Open scan report", "Open speed report", "Open organic research", "Open local link graph", "Open rank tracking", "Open Search Console", "Open AI lab"]) {
+  for (const explicitDashboardAction of ["Open site scans", "Open scan report", "Open speed report", "Open organic research", "Open local link graph", "Open rank tracking", "Open Search Console", "Open AI lab"]) {
     if (!webAppClient.includes(explicitDashboardAction)) {
       throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
+    }
+  }
+  for (const oldScanLabel of ["Open site audits", "No audits yet", "Site audits", "Back to audits", "Open audits"]) {
+    if (webAppClient.includes(oldScanLabel)) {
+      throw new Error(`Scan-run UI should use site scan wording instead of ${oldScanLabel}.`);
     }
   }
   if (webAppClient.includes(">Open report</Link>") || webAppClient.includes("Open report\\n")) {

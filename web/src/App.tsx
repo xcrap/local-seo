@@ -97,7 +97,7 @@ const nav = [
   { to: "/links", label: "Links", icon: Link2 },
   { to: "/brand", label: "Brand lookup", icon: Sparkles },
   { to: "/prompts", label: "Prompt explorer", icon: Bot },
-  { to: "/audits", label: "Audits", icon: FileSearch },
+  { to: "/audits", label: "Site scans", icon: FileSearch },
   { to: "/gsc", label: "Search Console", icon: BarChart3 },
   { to: "/ai", label: "AI lab", icon: Bot },
   { to: "/mcp-tools", label: "MCP", icon: Cable },
@@ -231,7 +231,7 @@ function KeywordToolDefaultsPanel({
         <span className="min-w-0">
           <span className="block text-sm font-semibold">Keyword tool defaults</span>
           <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-            Optional. Used by keyword research, SERP checks, and rank tracking. Audits crawl every page language they find.
+            Optional. Used by keyword research, SERP checks, and rank tracking. Site scans crawl every page language they find.
           </span>
         </span>
         <Badge variant="outline" className="shrink-0">
@@ -774,7 +774,7 @@ function sourceLabel(source?: string) {
     "duckduckgo-suggest": "DuckDuckGo suggest",
     duckduckgo: "DuckDuckGo",
     searxng: "SearXNG",
-    "local-audit": "Local audit",
+    "local-audit": "Local scan",
     "web-search": "Web search",
     codex: "Local Codex",
     "search-error": "Search error",
@@ -1444,7 +1444,7 @@ function NotFoundPage() {
           <div>
             <h2 className="text-lg font-semibold">Choose a current screen</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              The app uses fresh local routes for sites, audits, organic research, links, Search Console, MCP, and AI jobs.
+              The app uses fresh local routes for sites, scans, organic research, links, Search Console, MCP, and AI jobs.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1576,7 +1576,7 @@ function Overview({
       <PageHeader
         eyebrow="Site overview"
         title={siteDisplayName(site)}
-        description={site.domain ? "Reports, audits, crawl links, rankings, and Search Console use this site." : "Add a site to unlock scans, reports, rankings, and Search Console."}
+        description={site.domain ? "Reports, scans, crawl links, rankings, and Search Console use this site." : "Add a site to unlock scans, reports, rankings, and Search Console."}
         action={<Badge>{site.domain || "No site yet"}</Badge>}
       />
       {!site.domain ? (
@@ -1658,7 +1658,7 @@ function Overview({
               <AuditTable rows={scanLedgerRows} showSite onInspect={openAuditReport} />
             ) : (
               <EmptyState
-                title="No audits yet"
+                title="No scans yet"
                 text={site.domain ? "Start a technical scan for this site." : "Add a website address to start scanning."}
                 action={
                   site.domain ? (
@@ -1717,7 +1717,7 @@ function SiteCommandCenter({
       status: site.domain || "Needs website address",
       evidence: site.domain
         ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredAuditUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
-        : "Add a site before running audits, rankings, Search Console imports, or AI work.",
+        : "Add a site before running scans, rankings, Search Console imports, or AI work.",
       action: site.domain ? (
         <Button size="sm" onClick={onScan} disabled={scanning}>
           <FileSearch /> {scanning ? "Starting" : "Scan website"}
@@ -1736,7 +1736,7 @@ function SiteCommandCenter({
       evidence: latestAudit
         ? `${formatNumber(latestAudit.pages_crawled)} pages · ${formatNumber(latestAudit.issue_count)} issues · ${formatNumber(latestAuditSummary.checkedLinks || 0)} links checked`
         : "No crawl evidence saved yet.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/audits"><FileSearch /> Open site audits</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/audits"><FileSearch /> Open site scans</Link></Button>,
       secondary: latestAudit ? (
         <Button asChild size="sm" variant="outline">
           <Link to={`/audits/${latestAudit.id}`}><FileSearch /> Open scan report</Link>
@@ -1762,7 +1762,7 @@ function SiteCommandCenter({
         <Button asChild size="sm" variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
       ),
       secondary: latestAudit ? (
-        <Button asChild size="sm" variant="outline"><Link to="/audits"><FileSearch /> Open audit history</Link></Button>
+        <Button asChild size="sm" variant="outline"><Link to="/audits"><FileSearch /> Open scan history</Link></Button>
       ) : null,
     },
     {
@@ -1818,7 +1818,7 @@ function SiteCommandCenter({
           <div>
             <h2 className="text-lg font-semibold">Site control</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              The active site feeds audits, local link evidence, rankings, Search Console, and AI work.
+              The active site feeds scans, local link evidence, rankings, Search Console, and AI work.
             </p>
           </div>
           {site.domain ? <Badge variant="outline">{scanTargetShortDetail(site)}</Badge> : null}
@@ -2171,7 +2171,7 @@ function SitesPage({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add site</DialogTitle>
-                <DialogDescription>Add the website once, choose exactly how it should be reached, and start a local audit immediately.</DialogDescription>
+                <DialogDescription>Add the website once, choose exactly how it should be reached, and start a local scan immediately.</DialogDescription>
               </DialogHeader>
               <form className="space-y-4" onSubmit={submit}>
                 <Field label="Site name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Optional" /></Field>
@@ -3238,7 +3238,7 @@ function LocalOrganicEvidence({
           <div>
             <h2 className="text-lg font-semibold">Local crawl pages</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Real page evidence from the selected saved audit. No external keyword or traffic estimates are generated here.
+              Real page evidence from the selected saved scan. No external keyword or traffic estimates are generated here.
             </p>
           </div>
           <AuditRunPicker label="Saved scan for page evidence" audits={audits} selectedAuditId={selectedAuditId} onAuditChange={onAuditChange} />
@@ -3248,7 +3248,7 @@ function LocalOrganicEvidence({
         {!audit ? (
           <EmptyState
             title="No local crawl yet"
-            text={siteDomain ? "Run a site audit once to fill this page with real crawl evidence." : "Add a website address and run an audit to fill this page."}
+            text={siteDomain ? "Run a site scan once to fill this page with real crawl evidence." : "Add a website address and run a scan to fill this page."}
             action={siteDomain ? (
               <Button variant="secondary" onClick={onScan} disabled={scanning}>
                 <FileSearch /> {scanning ? "Starting scan" : `Scan ${siteDomain}`}
@@ -3461,7 +3461,7 @@ function LinksPage({ site }: { site: Site }) {
     if (!backlinkIndexConnected) {
       setOverview(null);
       setProfile(null);
-      setError("A web-wide backlink index is not connected. Use the local link graph from a saved audit, or connect a real backlink index before running this analysis.");
+      setError("A web-wide backlink index is not connected. Use the local link graph from a saved scan, or connect a real backlink index before running this analysis.");
       return;
     }
     setLoading(true);
@@ -3516,7 +3516,7 @@ function LinksPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Authority" title="Links" description="Local crawl links are available from audits. Web-wide backlinks are shown only when a real backlink index is connected." />
+      <PageHeader eyebrow="Authority" title="Links" description="Local crawl links are available from saved scans. Web-wide backlinks are shown only when a real backlink index is connected." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
           <SiteTargetField
@@ -3580,7 +3580,7 @@ function LinksPage({ site }: { site: Site }) {
           </TabsList>
           <TabsContent value="backlinks">
             <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Connect a real backlink index, then run a check."}>
-              {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title={backlinkIndexConnected ? "No backlink rows" : "No external backlink index connected"} text={profile?.warning || (backlinkIndexConnected ? "Check a domain to load real backlink rows." : "Local audits do not invent web-wide backlinks. Use the local link graph above until a real backlink index is connected.")} />}
+              {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title={backlinkIndexConnected ? "No backlink rows" : "No external backlink index connected"} text={profile?.warning || (backlinkIndexConnected ? "Check a domain to load real backlink rows." : "Local scans do not invent web-wide backlinks. Use the local link graph above until a real backlink index is connected.")} />}
             </ReportSection>
           </TabsContent>
           <TabsContent value="domains">
@@ -3636,7 +3636,7 @@ function LocalLinkEvidence({
           <div>
             <h2 className="text-lg font-semibold">Local link graph</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Real internal links, external links, and failing URLs from the selected saved audit.
+              Real internal links, external links, and failing URLs from the selected saved scan.
             </p>
           </div>
           <AuditRunPicker label="Saved scan for link evidence" audits={audits} selectedAuditId={selectedAuditId} onAuditChange={onAuditChange} />
@@ -3646,7 +3646,7 @@ function LocalLinkEvidence({
         {!audit ? (
           <EmptyState
             title="No local link graph yet"
-            text={siteDomain ? "Run a site audit once to collect internal links, external links, and broken link evidence." : "Add a website address and run an audit to collect link evidence."}
+            text={siteDomain ? "Run a site scan once to collect internal links, external links, and broken link evidence." : "Add a website address and run a scan to collect link evidence."}
             action={siteDomain ? (
               <Button variant="secondary" onClick={onScan} disabled={scanning}>
                 <FileSearch /> {scanning ? "Starting scan" : `Scan ${siteDomain}`}
@@ -4260,15 +4260,15 @@ function AuditReportRoute() {
         eyebrow="Technical"
         title="Audit report"
         description="Technical evidence, broken assets, metadata, indexability, and fixes from this saved local scan."
-        action={<Button asChild variant="outline"><Link to="/audits"><FileSearch /> Back to audits</Link></Button>}
+        action={<Button asChild variant="outline"><Link to="/audits"><FileSearch /> Back to scans</Link></Button>}
       />
       {error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       {loading ? (
-        <EmptyState title="Loading report" text="Reading the saved audit from local SQLite." />
+        <EmptyState title="Loading report" text="Reading the saved scan from local SQLite." />
       ) : audit ? (
         <AuditDetail audit={audit} />
       ) : (
-        <EmptyState title="Scan not found" text="This saved scan no longer exists in local SQLite." action={<Button asChild><Link to="/audits"><FileSearch /> Open audits</Link></Button>} />
+        <EmptyState title="Scan not found" text="This saved scan no longer exists in local SQLite." action={<Button asChild><Link to="/audits"><FileSearch /> Open scans</Link></Button>} />
       )}
     </>
   );
@@ -4429,7 +4429,7 @@ function AuditsPage({ site }: { site: Site }) {
   }
   return (
     <>
-      <PageHeader eyebrow="Technical" title="Site audits" description="Scan the active site's saved crawl URL and open the report when it completes." />
+      <PageHeader eyebrow="Technical" title="Site scans" description="Scan the active site's saved crawl URL and open the report when it completes." />
       <section className="border-y bg-background/40 px-4 py-4 sm:px-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
           <div className="min-w-0">
@@ -4524,8 +4524,8 @@ function AuditsPage({ site }: { site: Site }) {
               <AuditTable rows={allAudits} showSite selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingAudit(allAudits.find((audit) => audit.id === id) || { id })} />
             ) : (
               <EmptyState
-                title="No audits yet"
-                text={site.domain ? "Start a technical scan for this site." : "Add a website address before running an audit."}
+                title="No scans yet"
+                text={site.domain ? "Start a technical scan for this site." : "Add a website address before running a scan."}
                 action={site.domain ? (
                   <Button onClick={startSelectedSite} disabled={starting}>
                     <FileSearch /> {starting ? "Starting" : "Scan site now"}
@@ -7093,7 +7093,7 @@ function McpToolTable({ rows }: { rows: any[] }) {
 function mcpToolGroup(name: string) {
   if (/site|whoami/.test(name)) return "Sites";
   if (/keyword|serp|rank/.test(name)) return "Keywords and ranks";
-  if (/audit|scan/.test(name)) return "Audits";
+  if (/audit|scan/.test(name)) return "Site scans";
   if (/domain|backlink/.test(name)) return "Competitive data";
   if (/gsc|inspect/.test(name)) return "Search Console";
   if (/brand|prompt|ai/.test(name)) return "AI visibility";
@@ -7165,7 +7165,7 @@ function SettingsPage() {
           <form className="space-y-5" onSubmit={save}>
             <div>
               <h3 className="text-sm font-semibold">Keyword tool defaults</h3>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. They do not restrict multilingual site audits.</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. They do not restrict multilingual site scans.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Default keyword market">

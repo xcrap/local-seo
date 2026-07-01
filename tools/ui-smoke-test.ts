@@ -299,7 +299,7 @@ try {
     if (await siteControl.getByText(/has keywords|has jobs|needs scan|not run/i).count() || await siteControl.getByText("manual", { exact: true }).count()) {
       throw new Error("Overview still exposes vague internal status labels.");
     }
-    await siteControl.getByRole("link", { name: /^Open site audits$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open site scans$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open speed report$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open organic research$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open local link graph$/ }).waitFor();
@@ -446,7 +446,7 @@ try {
     await page.getByRole("dialog", { name: /Edit site/i }).getByText(fixtureUrl).waitFor();
     await page.keyboard.press("Escape");
 
-    await page.getByRole("navigation").getByRole("link", { name: /^Audits$/ }).click();
+    await page.getByRole("navigation").getByRole("link", { name: /^Site scans$/ }).click();
     await page.getByRole("heading", { name: /^Page speed tracking$/ }).waitFor();
     await page.getByText(/Latest avg .*ms/i).waitFor();
     await page.getByRole("columnheader", { name: /^P95$/ }).waitFor();
@@ -478,7 +478,7 @@ try {
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
     await page.getByText("No scan report yet").waitFor();
     await page.getByRole("button", { name: /^Scan site now$/ }).first().waitFor();
-    await page.getByText("No audits yet").waitFor();
+    await page.getByText("No scans yet").waitFor();
     await page.getByRole("button", { name: /^Scan site now$/ }).first().click();
     await page.getByText("Scan running").waitFor({ timeout: 5000 });
     await page.locator("section", { hasText: "Scan running" }).getByText(/pages crawled/i).first().waitFor();
@@ -567,7 +567,7 @@ try {
     await page.getByRole("button", { name: /^Add site$/ }).click();
     const addSiteDialog = page.getByRole("dialog", { name: /^Add site$/ });
     await addSiteDialog.getByText("Keyword tool defaults").waitFor();
-    await addSiteDialog.getByText("Audits crawl every page language they find.").waitFor();
+    await addSiteDialog.getByText("Site scans crawl every page language they find.").waitFor();
     await addSiteDialog.getByText("Portugal · Portuguese").waitFor();
     await addSiteDialog.getByRole("button", { name: /Keyword tool defaults/i }).click();
     await addSiteDialog.getByText("Market").waitFor();
