@@ -524,6 +524,11 @@ try {
       throw new Error(`User-facing scan navigation should use /scans instead of /audits: ${oldBrowserRoutePattern}`);
     }
   }
+  for (const oldScanSelectionState of ["local-seo:selected-audit", "/scans/:auditId", "selectedAuditId", "setSelectedAuditId"]) {
+    if (webAppClient.includes(oldScanSelectionState)) {
+      throw new Error(`Scan selection state should use scan naming, not ${oldScanSelectionState}.`);
+    }
+  }
   if (webAppClient.includes(">Open report</Link>") || webAppClient.includes("Open report\\n")) {
     throw new Error("Saved-scan actions should say Open scan report instead of generic Open report.");
   }
@@ -619,10 +624,10 @@ try {
     throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
   }
   if (webAppClient.includes("\"Deleted site\"")) {
-    throw new Error("Audit history should show readable site context and must never fall back to raw internal site IDs.");
+    throw new Error("Scan history should show readable site context and must never fall back to raw internal site IDs.");
   }
-  if (!webAppClient.includes("if (row.site_id) setSelectedAuditId(row.site_id, row.id);")) {
-    throw new Error("Audit history should only store selected scan state when a scan row has a site ID.");
+  if (!webAppClient.includes("if (row.site_id) setSelectedScanId(row.site_id, row.id);")) {
+    throw new Error("Scan history should only store selected scan state when a scan row has a site ID.");
   }
   for (const pattern of [
     "row.searchVolume || \"-\"",

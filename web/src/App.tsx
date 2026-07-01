@@ -164,23 +164,23 @@ function defaultCrawlHostFromConfig(config?: any): Site["crawl_host"] {
 }
 
 const activeSiteStorageKey = "local-seo:site";
-const selectedAuditStoragePrefix = "local-seo:selected-audit";
+const selectedScanStoragePrefix = "local-seo:selected-scan";
 const siteActionMessageStorageKey = "local-seo:site-action-message";
 
-function selectedAuditStorageKey(siteId: string) {
-  return `${selectedAuditStoragePrefix}:${siteId}`;
+function selectedScanStorageKey(siteId: string) {
+  return `${selectedScanStoragePrefix}:${siteId}`;
 }
 
-function getSelectedAuditId(siteId: string) {
-  return localStorage.getItem(selectedAuditStorageKey(siteId)) || "";
+function getSelectedScanId(siteId: string) {
+  return localStorage.getItem(selectedScanStorageKey(siteId)) || "";
 }
 
-function setSelectedAuditId(siteId: string, auditId: string) {
-  localStorage.setItem(selectedAuditStorageKey(siteId), auditId);
+function setSelectedScanId(siteId: string, scanId: string) {
+  localStorage.setItem(selectedScanStorageKey(siteId), scanId);
 }
 
-function clearSelectedAuditId(siteId?: string) {
-  if (siteId) localStorage.removeItem(selectedAuditStorageKey(siteId));
+function clearSelectedScanId(siteId?: string) {
+  if (siteId) localStorage.removeItem(selectedScanStorageKey(siteId));
 }
 
 function takeSiteActionMessage() {
@@ -1074,7 +1074,7 @@ function latestCompletedAudit(rows: any[]) {
   return (rows || []).find((audit) => audit?.status === "completed" && audit?.result) || null;
 }
 
-function defaultEvidenceAudit(rows: any[]) {
+function defaultEvidenceScan(rows: any[]) {
   const sorted = sortAuditRows(rows || []);
   return latestCompletedAudit(sorted) || sorted[0] || null;
 }
@@ -1275,7 +1275,7 @@ function AppShell() {
     try {
       const result = await api.scanSite(activeSite.id);
       if (result.scan?.id) {
-        setSelectedAuditId(activeSite.id, result.scan.id);
+        setSelectedScanId(activeSite.id, result.scan.id);
         navigate(`/scans/${result.scan.id}`);
       } else {
         navigate("/scans");
@@ -1415,7 +1415,7 @@ function AppShell() {
                 <Route path="/brand" element={<BrandLookupPage site={activeSite} />} />
                 <Route path="/prompts" element={<PromptExplorerPage site={activeSite} />} />
                 <Route path="/scans" element={<AuditsPage site={activeSite} />} />
-                <Route path="/scans/:auditId" element={<AuditReportRoute />} />
+                <Route path="/scans/:scanId" element={<AuditReportRoute />} />
                 <Route path="/gsc" element={<GscPage site={activeSite} />} />
                 <Route path="/ai" element={<AiPage site={activeSite} />} />
                 <Route path="/mcp-tools" element={<McpPage site={activeSite} />} />
@@ -1509,7 +1509,7 @@ function Overview({
       setScan(result);
       setScanAudit(result.scan);
       if (result.scan?.id) {
-        setSelectedAuditId(site.id, result.scan.id);
+        setSelectedScanId(site.id, result.scan.id);
         navigate(`/scans/${result.scan.id}`);
       }
       setSummary(await api.dashboard(site.id));
@@ -1520,9 +1520,9 @@ function Overview({
     }
   }
 
-  function openAuditReport(auditId: string, row?: any) {
-    setSelectedAuditId(row?.site_id || site.id, auditId);
-    navigate(`/scans/${auditId}`);
+  function openScanReport(scanId: string, row?: any) {
+    setSelectedScanId(row?.site_id || site.id, scanId);
+    navigate(`/scans/${scanId}`);
   }
 
   async function createSiteAndScan(event: FormEvent) {
@@ -1541,7 +1541,7 @@ function Overview({
       selectSite(created.id);
       const result = await api.scanSite(created.id);
       if (result.scan?.id) {
-        setSelectedAuditId(created.id, result.scan.id);
+        setSelectedScanId(created.id, result.scan.id);
       }
       await reloadSites();
       if (result.scan?.id) navigate(`/scans/${result.scan.id}`);
@@ -1655,7 +1655,7 @@ function Overview({
           </div>
           <div className="p-5">
             {scanLedgerRows.length ? (
-              <AuditTable rows={scanLedgerRows} showSite onInspect={openAuditReport} />
+              <AuditTable rows={scanLedgerRows} showSite onInspect={openScanReport} />
             ) : (
               <EmptyState
                 title="No scans yet"
@@ -2018,7 +2018,7 @@ function SitesPage({
       if (scanAfterCreate) {
         const result = await api.scanSite(created.id);
         if (result.scan?.id) {
-          setSelectedAuditId(created.id, result.scan.id);
+          setSelectedScanId(created.id, result.scan.id);
         }
         await reloadSites();
         if (result.scan?.id) navigate(`/scans/${result.scan.id}`);
@@ -2099,7 +2099,7 @@ function SitesPage({
     try {
       const result = await api.scanSite(site.id);
       if (result.scan?.id) {
-        setSelectedAuditId(site.id, result.scan.id);
+        setSelectedScanId(site.id, result.scan.id);
       }
       setScanningSiteId("");
       selectSite(site.id);
@@ -3017,16 +3017,16 @@ function DomainPage({ site }: { site: Site }) {
   const [overview, setOverview] = useState<any>(null);
   const [keywords, setKeywords] = useState<any>(null);
   const [pages, setPages] = useState<any>(null);
-  const [auditRows, setAuditRows] = useState<any[]>([]);
-  const [selectedAuditId, setSelectedAuditIdState] = useState("");
+  const [scanRows, setScanRows] = useState<any[]>([]);
+  const [selectedScanId, setSelectedScanIdState] = useState("");
   const [history, setHistory] = useState<any[]>([]);
   const [tab, setTab] = useState("keywords");
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
-  const selectedAudit = useMemo(
-    () => auditRows.find((audit) => audit.id === selectedAuditId) || defaultEvidenceAudit(auditRows),
-    [auditRows, selectedAuditId],
+  const selectedScan = useMemo(
+    () => scanRows.find((audit) => audit.id === selectedScanId) || defaultEvidenceScan(scanRows),
+    [scanRows, selectedScanId],
   );
 
   useEffect(() => {
@@ -3044,10 +3044,10 @@ function DomainPage({ site }: { site: Site }) {
     ]);
     setHistory(snapshots);
     const rows = sortAuditRows(audits);
-    setAuditRows(rows);
-    setSelectedAuditIdState((currentId) => {
+    setScanRows(rows);
+    setSelectedScanIdState((currentId) => {
       if (currentId && rows.some((audit) => audit.id === currentId)) return currentId;
-      return defaultEvidenceAudit(rows)?.id || "";
+      return defaultEvidenceScan(rows)?.id || "";
     });
   }
   useEffect(() => {
@@ -3086,7 +3086,7 @@ function DomainPage({ site }: { site: Site }) {
     try {
       const result = await api.scanSite(site.id);
       if (result.scan?.id) {
-        setSelectedAuditId(site.id, result.scan.id);
+        setSelectedScanId(site.id, result.scan.id);
         navigate(`/scans/${result.scan.id}`);
       } else {
         navigate("/scans");
@@ -3118,10 +3118,10 @@ function DomainPage({ site }: { site: Site }) {
       </section>
       <div className="mt-6 space-y-6">
         <LocalOrganicEvidence
-          audit={selectedAudit}
-          audits={auditRows}
-          selectedAuditId={selectedAudit?.id || ""}
-          onAuditChange={setSelectedAuditIdState}
+          audit={selectedScan}
+          audits={scanRows}
+          selectedScanId={selectedScan?.id || ""}
+          onScanChange={setSelectedScanIdState}
           siteDomain={site.domain}
           onScan={scanSite}
           scanning={scanning}
@@ -3166,24 +3166,24 @@ function DomainPage({ site }: { site: Site }) {
   );
 }
 
-function AuditRunPicker({
+function ScanRunPicker({
   label,
   audits,
-  selectedAuditId,
-  onAuditChange,
+  selectedScanId,
+  onScanChange,
 }: {
   label: string;
   audits: any[];
-  selectedAuditId: string;
-  onAuditChange: (auditId: string) => void;
+  selectedScanId: string;
+  onScanChange: (scanId: string) => void;
 }) {
   if (!audits.length) return null;
-  const selected = audits.find((audit) => audit.id === selectedAuditId) || audits[0];
+  const selected = audits.find((audit) => audit.id === selectedScanId) || audits[0];
   return (
     <div className="w-full space-y-2 lg:w-[440px]">
       <Label>{label}</Label>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Select value={selected?.id || ""} onValueChange={onAuditChange}>
+        <Select value={selected?.id || ""} onValueChange={onScanChange}>
           <SelectTrigger aria-label={label} className="min-w-0 flex-1">
             <SelectValue placeholder="Choose saved scan" />
           </SelectTrigger>
@@ -3209,16 +3209,16 @@ function AuditRunPicker({
 function LocalOrganicEvidence({
   audit,
   audits,
-  selectedAuditId,
-  onAuditChange,
+  selectedScanId,
+  onScanChange,
   siteDomain,
   onScan,
   scanning,
 }: {
   audit: any;
   audits: any[];
-  selectedAuditId: string;
-  onAuditChange: (auditId: string) => void;
+  selectedScanId: string;
+  onScanChange: (scanId: string) => void;
   siteDomain: string;
   onScan: () => void;
   scanning: boolean;
@@ -3241,7 +3241,7 @@ function LocalOrganicEvidence({
               Real page evidence from the selected saved scan. No external keyword or traffic estimates are generated here.
             </p>
           </div>
-          <AuditRunPicker label="Saved scan for page evidence" audits={audits} selectedAuditId={selectedAuditId} onAuditChange={onAuditChange} />
+          <ScanRunPicker label="Saved scan for page evidence" audits={audits} selectedScanId={selectedScanId} onScanChange={onScanChange} />
         </div>
       </div>
       <div className="space-y-4 p-5">
@@ -3418,17 +3418,17 @@ function LinksPage({ site }: { site: Site }) {
   const [overview, setOverview] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
-  const [auditRows, setAuditRows] = useState<any[]>([]);
-  const [selectedAuditId, setSelectedAuditIdState] = useState("");
+  const [scanRows, setScanRows] = useState<any[]>([]);
+  const [selectedScanId, setSelectedScanIdState] = useState("");
   const [history, setHistory] = useState<any[]>([]);
   const [tab, setTab] = useState("backlinks");
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
   const backlinkIndexConnected = Boolean(config?.seo_metrics_source_connected);
-  const selectedAudit = useMemo(
-    () => auditRows.find((audit) => audit.id === selectedAuditId) || defaultEvidenceAudit(auditRows),
-    [auditRows, selectedAuditId],
+  const selectedScan = useMemo(
+    () => scanRows.find((audit) => audit.id === selectedScanId) || defaultEvidenceScan(scanRows),
+    [scanRows, selectedScanId],
   );
 
   useEffect(() => {
@@ -3446,10 +3446,10 @@ function LinksPage({ site }: { site: Site }) {
     ]);
     setHistory(snapshots);
     const rows = sortAuditRows(audits);
-    setAuditRows(rows);
-    setSelectedAuditIdState((currentId) => {
+    setScanRows(rows);
+    setSelectedScanIdState((currentId) => {
       if (currentId && rows.some((audit) => audit.id === currentId)) return currentId;
-      return defaultEvidenceAudit(rows)?.id || "";
+      return defaultEvidenceScan(rows)?.id || "";
     });
     setConfig(appConfig);
   }
@@ -3502,7 +3502,7 @@ function LinksPage({ site }: { site: Site }) {
     try {
       const result = await api.scanSite(site.id);
       if (result.scan?.id) {
-        setSelectedAuditId(site.id, result.scan.id);
+        setSelectedScanId(site.id, result.scan.id);
         navigate(`/scans/${result.scan.id}`);
       } else {
         navigate("/scans");
@@ -3550,10 +3550,10 @@ function LinksPage({ site }: { site: Site }) {
       </section>
       <div className="mt-6 space-y-6">
         <LocalLinkEvidence
-          audit={selectedAudit}
-          audits={auditRows}
-          selectedAuditId={selectedAudit?.id || ""}
-          onAuditChange={setSelectedAuditIdState}
+          audit={selectedScan}
+          audits={scanRows}
+          selectedScanId={selectedScan?.id || ""}
+          onScanChange={setSelectedScanIdState}
           siteDomain={site.domain}
           onScan={scanSite}
           scanning={scanning}
@@ -3606,16 +3606,16 @@ function LinksPage({ site }: { site: Site }) {
 function LocalLinkEvidence({
   audit,
   audits,
-  selectedAuditId,
-  onAuditChange,
+  selectedScanId,
+  onScanChange,
   siteDomain,
   onScan,
   scanning,
 }: {
   audit: any;
   audits: any[];
-  selectedAuditId: string;
-  onAuditChange: (auditId: string) => void;
+  selectedScanId: string;
+  onScanChange: (scanId: string) => void;
   siteDomain: string;
   onScan: () => void;
   scanning: boolean;
@@ -3639,7 +3639,7 @@ function LocalLinkEvidence({
               Real internal links, external links, and failing URLs from the selected saved scan.
             </p>
           </div>
-          <AuditRunPicker label="Saved scan for link evidence" audits={audits} selectedAuditId={selectedAuditId} onAuditChange={onAuditChange} />
+          <ScanRunPicker label="Saved scan for link evidence" audits={audits} selectedScanId={selectedScanId} onScanChange={onScanChange} />
         </div>
       </div>
       <div className="space-y-4 p-5">
@@ -4207,7 +4207,7 @@ function HistoryTable({
 }
 
 function AuditReportRoute() {
-  const { auditId } = useParams();
+  const { scanId } = useParams();
   const [audit, setAudit] = useState<any>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -4216,21 +4216,21 @@ function AuditReportRoute() {
     let cancelled = false;
     let interval: number | undefined;
     async function load() {
-      if (!auditId) return;
+      if (!scanId) return;
       setError("");
       try {
-        const row = await api.scan(auditId);
+        const row = await api.scan(scanId);
         if (!cancelled) {
           setAudit(row);
           if (!row) {
-            clearSelectedAuditId();
+            clearSelectedScanId();
             if (interval) {
               window.clearInterval(interval);
               interval = undefined;
             }
             return;
           }
-          setSelectedAuditId(row.site_id, row.id);
+          setSelectedScanId(row.site_id, row.id);
           if (row.status !== "queued" && row.status !== "running" && interval) {
             window.clearInterval(interval);
             interval = undefined;
@@ -4245,14 +4245,14 @@ function AuditReportRoute() {
     setLoading(true);
     load().catch(console.error);
     interval = window.setInterval(() => {
-      if (!auditId) return;
+      if (!scanId) return;
       load().catch(console.error);
     }, 1500);
     return () => {
       cancelled = true;
       if (interval) window.clearInterval(interval);
     };
-  }, [auditId]);
+  }, [scanId]);
 
   return (
     <>
@@ -4285,9 +4285,9 @@ function AuditsPage({ site }: { site: Site }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [showCustomUrl, setShowCustomUrl] = useState(false);
-  const [manualLedgerAuditId, setManualLedgerAuditId] = useState("");
+  const [manualLedgerScanId, setManualLedgerScanId] = useState("");
   const [manualLedgerSiteId, setManualLedgerSiteId] = useState("");
-  const activeAudit = auditIsActive(detail) ? detail : allScans.find(auditIsActive);
+  const activeScan = auditIsActive(detail) ? detail : allScans.find(auditIsActive);
   async function load() {
     const [siteRows, ledgerRows] = await Promise.all([
       api.scans(site.id),
@@ -4299,17 +4299,17 @@ function AuditsPage({ site }: { site: Site }) {
     setAllScans(ledger);
     const currentDetail = detail?.id ? ledger.find((row) => row.id === detail.id) : null;
     const currentDetailBelongsToSite = currentDetail?.site_id === site.id;
-    const manualAudit = manualLedgerAuditId && manualLedgerSiteId === site.id
-      ? ledger.find((row) => row.id === manualLedgerAuditId)
+    const manualScan = manualLedgerScanId && manualLedgerSiteId === site.id
+      ? ledger.find((row) => row.id === manualLedgerScanId)
       : null;
-    const selectedAuditId = getSelectedAuditId(site.id);
-    const selectedAudit = selectedAuditId ? rows.find((row) => row.id === selectedAuditId) : null;
-    const nextDetail = manualAudit || (currentDetailBelongsToSite ? currentDetail : null) || selectedAudit || rows[0] || null;
+    const selectedScanId = getSelectedScanId(site.id);
+    const selectedScan = selectedScanId ? rows.find((row) => row.id === selectedScanId) : null;
+    const nextDetail = manualScan || (currentDetailBelongsToSite ? currentDetail : null) || selectedScan || rows[0] || null;
     setDetail(nextDetail);
-    if (nextDetail?.id) setSelectedAuditId(nextDetail.site_id || site.id, nextDetail.id);
-    else clearSelectedAuditId(site.id);
-    if (manualLedgerAuditId && !manualAudit) {
-      setManualLedgerAuditId("");
+    if (nextDetail?.id) setSelectedScanId(nextDetail.site_id || site.id, nextDetail.id);
+    else clearSelectedScanId(site.id);
+    if (manualLedgerScanId && !manualScan) {
+      setManualLedgerScanId("");
       setManualLedgerSiteId("");
     }
     return rows;
@@ -4333,7 +4333,7 @@ function AuditsPage({ site }: { site: Site }) {
   useEffect(() => {
     if (!detail?.id || !auditIsActive(detail)) return;
     let cancelled = false;
-    async function refreshSelectedAudit() {
+    async function refreshSelectedScan() {
       try {
         const nextAudit = await api.scan(detail.id);
         if (cancelled || !nextAudit) return;
@@ -4345,9 +4345,9 @@ function AuditsPage({ site }: { site: Site }) {
       }
     }
     const interval = window.setInterval(() => {
-      refreshSelectedAudit().catch(console.error);
+      refreshSelectedScan().catch(console.error);
     }, 1000);
-    refreshSelectedAudit().catch(console.error);
+    refreshSelectedScan().catch(console.error);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
@@ -4357,14 +4357,14 @@ function AuditsPage({ site }: { site: Site }) {
     event.preventDefault();
     setError("");
     setStarting(true);
-    setManualLedgerAuditId("");
+    setManualLedgerScanId("");
     setManualLedgerSiteId("");
     try {
       const audit = await api.startScan({ siteId: site.id, url });
       setDetail(audit);
       setAudits((rows) => upsertAuditRow(rows, audit));
       setAllScans((rows) => upsertAuditRow(rows, audit));
-      if (audit?.id) setSelectedAuditId(site.id, audit.id);
+      if (audit?.id) setSelectedScanId(site.id, audit.id);
       load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start scan");
@@ -4376,14 +4376,14 @@ function AuditsPage({ site }: { site: Site }) {
     if (!site.domain) return;
     setError("");
     setStarting(true);
-    setManualLedgerAuditId("");
+    setManualLedgerScanId("");
     setManualLedgerSiteId("");
     try {
       const result = await api.scanSite(site.id);
       setDetail(result.scan);
       setAudits((rows) => upsertAuditRow(rows, result.scan));
       setAllScans((rows) => upsertAuditRow(rows, result.scan));
-      if (result.scan?.id) setSelectedAuditId(site.id, result.scan.id);
+      if (result.scan?.id) setSelectedScanId(site.id, result.scan.id);
       load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start site scan");
@@ -4392,20 +4392,20 @@ function AuditsPage({ site }: { site: Site }) {
     }
   }
   async function inspect(id: string, row?: any) {
-    setManualLedgerAuditId(id);
+    setManualLedgerScanId(id);
     setManualLedgerSiteId(site.id);
-    setSelectedAuditId(row?.site_id || site.id, id);
+    setSelectedScanId(row?.site_id || site.id, id);
     setDetail(await api.scan(id));
   }
   async function remove(id: string, row?: any) {
     const siteId = row?.site_id || site.id;
     await api.deleteScan(siteId, id);
-    if (getSelectedAuditId(siteId) === id) {
-      clearSelectedAuditId(siteId);
+    if (getSelectedScanId(siteId) === id) {
+      clearSelectedScanId(siteId);
     }
     if (detail?.id === id) setDetail(null);
-    if (manualLedgerAuditId === id) {
-      setManualLedgerAuditId("");
+    if (manualLedgerScanId === id) {
+      setManualLedgerScanId("");
       setManualLedgerSiteId("");
     }
     await load();
@@ -4415,8 +4415,8 @@ function AuditsPage({ site }: { site: Site }) {
     setClearingAudits(true);
     try {
       await api.clearScans(site.id);
-      clearSelectedAuditId(site.id);
-      setManualLedgerAuditId("");
+      clearSelectedScanId(site.id);
+      setManualLedgerScanId("");
       setManualLedgerSiteId("");
       setDetail(null);
       setConfirmClearAudits(false);
@@ -4470,7 +4470,7 @@ function AuditsPage({ site }: { site: Site }) {
         ) : null}
       </section>
       <div className="mt-6 space-y-6">
-        {activeAudit ? <ActiveScanBanner audit={activeAudit} /> : null}
+        {activeScan ? <ActiveScanBanner audit={activeScan} /> : null}
         <AuditSpeedHistoryPanel audits={audits} />
         <section className="space-y-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -4731,7 +4731,7 @@ function AuditTable({
                       <Link
                         to={`/scans/${row.id}`}
                         onClick={() => {
-                          if (row.site_id) setSelectedAuditId(row.site_id, row.id);
+                          if (row.site_id) setSelectedScanId(row.site_id, row.id);
                         }}
                       >
                         <FileSearch /> Open scan report
@@ -4815,7 +4815,7 @@ function AuditTable({
                               to={`/scans/${row.id}`}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                if (row.site_id) setSelectedAuditId(row.site_id, row.id);
+                                if (row.site_id) setSelectedScanId(row.site_id, row.id);
                               }}
                             >
                               <FileSearch /> Open scan report
