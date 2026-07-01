@@ -383,6 +383,9 @@ try {
     throw new Error("The web client should send siteId in request bodies instead of projectId.");
   }
   const webAppClient = await readFile(path.join(rootDir, "web/src/App.tsx"), "utf8");
+  if (!webAppClient.includes("One local admin account for this install.") || !webAppClient.includes("SQLite is the source of truth on this machine.") || !webAppClient.includes("No hosted auth service is required.")) {
+    throw new Error("First-run setup should explain the single local admin, SQLite source of truth, and no hosted auth model.");
+  }
   if (/DataForSEO|DATAFORSEO/.test(webAppClient)) {
     throw new Error("The React UI should not advertise a paid metrics provider by name.");
   }

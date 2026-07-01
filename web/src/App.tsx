@@ -1167,6 +1167,22 @@ function LoginScreen({ setupRequired, onSuccess }: { setupRequired: boolean; onS
           </div>
         </CardHeader>
         <CardContent>
+          {setupRequired ? (
+            <div className="mb-4 divide-y rounded-md border bg-muted/15 text-sm">
+              <div className="grid gap-1 p-3 sm:grid-cols-[150px_1fr]">
+                <span className="font-medium">Admin</span>
+                <span className="text-muted-foreground">One local admin account for this install.</span>
+              </div>
+              <div className="grid gap-1 p-3 sm:grid-cols-[150px_1fr]">
+                <span className="font-medium">Storage</span>
+                <span className="text-muted-foreground">SQLite is the source of truth on this machine.</span>
+              </div>
+              <div className="grid gap-1 p-3 sm:grid-cols-[150px_1fr]">
+                <span className="font-medium">Auth</span>
+                <span className="text-muted-foreground">No hosted auth service is required.</span>
+              </div>
+            </div>
+          ) : null}
           <form className="space-y-4" onSubmit={submit}>
             <Field label="Email">
               <Input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required />

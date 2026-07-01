@@ -160,6 +160,9 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   try {
     await page.goto(webUrl, { waitUntil: "networkidle" });
+    await page.getByText("One local admin account for this install.").waitFor();
+    await page.getByText("SQLite is the source of truth on this machine.").waitFor();
+    await page.getByText("No hosted auth service is required.").waitFor();
     await page.getByLabel("Email").fill("admin@example.com");
     await page.getByLabel("Password").fill("local-password-123");
     await page.getByRole("button", { name: /Create admin/i }).click();
