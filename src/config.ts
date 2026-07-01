@@ -84,7 +84,7 @@ export function listPublicConfig(): Record<string, string | boolean | number> {
     seo_metrics_source_connected: Boolean(getConfigValue("seo_metrics_api_key")),
     local_db_path: dbPath,
     local_site_count: get<{ count: number }>("SELECT count(*) AS count FROM sites")?.count || 0,
-    local_audit_count: get<{ count: number }>("SELECT count(*) AS count FROM audits")?.count || 0,
+    local_scan_count: get<{ count: number }>("SELECT count(*) AS count FROM scans")?.count || 0,
     local_gsc_import_count: get<{ count: number }>("SELECT count(*) AS count FROM gsc_imports")?.count || 0,
   };
 }

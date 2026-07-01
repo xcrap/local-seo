@@ -10,6 +10,52 @@ process.env.DB_PATH = path.join(tempDir, "scope.sqlite");
 process.env.SEO_METRICS_API_KEY = "";
 process.env.CODEX_MODEL = "";
 process.env.CODEX_REASONING_EFFORT = "";
+
+const legacyAuditDbPath = path.join(tempDir, "legacy-audits.sqlite");
+const legacyAuditDb = new Database(legacyAuditDbPath);
+legacyAuditDb.exec(`
+  CREATE TABLE audits (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    status TEXT NOT NULL,
+    score INTEGER NOT NULL DEFAULT 0,
+    pages_crawled INTEGER NOT NULL DEFAULT 0,
+    issue_count INTEGER NOT NULL DEFAULT 0,
+    result_json TEXT,
+    error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  INSERT INTO audits (id, site_id, url, status, score, pages_crawled, issue_count, result_json)
+  VALUES ('legacy-scan-row', 'legacy-site', 'https://example.com', 'completed', 91, 1, 0, '{}');
+`);
+legacyAuditDb.close();
+const legacyMigration = Bun.spawnSync([process.execPath, "-e", "await import('./src/db.ts')"], {
+  cwd: rootDir,
+  env: { ...process.env, DB_PATH: legacyAuditDbPath },
+  stdout: "pipe",
+  stderr: "pipe",
+});
+if (legacyMigration.exitCode !== 0) {
+  throw new Error(`Legacy scan table migration failed: ${legacyMigration.stderr.toString()}`);
+}
+const migratedDb = new Database(legacyAuditDbPath, { readonly: true });
+try {
+  const migratedTables = new Set(
+    migratedDb.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name),
+  );
+  if (migratedTables.has("audits") || !migratedTables.has("scans")) {
+    throw new Error(`Legacy audits table should be renamed to scans: ${JSON.stringify([...migratedTables].sort())}`);
+  }
+  const migratedRow = migratedDb.query<{ count: number }, []>("SELECT count(*) AS count FROM scans WHERE id = 'legacy-scan-row'").get();
+  if (migratedRow?.count !== 1) {
+    throw new Error("Legacy scan row was not preserved while renaming audits to scans.");
+  }
+} finally {
+  migratedDb.close();
+}
+
 const { sameSiteUrl } = await import("../src/seo");
 const { codexModel, codexReasoningEffort } = await import("../src/config");
 if (codexModel() !== "") {
@@ -254,7 +300,10 @@ try {
     if (siteIndexes.includes("idx_sites_active")) {
       throw new Error("Fresh sites schema should not keep the old archive index.");
     }
-    for (const table of ["saved_keywords", "audits", "gsc_imports", "domain_snapshots", "backlink_snapshots", "serp_runs"]) {
+    if (tables.has("audits")) {
+      throw new Error("Fresh SQLite schema should use scans, not audits.");
+    }
+    for (const table of ["saved_keywords", "scans", "gsc_imports", "domain_snapshots", "backlink_snapshots", "serp_runs"]) {
       const columns = schemaDb.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((row) => row.name);
       if (!columns.includes("site_id")) {
         throw new Error(`Fresh SQLite table ${table} should reference site_id.`);
@@ -267,8 +316,8 @@ try {
     schemaDb.close();
   }
   const dbSource = await readFile(path.join(rootDir, "src/db.ts"), "utf8");
-  if (/DELETE\s+FROM\s+(sites|audits|gsc_imports)\b/i.test(dbSource)) {
-    throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
+  if (/DELETE\s+FROM\s+(sites|scans|audits|gsc_imports)\b/i.test(dbSource)) {
+    throw new Error("Startup database migrations must not silently delete user-owned sites, scans, or imports.");
   }
   for (const removedSchemaBridge of [
     "schema_migrations",
@@ -1238,7 +1287,7 @@ try {
   const scanHistoryDb = new Database(serverDbPath);
   try {
     const insertAudit = scanHistoryDb.prepare(`
-      INSERT INTO audits (id, site_id, url, status, score, pages_crawled, issue_count, result_json, created_at, updated_at)
+      INSERT INTO scans (id, site_id, url, status, score, pages_crawled, issue_count, result_json, created_at, updated_at)
       VALUES (?, ?, ?, 'completed', 88, 1, 0, '{}', ?, ?)
     `);
     const insertedAuditIds: string[] = [];

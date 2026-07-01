@@ -1149,7 +1149,7 @@ function localAuditPagesForDomain(siteId: string, domain: string, page: number, 
   const scope = `https://${domain}`;
   const audits = all<any>(
     `
-    SELECT * FROM audits
+    SELECT * FROM scans
     WHERE site_id = ? AND status = 'completed' AND result_json IS NOT NULL
     ORDER BY updated_at DESC, created_at DESC
     LIMIT 10
@@ -1566,7 +1566,7 @@ function publicAuditRow(row: any) {
 }
 
 export function listAudits(siteId: string) {
-  return all<any>("SELECT * FROM audits WHERE site_id = ? ORDER BY created_at DESC", [
+  return all<any>("SELECT * FROM scans WHERE site_id = ? ORDER BY created_at DESC", [
     siteId,
   ]).map(publicAuditRow);
 }
@@ -1574,31 +1574,31 @@ export function listAudits(siteId: string) {
 export function listAllAudits() {
   return all<any>(`
     SELECT
-      audits.*,
+      scans.*,
       sites.name AS site_name,
       sites.domain AS site_domain
-    FROM audits
-    LEFT JOIN sites ON sites.id = audits.site_id
-    ORDER BY audits.created_at DESC
+    FROM scans
+    LEFT JOIN sites ON sites.id = scans.site_id
+    ORDER BY scans.created_at DESC
   `).map(publicAuditRow);
 }
 
 export function getAudit(auditId: string) {
-  const row = get<any>("SELECT * FROM audits WHERE id = ?", [auditId]);
+  const row = get<any>("SELECT * FROM scans WHERE id = ?", [auditId]);
   return publicAuditRow(row);
 }
 
 export function deleteAudit(siteId: string, auditId: string) {
   const site = getSite(siteId);
   if (!site) throw new Error("Site not found.");
-  const info = run("DELETE FROM audits WHERE id = ? AND site_id = ?", [auditId, site.id]);
+  const info = run("DELETE FROM scans WHERE id = ? AND site_id = ?", [auditId, site.id]);
   return { deleted: Number(info.changes || 0) > 0 };
 }
 
 export function clearAudits(siteId: string) {
   const site = getSite(siteId);
   if (!site) throw new Error("Site not found.");
-  const info = run("DELETE FROM audits WHERE site_id = ?", [site.id]);
+  const info = run("DELETE FROM scans WHERE site_id = ?", [site.id]);
   return { deleted: Number(info.changes || 0) };
 }
 
@@ -1607,13 +1607,13 @@ export function startAudit(siteId: string, url: string) {
   if (!site) throw new Error("Site not found.");
   const auditId = randomUUID();
   run(
-    "INSERT INTO audits (id, site_id, url, status, updated_at) VALUES (?, ?, ?, 'queued', CURRENT_TIMESTAMP)",
+    "INSERT INTO scans (id, site_id, url, status, updated_at) VALUES (?, ?, ?, 'queued', CURRENT_TIMESTAMP)",
     [auditId, site.id, url.trim()],
   );
   queueMicrotask(() => {
     runLocalAudit(auditId).catch((error) => {
       run(
-        "UPDATE audits SET status = 'failed', error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE scans SET status = 'failed', error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         [error instanceof Error ? error.message : "Audit failed", auditId],
       );
     });
@@ -2578,9 +2578,9 @@ function auditResult(input: {
 }
 
 async function runLocalAudit(auditId: string) {
-  const audit = get<any>("SELECT * FROM audits WHERE id = ?", [auditId]);
+  const audit = get<any>("SELECT * FROM scans WHERE id = ?", [auditId]);
   if (!audit) return;
-  run("UPDATE audits SET status = 'running', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [
+  run("UPDATE scans SET status = 'running', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [
     auditId,
   ]);
   const startUrl = /^https?:\/\//i.test(audit.url) ? audit.url : `https://${audit.url}`;
@@ -2633,7 +2633,7 @@ async function runLocalAudit(auditId: string) {
     });
     run(
       `
-      UPDATE audits
+      UPDATE scans
       SET status = ?,
           pages_crawled = ?,
           issue_count = ?,
@@ -4140,7 +4140,7 @@ async function runLocalAudit(auditId: string) {
   });
   run(
     `
-    UPDATE audits
+    UPDATE scans
     SET status = 'completed',
         score = ?,
         pages_crawled = ?,
@@ -4189,7 +4189,7 @@ export function dashboardSummary(siteId?: string) {
         site.id,
       ])?.count || 0,
     auditCount:
-      get<{ count: number }>("SELECT count(*) AS count FROM audits WHERE site_id = ?", [
+      get<{ count: number }>("SELECT count(*) AS count FROM scans WHERE site_id = ?", [
         site.id,
       ])?.count || 0,
     serpRunCount:

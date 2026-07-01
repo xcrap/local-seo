@@ -7250,7 +7250,7 @@ function SettingsPage() {
                 tone: "good",
                 text: (
                   <span className="break-all">
-                    {config.local_db_path || "Database path unavailable"} · {formatNumber(config.local_site_count || 0)} sites · {formatNumber(config.local_audit_count || 0)} scans · {formatNumber(config.local_gsc_import_count || 0)} Search Console imports
+                    {config.local_db_path || "Database path unavailable"} · {formatNumber(config.local_site_count || 0)} sites · {formatNumber(config.local_scan_count || 0)} scans · {formatNumber(config.local_gsc_import_count || 0)} Search Console imports
                   </span>
                 ),
               },
