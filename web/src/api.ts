@@ -116,6 +116,8 @@ export const api = {
     request<any>("/api/domain/keywords", { method: "POST", body: JSON.stringify(body) }),
   domainPages: (body: any) =>
     request<any>("/api/domain/pages", { method: "POST", body: JSON.stringify(body) }),
+  importOrganicResearch: (body: any) =>
+    request<any>("/api/domain/import", { method: "POST", body: JSON.stringify(body) }),
   backlinksOverview: (body: any) =>
     request<any>("/api/backlinks/overview", { method: "POST", body: JSON.stringify(body) }),
   backlinkSnapshots: (siteId: string) => request<any[]>(`/api/sites/${siteId}/backlink-snapshots`),

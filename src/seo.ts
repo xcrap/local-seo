@@ -1119,6 +1119,21 @@ export async function domainOverview(input: { siteId: string; domain?: string })
   if (!site) throw new Error("Site not found.");
   const domain = normalizeDomain(input.domain || site.domain);
   if (!domain) throw new Error("Domain is required.");
+  const imported = latestOrganicImport(site.id, domain);
+  if (imported) {
+    return {
+      source: "organic-import",
+      domain,
+      organicKeywords: imported.summary.organicKeywords,
+      organicTraffic: imported.summary.organicTraffic,
+      estimatedValue: imported.summary.estimatedValue,
+      competitors: [],
+      topPages: imported.pages.slice(0, 10),
+      importId: imported.id,
+      sourceName: imported.sourceName,
+      importedAt: imported.createdAt,
+    };
+  }
   return emptyProviderResult("Organic research", {
     domain,
     organicKeywords: null,
@@ -1192,6 +1207,203 @@ function localScanPagesForDomain(siteId: string, domain: string, page: number, p
   return null;
 }
 
+type ImportedOrganicKeywordRow = {
+  keyword: string;
+  position: number | null;
+  searchVolume: number | null;
+  traffic: number | null;
+  keywordDifficulty: number | null;
+  cpc: number | null;
+  url: string;
+  relativeUrl: string | null;
+  intent: string;
+};
+
+type ImportedOrganicPageRow = {
+  page: string;
+  relativePath: string | null;
+  title: string;
+  organicTraffic: number | null;
+  keywords: number | null;
+  value: number | null;
+  source: string;
+};
+
+function parseOrganicCsv(csv: string) {
+  const parsed = Papa.parse<Record<string, unknown>>(csv, {
+    header: true,
+    skipEmptyLines: true,
+  });
+  if (parsed.errors.length) {
+    const firstError = parsed.errors[0];
+    throw new Error(`Organic research CSV could not be parsed: ${firstError.message}`);
+  }
+  return parsed.data.filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+}
+
+function organicUrl(value: string, domain: string) {
+  const clean = value.trim();
+  if (!clean) return "";
+  if (/^https?:\/\//i.test(clean)) return clean;
+  if (clean.startsWith("/")) return `https://${domain}${clean}`;
+  if (clean.includes(".") && !clean.includes(" ")) return `https://${clean}`;
+  return "";
+}
+
+function normalizeImportedOrganicRow(raw: Record<string, unknown>, domain: string) {
+  const row = normalizedCsvRow(raw);
+  const keyword = csvField(row, ["keyword", "query", "search term", "search_term", "term"]);
+  const rawUrl = csvField(row, [
+    "url",
+    "page",
+    "ranking url",
+    "ranking_url",
+    "ranking page",
+    "top page",
+    "landing page",
+    "target url",
+    "page url",
+  ]);
+  const url = organicUrl(rawUrl, domain);
+  const acceptsUrl = !url || sameSiteUrl(url, `https://${domain}`);
+  const traffic = csvNumber(row, ["traffic", "organic traffic", "organic_traffic", "clicks", "estimated traffic"]);
+  const keywordCount = csvNumber(row, ["keywords", "keyword count", "keyword_count", "ranking keywords"]);
+  const page: ImportedOrganicPageRow | null = url && acceptsUrl
+    ? {
+        page: url,
+        relativePath: relativePath(url),
+        title: csvField(row, ["title", "page title", "meta title"]),
+        organicTraffic: traffic,
+        keywords: keywordCount || (keyword ? 1 : null),
+        value: csvNumber(row, ["value", "traffic value", "estimated value", "cost"]),
+        source: "organic-import",
+      }
+    : null;
+  const keywordRow: ImportedOrganicKeywordRow | null = keyword && acceptsUrl
+    ? {
+        keyword,
+        position: csvNumber(row, ["position", "rank", "ranking position", "current position"]),
+        searchVolume: csvNumber(row, ["search volume", "search_volume", "volume", "avg monthly searches", "monthly searches", "impressions"]),
+        traffic,
+        keywordDifficulty: csvNumber(row, ["keyword difficulty", "keyword_difficulty", "difficulty", "kd", "seo difficulty"]),
+        cpc: csvNumber(row, ["cpc", "cost per click", "cost_per_click"]),
+        url,
+        relativeUrl: url ? relativePath(url) : null,
+        intent: csvField(row, ["intent", "search intent"]) || "unknown",
+      }
+    : null;
+  return { keyword: keywordRow, page };
+}
+
+function mergeOrganicPages(rows: ImportedOrganicPageRow[]) {
+  const byPage = new Map<string, ImportedOrganicPageRow>();
+  for (const row of rows) {
+    const key = row.page;
+    const current = byPage.get(key);
+    if (!current) {
+      byPage.set(key, { ...row });
+      continue;
+    }
+    current.title ||= row.title;
+    current.organicTraffic = (Number(current.organicTraffic || 0) + Number(row.organicTraffic || 0)) || null;
+    current.keywords = (Number(current.keywords || 0) + Number(row.keywords || 0)) || null;
+    current.value = (Number(current.value || 0) + Number(row.value || 0)) || null;
+  }
+  return [...byPage.values()].sort((a, b) => Number(b.organicTraffic || 0) - Number(a.organicTraffic || 0));
+}
+
+function organicSummary(keywords: ImportedOrganicKeywordRow[], pages: ImportedOrganicPageRow[]) {
+  const keywordSet = new Set(keywords.map((row) => row.keyword.toLowerCase()).filter(Boolean));
+  const organicKeywords = keywordSet.size || keywords.length || pages.reduce((total, row) => total + Number(row.keywords || 0), 0);
+  return {
+    organicKeywords,
+    organicTraffic: pages.reduce((total, row) => total + Number(row.organicTraffic || 0), 0) || keywords.reduce((total, row) => total + Number(row.traffic || 0), 0) || null,
+    estimatedValue: pages.reduce((total, row) => total + Number(row.value || 0), 0) || null,
+  };
+}
+
+function mapOrganicImport(row: any) {
+  const keywords = jsonParse<ImportedOrganicKeywordRow[]>(row.keywords_json, []);
+  const pages = jsonParse<ImportedOrganicPageRow[]>(row.pages_json, []);
+  const summary = jsonParse<Record<string, any>>(row.summary_json, {});
+  return {
+    id: row.id,
+    siteId: row.site_id,
+    domain: row.domain,
+    source: "organic-import",
+    sourceName: row.source_name,
+    source_name: row.source_name,
+    keywordCount: row.keyword_count,
+    keyword_count: row.keyword_count,
+    pageCount: row.page_count,
+    page_count: row.page_count,
+    rowCount: Number(row.keyword_count || 0) + Number(row.page_count || 0),
+    row_count: Number(row.keyword_count || 0) + Number(row.page_count || 0),
+    summary,
+    keywords,
+    pages,
+    result: { source: "organic-import", domain: row.domain, ...summary },
+    createdAt: row.created_at,
+    created_at: row.created_at,
+  };
+}
+
+function latestOrganicImport(siteId: string, domain: string) {
+  const row = get<any>(
+    "SELECT * FROM organic_imports WHERE site_id = ? AND domain = ? ORDER BY created_at DESC LIMIT 1",
+    [siteId, domain],
+  );
+  return row ? mapOrganicImport(row) : null;
+}
+
+export function listOrganicImports(siteId: string) {
+  return all<any>(
+    "SELECT * FROM organic_imports WHERE site_id = ? ORDER BY created_at DESC",
+    [siteId],
+  ).map(mapOrganicImport);
+}
+
+export function importOrganicResearchCsv(input: {
+  siteId?: string;
+  domain?: string;
+  sourceName?: string;
+  csv?: string;
+  rows?: Record<string, unknown>[];
+}) {
+  const site = getSite(String(input.siteId || ""));
+  if (!site) throw new Error("Site not found.");
+  const domain = normalizeDomain(input.domain || site.domain);
+  if (!domain) throw new Error("Domain is required.");
+  const rawRows = input.csv ? parseOrganicCsv(input.csv) : input.rows || [];
+  const normalized = rawRows.map((row) => normalizeImportedOrganicRow(row, domain));
+  const keywords = normalized.map((row) => row.keyword).filter((row): row is ImportedOrganicKeywordRow => Boolean(row));
+  const pages = mergeOrganicPages(normalized.map((row) => row.page).filter((row): row is ImportedOrganicPageRow => Boolean(row)));
+  if (!keywords.length && !pages.length) {
+    throw new Error("Import file has no organic keyword or page rows for this domain.");
+  }
+  const summary = organicSummary(keywords, pages);
+  const id = randomUUID();
+  run(
+    `
+    INSERT INTO organic_imports
+      (id, site_id, domain, source_name, keyword_count, page_count, summary_json, keywords_json, pages_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      id,
+      site.id,
+      domain,
+      String(input.sourceName || "Organic research CSV").slice(0, 160),
+      keywords.length,
+      pages.length,
+      JSON.stringify(summary),
+      JSON.stringify(keywords),
+      JSON.stringify(pages),
+    ],
+  );
+  return mapOrganicImport(get<any>("SELECT * FROM organic_imports WHERE id = ?", [id]));
+}
+
 export async function getDomainKeywordSuggestions(input: {
   siteId: string;
   domain?: string;
@@ -1228,7 +1440,29 @@ export async function getDomainKeywordsPage(input: {
   if (!target) throw new Error("Domain is required.");
   const page = Math.max(1, Number(input.page || 1));
   const pageSize = Math.max(10, Math.min(200, Number(input.pageSize || 50)));
-  let result: any = {
+  const search = String(input.search || "").trim().toLowerCase();
+  const imported = latestOrganicImport(site.id, target);
+  if (imported) {
+    const rows = (search
+      ? imported.keywords.filter((row) => `${row.keyword} ${row.url}`.toLowerCase().includes(search))
+      : imported.keywords
+    ).sort((a, b) => Number(a.position || 999999) - Number(b.position || 999999));
+    const paged = paginateRows(rows, page, pageSize);
+    return {
+      source: "organic-import",
+      domain: target,
+      page,
+      pageSize,
+      totalCount: paged.totalCount,
+      hasMore: paged.hasMore,
+      keywords: paged.rows,
+      fetchedAt: nowIso(),
+      importId: imported.id,
+      sourceName: imported.sourceName,
+    };
+  }
+  return {
+    source: "provider-not-configured",
     domain: target,
     page,
     pageSize,
@@ -1238,13 +1472,6 @@ export async function getDomainKeywordsPage(input: {
     fetchedAt: nowIso(),
     warning: providerRequiredMessage("Ranked domain keywords"),
   };
-  let source = "provider-not-configured";
-
-  const search = String(input.search || "").trim().toLowerCase();
-  if (search) {
-    result.keywords = result.keywords.filter((row: any) => String(row.keyword).toLowerCase().includes(search));
-  }
-  return { source, ...result };
 }
 
 export async function getDomainPagesPage(input: {
@@ -1263,7 +1490,34 @@ export async function getDomainPagesPage(input: {
   if (!target) throw new Error("Domain is required.");
   const page = Math.max(1, Number(input.page || 1));
   const pageSize = Math.max(10, Math.min(200, Number(input.pageSize || 50)));
-  let result: any = {
+  const search = String(input.search || "").trim().toLowerCase();
+  const imported = latestOrganicImport(site.id, target);
+  if (imported?.pages.length) {
+    const rows = search
+      ? imported.pages.filter((row) => `${row.page} ${row.relativePath || ""} ${row.title || ""}`.toLowerCase().includes(search))
+      : imported.pages;
+    const paged = paginateRows(rows, page, pageSize);
+    return {
+      source: "organic-import",
+      domain: target,
+      page,
+      pageSize,
+      totalCount: paged.totalCount,
+      hasMore: paged.hasMore,
+      pages: paged.rows,
+      fetchedAt: nowIso(),
+      importId: imported.id,
+      sourceName: imported.sourceName,
+    };
+  }
+  if (sameSiteUrl(`https://${target}`, `https://${site.domain}`)) {
+    const localPages = localScanPagesForDomain(site.id, target, page, pageSize, search);
+    if (localPages) {
+      return { source: "local-scan", ...localPages };
+    }
+  }
+  return {
+    source: "provider-not-configured",
     domain: target,
     page,
     pageSize,
@@ -1273,26 +1527,16 @@ export async function getDomainPagesPage(input: {
     fetchedAt: nowIso(),
     warning: providerRequiredMessage("Domain top pages"),
   };
-  let source = "provider-not-configured";
-
-  const search = String(input.search || "").trim().toLowerCase();
-  if (source === "provider-not-configured" && sameSiteUrl(`https://${target}`, `https://${site.domain}`)) {
-    const localPages = localScanPagesForDomain(site.id, target, page, pageSize, search);
-    if (localPages) {
-      return { source: "local-scan", ...localPages };
-    }
-  }
-  if (search) {
-    result.pages = result.pages.filter((row: any) => String(row.page).toLowerCase().includes(search));
-  }
-  return { source, ...result };
 }
 
 export function listDomainSnapshots(siteId: string) {
-  return all<any>(
+  const snapshots = all<any>(
     "SELECT * FROM domain_snapshots WHERE site_id = ? ORDER BY created_at DESC",
     [siteId],
   ).map(publicDomainSnapshotRow);
+  return [...listOrganicImports(siteId), ...snapshots].sort(
+    (a, b) => new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime(),
+  );
 }
 
 export async function backlinksOverview(input: { siteId: string; domain?: string }) {

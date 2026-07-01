@@ -258,12 +258,12 @@ try {
     if (tables.has("audits")) {
       throw new Error("Fresh SQLite schema should use scans, not audits.");
     }
-    for (const table of ["saved_keywords", "keyword_metric_imports", "scans", "gsc_imports", "domain_snapshots", "backlink_snapshots", "backlink_imports", "serp_runs"]) {
+    for (const table of ["saved_keywords", "keyword_metric_imports", "scans", "gsc_imports", "domain_snapshots", "organic_imports", "backlink_snapshots", "backlink_imports", "serp_runs"]) {
       const columns = schemaDb.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((row) => row.name);
       if (!columns.includes("site_id")) {
         throw new Error(`Fresh SQLite table ${table} should reference site_id.`);
       }
-      if (["domain_snapshots", "backlink_snapshots", "serp_runs"].includes(table) && columns.includes("target")) {
+      if (["domain_snapshots", "organic_imports", "backlink_snapshots", "serp_runs"].includes(table) && columns.includes("target")) {
         throw new Error(`Fresh SQLite table ${table} should use domain, not target.`);
       }
     }
@@ -328,6 +328,9 @@ try {
   if (apiServerSource.includes("/api/audits") || apiServerSource.includes("/audits")) {
     throw new Error("Backend routes should expose scans only, with no old audit endpoint aliases.");
   }
+  if (/\/api\/projects|\/projects/.test(apiServerSource)) {
+    throw new Error("Backend routes should not keep project endpoints in the fresh local Sites app.");
+  }
   if (mcpSource.includes('case "start_audit"') || mcpSource.includes('case "get_audit"')) {
     throw new Error("MCP runtime should not keep hidden audit-named tool aliases.");
   }
@@ -357,6 +360,9 @@ try {
   if (webApiClient.includes("/api/audits") || webApiClient.includes("/audits`")) {
     throw new Error("The React API client should use scan-named /api/scans endpoints.");
   }
+  if (/\/api\/projects|\/projects/.test(webApiClient)) {
+    throw new Error("The React API client should not keep old project endpoints.");
+  }
   if (!webApiClient.includes("/api/scans") || !webApiClient.includes("/scans`")) {
     throw new Error("The React API client should call scan-named endpoints.");
   }
@@ -384,6 +390,9 @@ try {
   }
   if (webAppClient.includes('path="/mcp"') || webAppClient.includes('to: "/mcp"')) {
     throw new Error("The React app should not use /mcp as a UI route because /mcp is the JSON-RPC endpoint.");
+  }
+  if (webAppClient.includes('path="/projects"') || webAppClient.includes('to: "/projects"') || webAppClient.includes('to="/projects"')) {
+    throw new Error("The React app should not expose the old /projects route or navigation.");
   }
   if (webAppClient.includes('path="/backlinks"') || webAppClient.includes('to="/backlinks"')) {
     throw new Error("The React app should not keep a /backlinks UI route or redirect.");
@@ -659,6 +668,11 @@ try {
   }
   if (!webAppClient.includes("Volume, CPC, and difficulty stay unavailable unless you import real metrics later.")) {
     throw new Error("Keyword research copy should explain unavailable metric values clearly without pointing to secret settings.");
+  }
+  for (const organicImportCopy of ['Field label="Import organic CSV"', "Load organic research", "Organic CSV import needed"]) {
+    if (!webAppClient.includes(organicImportCopy)) {
+      throw new Error(`Organic research should expose local CSV import workflow, missing ${organicImportCopy}.`);
+    }
   }
   for (const keywordFormLabel of ['Field label="Seed keyword"', 'Field label="Suggestion limit"', 'Field label="Search keywords"', 'Field label="Tag filter"', 'Field label="Tag names"']) {
     if (!webAppClient.includes(keywordFormLabel)) {
@@ -1008,6 +1022,55 @@ try {
     method: "POST",
     body: JSON.stringify({ siteId: site.id, domain: "example.com", pageSize: 10 }),
   });
+  const organicImport = await request("/api/domain/import", {
+    method: "POST",
+    body: JSON.stringify({
+      siteId: site.id,
+      domain: "example.com",
+      sourceName: "organic-research.csv",
+      csv: [
+        "keyword,position,search_volume,traffic,keyword_difficulty,url,title",
+        "seo software,3,1200,80,44,https://example.com/seo,SEO Software",
+        "local seo sqlite,9,90,12,12,/local-seo,Local SEO SQLite",
+      ].join("\n"),
+    }),
+  });
+  if (organicImport.source !== "organic-import" || organicImport.keywordCount !== 2 || organicImport.pageCount !== 2) {
+    throw new Error(`Organic import should persist real keyword and page rows: ${JSON.stringify(organicImport)}`);
+  }
+  const importedOrganicOverview = await request("/api/domain/overview", {
+    method: "POST",
+    body: JSON.stringify({ siteId: site.id, domain: "example.com" }),
+  });
+  if (
+    importedOrganicOverview.source !== "organic-import" ||
+    importedOrganicOverview.organicKeywords !== 2 ||
+    importedOrganicOverview.organicTraffic !== 92
+  ) {
+    throw new Error(`Organic overview should use imported rows: ${JSON.stringify(importedOrganicOverview)}`);
+  }
+  const importedOrganicKeywords = await request("/api/domain/keywords", {
+    method: "POST",
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", pageSize: 10 }),
+  });
+  if (
+    importedOrganicKeywords.source !== "organic-import" ||
+    importedOrganicKeywords.keywords?.length !== 2 ||
+    !importedOrganicKeywords.keywords.some((row: any) => row.keyword === "seo software" && row.searchVolume === 1200)
+  ) {
+    throw new Error(`Organic keywords should come from imported CSV rows: ${JSON.stringify(importedOrganicKeywords)}`);
+  }
+  const importedOrganicPages = await request("/api/domain/pages", {
+    method: "POST",
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", pageSize: 10 }),
+  });
+  if (
+    importedOrganicPages.source !== "organic-import" ||
+    importedOrganicPages.pages?.length !== 2 ||
+    !importedOrganicPages.pages.some((row: any) => row.page === "https://example.com/seo" && row.organicTraffic === 80)
+  ) {
+    throw new Error(`Organic pages should come from imported CSV rows: ${JSON.stringify(importedOrganicPages)}`);
+  }
   await request("/api/domain/pages", {
     method: "POST",
     body: JSON.stringify({ siteId: site.id, domain: "example.com", pageSize: 10 }),
@@ -1583,6 +1646,10 @@ try {
   if (!importKeywordMetricsTool?.inputSchema?.required?.includes("siteId") || !importKeywordMetricsTool?.inputSchema?.required?.includes("csv")) {
     throw new Error("MCP import_keyword_metrics should require siteId and csv.");
   }
+  const importOrganicResearchTool = (mcp.result?.tools || []).find((row: any) => row.name === "import_organic_research");
+  if (!importOrganicResearchTool?.inputSchema?.required?.includes("siteId") || !importOrganicResearchTool?.inputSchema?.required?.includes("csv")) {
+    throw new Error("MCP import_organic_research should require siteId and csv.");
+  }
   const mcpDomainOverview = await request("/mcp", {
     method: "POST",
     body: JSON.stringify({
@@ -1654,6 +1721,33 @@ try {
     mcpKeywordMetricImport.result?.structuredContent?.rowCount !== 1
   ) {
     throw new Error(`MCP import_keyword_metrics should save real imported rows: ${JSON.stringify(mcpKeywordMetricImport)}`);
+  }
+  const mcpOrganicImport = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 205,
+      method: "tools/call",
+      params: {
+        name: "import_organic_research",
+        arguments: {
+          siteId: site.id,
+          domain: "example.com",
+          sourceName: "mcp-organic.csv",
+          csv: [
+            "keyword,position,search_volume,traffic,url",
+            "mcp organic keyword,4,300,22,https://example.com/mcp-organic",
+          ].join("\n"),
+        },
+      },
+    }),
+  });
+  if (
+    mcpOrganicImport.error ||
+    mcpOrganicImport.result?.structuredContent?.source !== "organic-import" ||
+    mcpOrganicImport.result?.structuredContent?.keywordCount !== 1
+  ) {
+    throw new Error(`MCP import_organic_research should save real imported rows: ${JSON.stringify(mcpOrganicImport)}`);
   }
   const mcpSerpAnalysis = await request("/mcp", {
     method: "POST",

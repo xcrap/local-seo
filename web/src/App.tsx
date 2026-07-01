@@ -780,6 +780,7 @@ function sourceLabel(source?: string) {
     duckduckgo: "DuckDuckGo",
     searxng: "SearXNG",
     "local-scan": "Local scan",
+    "organic-import": "Organic import",
     "backlink-import": "Backlink import",
     "keyword-metrics-import": "Keyword metrics import",
     "web-search": "Web search",
@@ -797,6 +798,7 @@ function sourceVariant(source?: string) {
     source === "duckduckgo-suggest" ||
     source === "searxng" ||
     source === "local-scan" ||
+    source === "organic-import" ||
     source === "backlink-import" ||
     source === "keyword-metrics-import" ||
     source === "web-search" ||
@@ -3081,8 +3083,10 @@ function DomainPage({ site }: { site: Site }) {
   const [history, setHistory] = useState<any[]>([]);
   const [tab, setTab] = useState("keywords");
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const selectedScan = useMemo(
     () => scanRows.find((scan) => scan.id === selectedScanId) || defaultEvidenceScan(scanRows),
     [scanRows, selectedScanId],
@@ -3094,6 +3098,7 @@ function DomainPage({ site }: { site: Site }) {
     setKeywords(null);
     setPages(null);
     setError("");
+    setMessage("");
   }, [site.id, site.domain]);
 
   async function loadHistory() {
@@ -3117,6 +3122,7 @@ function DomainPage({ site }: { site: Site }) {
     event?.preventDefault();
     setLoading(true);
     setError("");
+    setMessage("");
     const body = { siteId: site.id, domain, pageSize: 50 };
     try {
       const [overviewData, keywordData, pageData] = await Promise.all([
@@ -3132,6 +3138,40 @@ function DomainPage({ site }: { site: Site }) {
       setError(err instanceof Error ? err.message : "Organic research failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function importOrganicCsv(event: FormEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setError("");
+    setMessage("");
+    try {
+      const csv = await file.text();
+      const imported = await api.importOrganicResearch({
+        siteId: site.id,
+        domain,
+        sourceName: file.name,
+        csv,
+      });
+      setMessage(`Imported ${formatNumber(imported.keywordCount || 0)} keyword rows and ${formatNumber(imported.pageCount || 0)} page rows from ${file.name}.`);
+      const body = { siteId: site.id, domain, pageSize: 50 };
+      const [overviewData, keywordData, pageData] = await Promise.all([
+        api.domainOverview(body),
+        api.domainKeywords(body),
+        api.domainPages(body),
+      ]);
+      setOverview(overviewData);
+      setKeywords(keywordData);
+      setPages(pageData);
+      await loadHistory();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not import organic research CSV");
+    } finally {
+      input.value = "";
+      setImporting(false);
     }
   }
 
@@ -3159,21 +3199,40 @@ function DomainPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Competitive" title="Organic research" description="Ranked keywords and top pages for the active site or a competitor site." />
+      <PageHeader eyebrow="Competitive" title="Organic research" description="Import ranked keywords and top pages for the active site or a competitor site." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
           <SiteDomainField
             label="Research domain"
             value={domain}
             siteDomain={site.domain}
-            hint="Use the active site or enter a competitor domain. Saved site scans provide the local crawl evidence below."
+            hint="Use the active site or enter a competitor domain. CSV imports provide organic rows; saved scans provide local crawl evidence below."
             onChange={setDomain}
           />
           <div className="flex items-end">
-            <Button disabled={loading || !domain.trim()}><Globe2 /> {loading ? "Analyzing" : "Analyze organic site"}</Button>
+            <Button disabled={loading || !domain.trim()}><Globe2 /> {loading ? "Loading" : "Load organic research"}</Button>
           </div>
         </form>
+        <div className="mt-4 rounded-md border bg-muted/20">
+          <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)_280px]">
+            <div className="border-b px-4 py-3 md:border-b-0 md:border-r">
+              <div className="text-sm font-medium">Organic CSV</div>
+              <Badge className="mt-2" variant={history.some((row) => row.source === "organic-import" && domainKey(row.domain) === domainKey(domain)) ? "good" : "outline"}>
+                {history.some((row) => row.source === "organic-import" && domainKey(row.domain) === domainKey(domain)) ? "Imported" : "CSV ready"}
+              </Badge>
+            </div>
+            <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
+              Import real keyword, position, volume, traffic, difficulty, URL, page, and title columns. Rows are stored in SQLite and used by the tables below.
+            </div>
+            <div className="px-4 py-3">
+              <Field label="Import organic CSV">
+                <Input type="file" accept=".csv,text/csv" onChange={importOrganicCsv} disabled={importing || !domain.trim()} />
+              </Field>
+            </div>
+          </div>
+        </div>
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
+        {message ? <p className="mt-3 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
       </section>
       <div className="mt-6 space-y-6">
         <LocalOrganicEvidence
@@ -3186,7 +3245,7 @@ function DomainPage({ site }: { site: Site }) {
           scanning={scanning}
         />
         {overview?.warning ? (
-          <ProviderNotice title="External ranked-keyword dataset unavailable" text={overview.warning} source={overview.source} />
+          <ProviderNotice title="Organic CSV import needed" text={overview.warning} source={overview.source} />
         ) : null}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>

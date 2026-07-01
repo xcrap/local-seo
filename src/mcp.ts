@@ -15,6 +15,7 @@ import {
   getSite,
   importBacklinksCsv,
   importKeywordMetricsCsv,
+  importOrganicResearchCsv,
   listRankTrackers,
   listSites,
   listSavedKeywords,
@@ -215,6 +216,20 @@ const tools = [
         pageSize: { type: "number" },
       },
       required: ["siteId"],
+    },
+  },
+  {
+    name: "import_organic_research",
+    description: "Import real organic ranked-keyword and top-page CSV rows into local SQLite for a saved site.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...siteIdInput,
+        domain: { type: "string" },
+        sourceName: { type: "string" },
+        csv: { type: "string" },
+      },
+      required: ["siteId", "csv"],
     },
   },
   {
@@ -473,6 +488,8 @@ async function callTool(name: string, args: any) {
       return getDomainKeywordsPage(withDomainInput(args));
     case "get_domain_pages_page":
       return getDomainPagesPage(withDomainInput(args));
+    case "import_organic_research":
+      return importOrganicResearchCsv(withDomainInput(args));
     case "get_backlinks_overview":
       return backlinksOverview(withDomainInput(args));
     case "get_backlinks_profile":

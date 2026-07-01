@@ -23,7 +23,7 @@ data connectors only when you configure them.
 - **SERP analysis:** live web result snapshots, active-site ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
-- **Organic research:** local scan pages for the active site. Ranked keywords and traffic estimates are not generated locally.
+- **Organic research:** local crawl pages plus organic CSV imports for ranked keywords, top pages, traffic, and keyword counts.
 - **Links and backlinks:** local crawl link graph from scans, plus backlink CSV import for web-wide backlink rows, referring domains, and top linked pages. Backlinks are never generated locally.
 - **Site scans:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, page response timing, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
 - **Brand lookup:** real web-search evidence without generated answer-model claims.
@@ -65,9 +65,8 @@ domain.
 
 SERP and rank checks can use self-hosted OpenSERP, self-hosted SearXNG, or the
 built-in DuckDuckGo fallback. External SEO metrics are never generated locally.
-Keyword volumes, CPC, keyword difficulty, and backlink tables can be populated
-from real CSV imports. Third-party traffic estimates still require future import
-support or a deliberately built adapter. Local scans feed technical pages,
+Keyword volumes, CPC, keyword difficulty, organic research tables, and backlink
+tables can be populated from real CSV imports. Local scans feed technical pages,
 internal/external links, images, assets, sitemap, robots, and response timing
 into reports. The app shows unavailable states instead of invented rows.
 

@@ -397,18 +397,29 @@ try {
       throw new Error(`Organic crawl evidence should use the full desktop width, got ${localCrawlPagesBox?.width}.`);
     }
     await page.getByLabel("Research domain").waitFor();
-    await page.getByRole("button", { name: /^Analyze organic site$/ }).click();
-    await page.getByText("External ranked-keyword dataset unavailable").waitFor();
+    await page.getByLabel("Import organic CSV").waitFor();
+    const organicCsvPath = path.join(tempDir, "organic-ui.csv");
+    await writeFile(
+      organicCsvPath,
+      [
+        "keyword,position,search_volume,traffic,keyword_difficulty,url,title",
+        `fixture organic keyword,2,700,44,18,${fixtureUrl}/organic,Fixture Organic Page`,
+        `fixture second keyword,8,120,9,11,${fixtureUrl}/second,Second Fixture Page`,
+      ].join("\n"),
+    );
+    await page.getByLabel("Import organic CSV").setInputFiles(organicCsvPath);
+    await page.getByText(/Imported 2 keyword rows and 2 page rows/i).waitFor();
+    await page.getByRole("row", { name: /fixture organic keyword.*2.*700.*44.*18/i }).waitFor();
+    await page.getByRole("tab", { name: /^Pages$/ }).click();
+    await page.getByRole("row", { name: /organic.*44.*1.*Imported organic dataset/i }).waitFor();
     await page.getByRole("tab", { name: /^Snapshot$/ }).click();
     await page.getByRole("heading", { name: /^Snapshot$/ }).waitFor();
     const organicKeywordsRow = await page.getByRole("row", { name: /Organic keywords/i }).textContent();
     const normalizedOrganicKeywordsRow = (organicKeywordsRow || "").replace(/\s+/g, " ").trim();
-    if (!normalizedOrganicKeywordsRow.includes("Not available")) {
-      throw new Error(`Missing organic metric should render as unavailable, got: ${normalizedOrganicKeywordsRow}`);
+    if (!/Organic keywords\s*2/.test(normalizedOrganicKeywordsRow)) {
+      throw new Error(`Imported organic metric should render as measured rows, got: ${normalizedOrganicKeywordsRow}`);
     }
-    if (/Organic keywords 0\b/.test(normalizedOrganicKeywordsRow)) {
-      throw new Error("Missing organic metric rendered as a measured zero.");
-    }
+    await capture(page, "organic-research");
 
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
     await page.getByRole("heading", { name: /^Links$/ }).waitFor();
@@ -563,7 +574,7 @@ try {
     await page.getByRole("heading", { name: /^Page not found$/ }).waitFor();
     await page.goto(`${webUrl}/projects`, { waitUntil: "networkidle" });
     if (new URL(page.url()).pathname !== "/projects") {
-      throw new Error(`Legacy /projects route should not redirect, got ${page.url()}.`);
+      throw new Error(`Removed /projects route should render as an unknown local URL, got ${page.url()}.`);
     }
     await page.getByRole("heading", { name: /^Page not found$/ }).waitFor();
     await page.goto(`${webUrl}/scans`, { waitUntil: "networkidle" });

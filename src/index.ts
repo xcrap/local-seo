@@ -54,6 +54,7 @@ import {
   getSite,
   importBacklinksCsv,
   importKeywordMetricsCsv,
+  importOrganicResearchCsv,
   listBacklinkSnapshots,
   listAllScans,
   listScans,
@@ -459,6 +460,10 @@ app.post(
 app.post(
   "/api/domain/pages",
   safe(async (c) => c.json(await getDomainPagesPage((await readDomainScopedJson(c)) as any))),
+);
+app.post(
+  "/api/domain/import",
+  safe(async (c) => c.json(importOrganicResearchCsv((await readDomainScopedJson(c)) as any))),
 );
 app.post(
   "/api/backlinks/overview",
