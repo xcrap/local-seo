@@ -665,10 +665,13 @@ try {
       throw new Error(`Keyword workflows should use explicit form labels, missing ${keywordFormLabel}.`);
     }
   }
-  for (const trackingFormLabel of ['Field label="Add tracked keywords"', '"Add keywords"', '"Refresh metrics"', "Remove selected", 'Field label="URLs to inspect"']) {
+  for (const trackingFormLabel of ['Field label="Add tracked keywords"', '"Add keywords"', '"Sync imported metrics"', '<Link to="/saved"><Upload /> Import metrics</Link>', "Remove selected", 'Field label="URLs to inspect"']) {
     if (!webAppClient.includes(trackingFormLabel)) {
       throw new Error(`Rank tracking and Search Console forms should use explicit labels/actions, missing ${trackingFormLabel}.`);
     }
+  }
+  if (webAppClient.includes('"Refresh metrics"') || webAppClient.includes("/refresh-metrics")) {
+    throw new Error("Rank tracking should sync local imported metrics, not expose stale refresh-metrics wording.");
   }
   const site = await request("/api/sites", {
     method: "POST",
@@ -1164,7 +1167,19 @@ try {
     method: "POST",
     body: JSON.stringify({ siteId: site.id, domain: "example.com", keywords: ["seo software", "seo tools"] }),
   });
-  await request(`/api/rank-trackers/${tracker.id}/refresh-metrics`, { method: "POST" });
+  const hydratedRankKeyword = tracker.keywords?.find((row: any) => row.keyword === "seo software");
+  if (
+    hydratedRankKeyword?.search_volume !== 1200 ||
+    hydratedRankKeyword?.keyword_difficulty !== 44 ||
+    hydratedRankKeyword?.cpc !== 3.25 ||
+    !hydratedRankKeyword?.metrics_fetched_at
+  ) {
+    throw new Error(`New rank keywords should hydrate from imported keyword metrics: ${JSON.stringify(tracker.keywords)}`);
+  }
+  const syncedRankMetrics = await request(`/api/rank-trackers/${tracker.id}/sync-metrics`, { method: "POST" });
+  if (syncedRankMetrics.source !== "local-keyword-metrics" || syncedRankMetrics.updated < 1) {
+    throw new Error(`Rank metrics should sync from local keyword imports: ${JSON.stringify(syncedRankMetrics)}`);
+  }
   await request(`/api/rank-trackers/${tracker.id}/check`, { method: "POST" });
   await request(`/api/rank-trackers/${tracker.id}/trend`);
   const brandLookupResult = await request("/api/brand-lookup", {

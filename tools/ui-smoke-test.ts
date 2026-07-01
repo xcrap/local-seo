@@ -373,6 +373,20 @@ try {
     await page.getByRole("cell", { name: "keyword-metrics-ui.csv", exact: true }).waitFor();
     await capture(page, "saved-keywords");
 
+    await page.getByRole("navigation").getByRole("link", { name: /^Rank tracking$/ }).click();
+    await page.getByRole("heading", { name: /^Rank tracking$/ }).waitFor();
+    await page.getByLabel("Domain").fill(`localhost:${fixtureServer.port}`);
+    await page.getByLabel("Keywords").fill("fixture imported keyword");
+    await page.getByRole("button", { name: /^Add tracker$/ }).click();
+    await page.getByRole("tab", { name: /^Keywords$/ }).click();
+    await page.getByRole("row", { name: /fixture imported keyword.*55.*8.*0\.4/i }).waitFor();
+    await page.getByRole("button", { name: /^Sync imported metrics$/ }).waitFor();
+    await page.getByRole("link", { name: /^Import metrics$/ }).waitFor();
+    if (await page.getByRole("button", { name: /^Refresh metrics$/ }).count()) {
+      throw new Error("Rank tracking should not expose stale Refresh metrics action.");
+    }
+    await capture(page, "rank-tracking");
+
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
     await page.getByLabel("Saved scan for page evidence").waitFor();

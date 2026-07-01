@@ -70,7 +70,7 @@ import {
   siteSummary,
   querySavedKeywords,
   researchKeywords,
-  refreshRankKeywordMetrics,
+  syncRankKeywordMetrics,
   removeRankKeywords,
   removeSavedKeywords,
   runRankCheck,
@@ -419,8 +419,8 @@ app.post(
   }),
 );
 app.post(
-  "/api/rank-trackers/:id/refresh-metrics",
-  safe((c) => c.json(refreshRankKeywordMetrics(c.req.param("id")))),
+  "/api/rank-trackers/:id/sync-metrics",
+  safe((c) => c.json(syncRankKeywordMetrics(c.req.param("id")))),
 );
 app.get(
   "/api/rank-trackers/:id/trend",

@@ -100,8 +100,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ keywordIds }),
     }),
-  refreshRankMetrics: (trackerId: string) =>
-    request<any>(`/api/rank-trackers/${trackerId}/refresh-metrics`, { method: "POST" }),
+  syncRankMetrics: (trackerId: string) =>
+    request<any>(`/api/rank-trackers/${trackerId}/sync-metrics`, { method: "POST" }),
   rankTrend: (trackerId: string) => request<any[]>(`/api/rank-trackers/${trackerId}/trend`),
   rankKeywordHistory: (trackerId: string, keywordId: string) =>
     request<any[]>(`/api/rank-trackers/${trackerId}/keywords/${keywordId}/history`),

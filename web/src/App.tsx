@@ -2922,16 +2922,16 @@ function RankPage({ site }: { site: Site }) {
     }
   }
 
-  async function refreshMetrics(trackerId: string) {
+  async function syncMetrics(trackerId: string) {
     setLoading(`metrics-${trackerId}`);
     setError("");
     setMessage("");
     try {
-      await api.refreshRankMetrics(trackerId);
-      setMessage("Keyword metrics are not generated locally. Positions still update from real SERP checks.");
+      const result = await api.syncRankMetrics(trackerId);
+      setMessage(`Synced imported metrics for ${formatNumber(result.updated || 0)} keywords${result.skipped ? `; ${formatNumber(result.skipped)} still need CSV metrics` : ""}.`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not refresh keyword metrics");
+      setError(err instanceof Error ? err.message : "Could not sync keyword metrics");
     } finally {
       setLoading("");
     }
@@ -2972,13 +2972,16 @@ function RankPage({ site }: { site: Site }) {
                   {tracker.latest?.length ? <RankTable rows={tracker.latest} /> : <EmptyState title="No snapshots" text="Run a check to create the first local rank snapshot." />}
                 </TabsContent>
                 <TabsContent value="keywords">
-                  <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
+                  <div className="mb-4 space-y-3">
                     <Field label="Add tracked keywords">
                       <Textarea value={keywordDrafts[tracker.id] || ""} onChange={(event) => setKeywordDrafts({ ...keywordDrafts, [tracker.id]: event.target.value })} placeholder="add keywords, one per line" />
                     </Field>
-                    <Button variant="secondary" onClick={() => addKeywords(tracker.id)} disabled={loading === `add-${tracker.id}`}><Plus /> {loading === `add-${tracker.id}` ? "Adding keywords" : "Add keywords"}</Button>
-                    <Button variant="outline" onClick={() => refreshMetrics(tracker.id)} disabled={loading === `metrics-${tracker.id}`}><RefreshCw /> {loading === `metrics-${tracker.id}` ? "Refreshing metrics" : "Refresh metrics"}</Button>
-                    <Button variant="destructive" onClick={() => removeKeywords(tracker.id)} disabled={loading === `remove-${tracker.id}`}><Trash2 /> Remove selected</Button>
+                    <div className="flex flex-wrap gap-3">
+                      <Button variant="secondary" onClick={() => addKeywords(tracker.id)} disabled={loading === `add-${tracker.id}`}><Plus /> {loading === `add-${tracker.id}` ? "Adding keywords" : "Add keywords"}</Button>
+                      <Button variant="outline" onClick={() => syncMetrics(tracker.id)} disabled={loading === `metrics-${tracker.id}`}><RefreshCw /> {loading === `metrics-${tracker.id}` ? "Syncing metrics" : "Sync imported metrics"}</Button>
+                      <Button asChild variant="outline"><Link to="/saved"><Upload /> Import metrics</Link></Button>
+                      <Button variant="destructive" onClick={() => removeKeywords(tracker.id)} disabled={loading === `remove-${tracker.id}`}><Trash2 /> Remove selected</Button>
+                    </div>
                   </div>
                   <RankKeywordTable
                     rows={tracker.keywords || []}

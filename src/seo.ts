@@ -625,9 +625,14 @@ export function importKeywordMetricsCsv(input: {
           cpc = COALESCE(?, cpc),
           metrics_fetched_at = CURRENT_TIMESTAMP
       WHERE lower(keyword) = lower(?)
-        AND tracker_id IN (SELECT id FROM rank_trackers WHERE site_id = ?)
+        AND tracker_id IN (
+          SELECT id FROM rank_trackers
+          WHERE site_id = ?
+            AND location_code = ?
+            AND language_code = ?
+        )
       `,
-      [row.searchVolume, row.difficulty, row.cpc, row.keyword, site.id],
+      [row.searchVolume, row.difficulty, row.cpc, row.keyword, site.id, site.location_code, site.language_code],
     );
   }
 
@@ -917,21 +922,49 @@ export function createRankTracker(input: {
   return listRankTrackers(site.id).find((tracker) => tracker.id === id);
 }
 
+function savedKeywordMetricsForTracker(tracker: any, keyword: string) {
+  return get<any>(
+    `
+    SELECT search_volume, difficulty, cpc
+    FROM saved_keywords
+    WHERE site_id = ?
+      AND lower(keyword) = lower(?)
+      AND location_code = ?
+      AND language_code = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [tracker.site_id, keyword, tracker.location_code, tracker.language_code],
+  );
+}
+
+function hasImportedKeywordMetrics(metrics: any) {
+  return metrics && (metrics.search_volume != null || metrics.difficulty != null || metrics.cpc != null);
+}
+
 export function addRankKeywords(trackerId: string, keywords: string[]) {
+  const tracker = get<any>("SELECT * FROM rank_trackers WHERE id = ?", [trackerId]);
+  if (!tracker) throw new Error("Tracker not found.");
   for (const raw of keywords) {
     const keyword = raw.trim();
     if (!keyword) continue;
+    const metrics = savedKeywordMetricsForTracker(tracker, keyword);
+    const hasMetrics = hasImportedKeywordMetrics(metrics);
     run(
       `
       INSERT INTO rank_keywords
         (id, tracker_id, keyword, search_volume, keyword_difficulty, cpc, metrics_fetched_at)
-      VALUES (?, ?, ?, NULL, NULL, NULL, NULL)
+      VALUES (?, ?, ?, ?, ?, ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END)
       ON CONFLICT(tracker_id, keyword) DO NOTHING
       `,
       [
         randomUUID(),
         trackerId,
         keyword,
+        metrics?.search_volume ?? null,
+        metrics?.difficulty ?? null,
+        metrics?.cpc ?? null,
+        hasMetrics ? 1 : 0,
       ],
     );
   }
@@ -990,15 +1023,39 @@ export function getRankTrackerTrend(trackerId: string, sinceDays = 365) {
   });
 }
 
-export function refreshRankKeywordMetrics(trackerId: string) {
+export function syncRankKeywordMetrics(trackerId: string) {
   const tracker = get<any>("SELECT * FROM rank_trackers WHERE id = ?", [trackerId]);
   if (!tracker) throw new Error("Tracker not found.");
   const keywords = all<any>("SELECT * FROM rank_keywords WHERE tracker_id = ?", [trackerId]);
+  let updated = 0;
+  const missingKeywords: string[] = [];
+  for (const keyword of keywords) {
+    const metrics = savedKeywordMetricsForTracker(tracker, keyword.keyword);
+    if (!hasImportedKeywordMetrics(metrics)) {
+      missingKeywords.push(keyword.keyword);
+      continue;
+    }
+    run(
+      `
+      UPDATE rank_keywords
+      SET search_volume = COALESCE(?, search_volume),
+          keyword_difficulty = COALESCE(?, keyword_difficulty),
+          cpc = COALESCE(?, cpc),
+          metrics_fetched_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [metrics.search_volume, metrics.difficulty, metrics.cpc, keyword.id],
+    );
+    updated += 1;
+  }
   return {
-    updated: 0,
-    skipped: keywords.length,
-    source: "provider-not-configured",
-    warning: providerRequiredMessage("Rank keyword metrics"),
+    updated,
+    skipped: missingKeywords.length,
+    source: "local-keyword-metrics",
+    warning: missingKeywords.length
+      ? "Some tracked keywords do not have imported metrics yet. Import a keyword metrics CSV from Saved keywords."
+      : "",
+    missingKeywords,
     tracker: listRankTrackers(tracker.site_id).find((item) => item.id === trackerId),
   };
 }
