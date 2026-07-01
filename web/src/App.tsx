@@ -4411,7 +4411,9 @@ function AuditsPage({ site }: { site: Site }) {
           <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">All scan history</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Every saved scan in local SQLite stays visible until you delete it.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Active site: {formatNumber(audits.length)} saved scans. Local database: {formatNumber(allAudits.length)} total scans visible below.
+              </p>
             </div>
             {audits.length ? (
               <Button

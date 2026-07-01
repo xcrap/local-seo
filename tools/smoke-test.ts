@@ -448,6 +448,9 @@ try {
   if (!webAppClient.includes("Every saved scan is still listed below")) {
     throw new Error("Audit page should explain that all saved scans remain visible in the local ledger.");
   }
+  if (!webAppClient.includes("total scans visible below")) {
+    throw new Error("Audit history should show the active-site scan count and total visible scan count.");
+  }
   if (!webAppClient.includes("Could not load local sites") || !webAppClient.includes("Your SQLite data was not cleared")) {
     throw new Error("Site loading failures should be visible instead of rendering an empty site list that looks like data loss.");
   }
