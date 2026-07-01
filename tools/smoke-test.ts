@@ -260,6 +260,9 @@ try {
   if (!webAppClient.includes("Scan plan")) {
     throw new Error("The main site flow should expose the saved site's scan plan.");
   }
+  if (!webAppClient.includes("Scan plan preview")) {
+    throw new Error("Site create/edit forms should preview the exact scan plan before starting a scan.");
+  }
   if (!webAppClient.includes("Every saved scan is still listed below")) {
     throw new Error("Audit page should explain that all saved scans remain visible in the local ledger.");
   }

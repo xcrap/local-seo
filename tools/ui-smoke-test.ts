@@ -157,6 +157,8 @@ try {
     await page.getByPlaceholder("Site name (optional)").fill("Fixture Site");
     await page.getByText("Scan protocol").waitFor();
     await page.getByText("Host variant").waitFor();
+    await page.getByText("Scan plan preview").waitFor();
+    await page.getByText(fixtureUrl).first().waitFor();
     await page.getByRole("button", { name: /Add site and scan/i }).click();
 
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
@@ -295,6 +297,8 @@ try {
     await page.getByRole("heading", { name: /Edit site/i }).waitFor();
     await page.getByText("Scan protocol").waitFor();
     await page.getByText("Host variant").waitFor();
+    await page.getByRole("dialog", { name: /Edit site/i }).getByText("Scan plan preview").waitFor();
+    await page.getByRole("dialog", { name: /Edit site/i }).getByText(fixtureUrl).waitFor();
     await page.keyboard.press("Escape");
 
     await page.getByRole("navigation").getByRole("link", { name: /^Audits$/ }).click();
@@ -371,6 +375,8 @@ try {
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "HTTPS only" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "With www" }).first().waitFor();
     await addSiteDialog.getByLabel("Website address").fill("second.test");
+    await addSiteDialog.getByText("Scan plan preview").waitFor();
+    await addSiteDialog.getByText("https://www.second.test").waitFor();
     await Promise.all([
       page.waitForResponse((response) => response.url().includes("/api/sites") && response.request().method() === "POST"),
       addSiteDialog.getByRole("button", { name: /^Save site only$/ }).click(),

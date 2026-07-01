@@ -137,6 +137,12 @@ const crawlHostOptions = [
   { value: "both", label: "Try both" },
 ] as const;
 
+type ScanPlanTarget = {
+  domain?: string;
+  crawl_protocol?: Project["crawl_protocol"];
+  crawl_host?: Project["crawl_host"];
+};
+
 function defaultLocationCodeFromConfig(config?: any) {
   const code = Number(config?.default_location_code || 2840);
   return marketOptions.some((market) => market.code === code) ? code : 2840;
@@ -226,7 +232,7 @@ function scanProtocolCandidates(domain: string, crawlProtocol?: Project["crawl_p
   return localSiteHost(domain) ? ["http", "https"] : ["https", "http"];
 }
 
-function scanTargetCandidates(project?: Project | null) {
+function scanTargetCandidates(project?: ScanPlanTarget | null) {
   const clean = cleanSiteDomain(project?.domain);
   if (!clean) return [];
   const hosts = scanHostCandidates(clean, project?.crawl_host || "auto");
@@ -235,30 +241,30 @@ function scanTargetCandidates(project?: Project | null) {
   return Array.from(new Set(urls));
 }
 
-function preferredAuditUrl(project?: Project | null) {
+function preferredAuditUrl(project?: ScanPlanTarget | null) {
   return scanTargetCandidates(project)[0] || "";
 }
 
-function crawlPreferenceLabel(project?: Project | null) {
+function crawlPreferenceLabel(project?: ScanPlanTarget | null) {
   const protocol = crawlProtocolOptions.find((item) => item.value === (project?.crawl_protocol || "auto"))?.label || "Auto";
   const host = crawlHostOptions.find((item) => item.value === (project?.crawl_host || "auto"))?.label || "Auto";
   return `${protocol} · ${host}`;
 }
 
-function scanTargetDetail(project?: Project | null) {
+function scanTargetDetail(project?: ScanPlanTarget | null) {
   const candidates = scanTargetCandidates(project);
   if (!candidates.length) return "Set a website address to scan.";
   if (candidates.length === 1) return `${crawlPreferenceLabel(project)} · ${candidates[0]}`;
   return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} target candidates`;
 }
 
-function scanTargetShortDetail(project?: Project | null) {
+function scanTargetShortDetail(project?: ScanPlanTarget | null) {
   const candidates = scanTargetCandidates(project);
   if (!candidates.length) return "No scan target";
   return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} target${candidates.length === 1 ? "" : "s"}`;
 }
 
-function scanTargetCountLabel(project?: Project | null) {
+function scanTargetCountLabel(project?: ScanPlanTarget | null) {
   const count = scanTargetCandidates(project).length;
   return `${formatNumber(count)} target${count === 1 ? "" : "s"}`;
 }
@@ -267,7 +273,7 @@ function ScanTargetPills({
   project,
   compact = false,
 }: {
-  project?: Project | null;
+  project?: ScanPlanTarget | null;
   compact?: boolean;
 }) {
   const candidates = scanTargetCandidates(project);
@@ -294,7 +300,7 @@ function ScanPlanSummary({
   project,
   compact = false,
 }: {
-  project?: Project | null;
+  project?: ScanPlanTarget | null;
   compact?: boolean;
 }) {
   return (
@@ -304,6 +310,21 @@ function ScanPlanSummary({
         <Badge variant="outline">{crawlPreferenceLabel(project)}</Badge>
       </div>
       <ScanTargetPills project={project} compact={compact} />
+    </div>
+  );
+}
+
+function ScanPlanPreview({ project }: { project?: ScanPlanTarget | null }) {
+  return (
+    <div className="rounded-md border bg-muted/20 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold">Scan plan preview</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">The scan button will try these URLs in this order.</div>
+        </div>
+        <Badge variant="outline">{scanTargetCountLabel(project)}</Badge>
+      </div>
+      <ScanTargetPills project={project} compact />
     </div>
   );
 }
@@ -1291,6 +1312,12 @@ function Overview({
     return () => window.clearInterval(interval);
   }, [scanAudit?.id, scanAudit?.status]);
 
+  const firstScanPlan = {
+    domain: firstDomain,
+    crawl_protocol: firstCrawlProtocol,
+    crawl_host: firstCrawlHost,
+  };
+
   return (
     <>
       <PageHeader
@@ -1331,6 +1358,7 @@ function Overview({
                 </Select>
               </Field>
             </div>
+            <ScanPlanPreview project={firstScanPlan} />
           </form>
           {firstScanError && <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{firstScanError}</p>}
         </section>
@@ -1744,6 +1772,17 @@ function ProjectsPage({
     }
   }
 
+  const formScanPlan = {
+    domain: form.domain,
+    crawl_protocol: form.crawlProtocol,
+    crawl_host: form.crawlHost,
+  };
+  const editScanPlan = {
+    domain: editForm.domain,
+    crawl_protocol: editForm.crawl_protocol,
+    crawl_host: editForm.crawl_host,
+  };
+
   return (
     <>
       <PageHeader
@@ -1805,6 +1844,7 @@ function ProjectsPage({
                     </Select>
                   </Field>
                 </div>
+                <ScanPlanPreview project={formScanPlan} />
                 <Field label="Notes"><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1853,6 +1893,7 @@ function ProjectsPage({
                 </Select>
               </Field>
             </div>
+            <ScanPlanPreview project={formScanPlan} />
           </form>
         </section>
       ) : (
@@ -1970,6 +2011,7 @@ function ProjectsPage({
                 </Select>
               </Field>
             </div>
+            <ScanPlanPreview project={editScanPlan} />
             <Field label="Notes"><Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></Field>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit"><Pencil /> Save changes</Button>
