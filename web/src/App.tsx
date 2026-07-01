@@ -6223,43 +6223,48 @@ function gscVerdictTone(value?: string) {
 
 function GscInspectionResults({ rows }: { rows: any[] }) {
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      {rows.map((row) => {
-        const index = row.result?.indexStatusResult || {};
-        const rich = row.result?.richResultsResult || {};
-        return (
-          <div key={row.inspectionUrl} className="rounded-md border bg-background p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="break-all font-medium">{row.inspectionUrl}</div>
-                {row.error ? <p className="mt-1 text-sm text-destructive">{row.error}</p> : <p className="mt-1 text-sm text-muted-foreground">{index.coverageState || "Coverage state unavailable"}</p>}
-              </div>
-              <Badge variant={gscVerdictTone(index.verdict || row.error) as any}>{row.error ? "Error" : index.verdict || "Unknown"}</Badge>
-            </div>
-            {!row.error ? (
-              <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-                <GscInspectionFact label="Indexing" value={index.indexingState} />
-                <GscInspectionFact label="Page fetch" value={index.pageFetchState} />
-                <GscInspectionFact label="Robots" value={index.robotsTxtState} />
-                <GscInspectionFact label="Last crawl" value={index.lastCrawlTime ? formatDate(index.lastCrawlTime) : "-"} />
-                <GscInspectionFact label="Google canonical" value={index.googleCanonical} wide />
-                <GscInspectionFact label="User canonical" value={index.userCanonical} wide />
-                <GscInspectionFact label="Rich results" value={rich.verdict || "-"} />
-              </div>
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function GscInspectionFact({ label, value, wide }: { label: string; value?: string; wide?: boolean }) {
-  return (
-    <div className={cn("rounded-md bg-muted/35 p-3", wide ? "sm:col-span-2" : "")}>
-      <div className="text-xs font-semibold uppercase text-muted-foreground">{label}</div>
-      <div className="mt-1 break-all">{value || "-"}</div>
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>URL</TableHead>
+          <TableHead>Verdict</TableHead>
+          <TableHead>Coverage</TableHead>
+          <TableHead>Indexing</TableHead>
+          <TableHead>Fetch</TableHead>
+          <TableHead>Robots</TableHead>
+          <TableHead>Canonical evidence</TableHead>
+          <TableHead>Rich results</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => {
+          const index = row.result?.indexStatusResult || {};
+          const rich = row.result?.richResultsResult || {};
+          return (
+            <TableRow key={row.inspectionUrl}>
+              <TableCell className="max-w-sm break-all font-medium">
+                <div>{row.inspectionUrl}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{index.lastCrawlTime ? `Last crawl ${formatDate(index.lastCrawlTime)}` : "Last crawl unavailable"}</div>
+              </TableCell>
+              <TableCell>
+                <Badge variant={gscVerdictTone(index.verdict || row.error) as any}>{row.error ? "Error" : index.verdict || "Unknown"}</Badge>
+              </TableCell>
+              <TableCell className={cn("max-w-xs text-sm", row.error ? "text-destructive" : "text-muted-foreground")}>
+                {row.error || index.coverageState || "Coverage state unavailable"}
+              </TableCell>
+              <TableCell className="text-muted-foreground">{index.indexingState || "-"}</TableCell>
+              <TableCell className="text-muted-foreground">{index.pageFetchState || "-"}</TableCell>
+              <TableCell className="text-muted-foreground">{index.robotsTxtState || "-"}</TableCell>
+              <TableCell className="max-w-sm text-sm text-muted-foreground">
+                <div className="break-all">Google: {index.googleCanonical || "-"}</div>
+                <div className="mt-1 break-all">User: {index.userCanonical || "-"}</div>
+              </TableCell>
+              <TableCell className="text-muted-foreground">{rich.verdict || "-"}</TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -6375,11 +6380,13 @@ function AiJobOutput({ job }: { job: any }) {
     >
       {job ? (
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
-            <AiJobFact label="Status" value={job.status || "-"} />
-            <AiJobFact label="Started" value={job.started_at ? formatDate(job.started_at) : "-"} />
-            <AiJobFact label="Finished" value={job.finished_at ? formatDate(job.finished_at) : "-"} />
-          </div>
+          <StatusEvidenceTable
+            rows={[
+              { title: "Status", status: job.status || "-", tone: job.status === "completed" ? "good" : job.status === "failed" ? "bad" : "warn", text: job.message || "Local Codex job state." },
+              { title: "Started", status: job.started_at ? formatDate(job.started_at) : "-", tone: "outline", text: "Timestamp stored in local SQLite for this job." },
+              { title: "Finished", status: job.finished_at ? formatDate(job.finished_at) : "-", tone: job.finished_at ? "good" : "outline", text: "Completion timestamp from the saved job row." },
+            ]}
+          />
           {job.error ? (
             <pre className="max-h-[520px] overflow-auto rounded-md border border-destructive/40 bg-muted/30 p-4 text-sm leading-6 text-destructive whitespace-pre-wrap">{job.error}</pre>
           ) : job.result_text ? (
@@ -6392,15 +6399,6 @@ function AiJobOutput({ job }: { job: any }) {
         <EmptyState title="No job selected" text="Start or select a local Codex job to read the complete output here." />
       )}
     </ReportSection>
-  );
-}
-
-function AiJobFact({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-md border bg-muted/25 p-3">
-      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
-      <div className="mt-1 break-all text-sm font-medium">{value}</div>
-    </div>
   );
 }
 

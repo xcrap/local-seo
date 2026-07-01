@@ -428,6 +428,13 @@ try {
   ) {
     throw new Error("Metric summaries should render as readable evidence tables instead of mini card grids.");
   }
+  if (
+    webAppClient.includes("function GscInspectionFact") ||
+    webAppClient.includes("function AiJobFact") ||
+    webAppClient.includes('<div className="grid gap-3 md:grid-cols-3">')
+  ) {
+    throw new Error("Search Console inspection and AI job metadata should render as readable evidence tables, not mini fact cards.");
+  }
   if (webAppClient.includes("Clear selected site")) {
     throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
   }
