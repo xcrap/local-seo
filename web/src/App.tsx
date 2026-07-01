@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type FormEvent, type ReactElement, type ReactNode } from "react";
-import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
@@ -164,25 +164,25 @@ function defaultCrawlHostFromConfig(config?: any): Site["crawl_host"] {
 }
 
 const activeSiteStorageKey = "local-seo:site";
-const legacyProjectStorageKey = "local-seo:project";
+const legacySiteStorageKey = "local-seo:project";
 const legacySelectedAuditStorageKey = "local-seo:selected-audit";
 const selectedAuditStoragePrefix = "local-seo:selected-audit";
 
-function selectedAuditStorageKey(projectId: string) {
-  return `${selectedAuditStoragePrefix}:${projectId}`;
+function selectedAuditStorageKey(siteId: string) {
+  return `${selectedAuditStoragePrefix}:${siteId}`;
 }
 
-function getSelectedAuditId(projectId: string) {
-  return localStorage.getItem(selectedAuditStorageKey(projectId)) || localStorage.getItem(legacySelectedAuditStorageKey) || "";
+function getSelectedAuditId(siteId: string) {
+  return localStorage.getItem(selectedAuditStorageKey(siteId)) || localStorage.getItem(legacySelectedAuditStorageKey) || "";
 }
 
-function setSelectedAuditId(projectId: string, auditId: string) {
-  localStorage.setItem(selectedAuditStorageKey(projectId), auditId);
+function setSelectedAuditId(siteId: string, auditId: string) {
+  localStorage.setItem(selectedAuditStorageKey(siteId), auditId);
   localStorage.removeItem(legacySelectedAuditStorageKey);
 }
 
-function clearSelectedAuditId(projectId?: string) {
-  if (projectId) localStorage.removeItem(selectedAuditStorageKey(projectId));
+function clearSelectedAuditId(siteId?: string) {
+  if (siteId) localStorage.removeItem(selectedAuditStorageKey(siteId));
   localStorage.removeItem(legacySelectedAuditStorageKey);
 }
 
@@ -194,8 +194,8 @@ function languageLabel(code: string) {
   return languageOptions.find((item) => item.code === code)?.label || code;
 }
 
-function keywordRankDefaultsLabel(project: Site) {
-  return `${marketLabel(project.location_code)} · ${languageLabel(project.language_code)}`;
+function keywordRankDefaultsLabel(site: Site) {
+  return `${marketLabel(site.location_code)} · ${languageLabel(site.language_code)}`;
 }
 
 function localSiteHost(domain: string) {
@@ -252,51 +252,51 @@ function scanProtocolCandidates(domain: string, crawlProtocol?: Site["crawl_prot
   return localSiteHost(domain) ? ["http", "https"] : ["https", "http"];
 }
 
-function scanTargetCandidates(project?: ScanPlanTarget | null) {
-  const clean = cleanSiteDomain(project?.domain);
+function scanTargetCandidates(site?: ScanPlanTarget | null) {
+  const clean = cleanSiteDomain(site?.domain);
   if (!clean) return [];
-  const hosts = scanHostCandidates(clean, project?.crawl_host || "auto");
-  const protocols = scanProtocolCandidates(clean, project?.crawl_protocol || "auto");
+  const hosts = scanHostCandidates(clean, site?.crawl_host || "auto");
+  const protocols = scanProtocolCandidates(clean, site?.crawl_protocol || "auto");
   const urls = protocols.flatMap((protocol) => hosts.map((host) => `${protocol}://${host}`));
   return Array.from(new Set(urls));
 }
 
-function preferredAuditUrl(project?: ScanPlanTarget | null) {
-  return scanTargetCandidates(project)[0] || "";
+function preferredAuditUrl(site?: ScanPlanTarget | null) {
+  return scanTargetCandidates(site)[0] || "";
 }
 
-function crawlPreferenceLabel(project?: ScanPlanTarget | null) {
-  const protocol = crawlProtocolOptions.find((item) => item.value === (project?.crawl_protocol || "auto"))?.label || "Auto";
-  const host = crawlHostOptions.find((item) => item.value === (project?.crawl_host || "auto"))?.label || "Auto";
+function crawlPreferenceLabel(site?: ScanPlanTarget | null) {
+  const protocol = crawlProtocolOptions.find((item) => item.value === (site?.crawl_protocol || "auto"))?.label || "Auto";
+  const host = crawlHostOptions.find((item) => item.value === (site?.crawl_host || "auto"))?.label || "Auto";
   return `${protocol} · ${host}`;
 }
 
-function scanTargetDetail(project?: ScanPlanTarget | null) {
-  const candidates = scanTargetCandidates(project);
+function scanTargetDetail(site?: ScanPlanTarget | null) {
+  const candidates = scanTargetCandidates(site);
   if (!candidates.length) return "Set a website address to scan.";
-  if (candidates.length === 1) return `${crawlPreferenceLabel(project)} · ${candidates[0]}`;
-  return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} possible crawl URLs`;
+  if (candidates.length === 1) return `${crawlPreferenceLabel(site)} · ${candidates[0]}`;
+  return `${crawlPreferenceLabel(site)} · ${formatNumber(candidates.length)} possible crawl URLs`;
 }
 
-function scanTargetShortDetail(project?: ScanPlanTarget | null) {
-  const candidates = scanTargetCandidates(project);
+function scanTargetShortDetail(site?: ScanPlanTarget | null) {
+  const candidates = scanTargetCandidates(site);
   if (!candidates.length) return "No crawl URL";
-  return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} crawl URL${candidates.length === 1 ? "" : "s"}`;
+  return `${crawlPreferenceLabel(site)} · ${formatNumber(candidates.length)} crawl URL${candidates.length === 1 ? "" : "s"}`;
 }
 
-function scanTargetCountLabel(project?: ScanPlanTarget | null) {
-  const count = scanTargetCandidates(project).length;
+function scanTargetCountLabel(site?: ScanPlanTarget | null) {
+  const count = scanTargetCandidates(site).length;
   return `${formatNumber(count)} crawl URL${count === 1 ? "" : "s"}`;
 }
 
 function ScanTargetPills({
-  project,
+  site,
   compact = false,
 }: {
-  project?: ScanPlanTarget | null;
+  site?: ScanPlanTarget | null;
   compact?: boolean;
 }) {
-  const candidates = scanTargetCandidates(project);
+  const candidates = scanTargetCandidates(site);
   if (!candidates.length) return <span className="text-sm text-muted-foreground">Set a website address</span>;
   return (
     <div className={cn("flex flex-wrap gap-2", compact ? "gap-1.5" : "")}>
@@ -317,24 +317,24 @@ function ScanTargetPills({
 }
 
 function ScanPlanSummary({
-  project,
+  site,
   compact = false,
 }: {
-  project?: ScanPlanTarget | null;
+  site?: ScanPlanTarget | null;
   compact?: boolean;
 }) {
   return (
     <div className={cn("space-y-2", compact ? "space-y-1.5" : "")}>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">{scanTargetCountLabel(project)}</Badge>
-        <Badge variant="outline">{crawlPreferenceLabel(project)}</Badge>
+        <Badge variant="outline">{scanTargetCountLabel(site)}</Badge>
+        <Badge variant="outline">{crawlPreferenceLabel(site)}</Badge>
       </div>
-      <ScanTargetPills project={project} compact={compact} />
+      <ScanTargetPills site={site} compact={compact} />
     </div>
   );
 }
 
-function ScanPlanPreview({ project }: { project?: ScanPlanTarget | null }) {
+function ScanPlanPreview({ site }: { site?: ScanPlanTarget | null }) {
   return (
     <div className="rounded-md border bg-muted/20 p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -342,21 +342,21 @@ function ScanPlanPreview({ project }: { project?: ScanPlanTarget | null }) {
           <div className="text-sm font-semibold">Scan plan preview</div>
           <div className="mt-0.5 text-xs text-muted-foreground">The scan button will try these URLs in this order.</div>
         </div>
-        <Badge variant="outline">{scanTargetCountLabel(project)}</Badge>
+        <Badge variant="outline">{scanTargetCountLabel(site)}</Badge>
       </div>
-      <ScanTargetPills project={project} compact />
+      <ScanTargetPills site={site} compact />
     </div>
   );
 }
 
-function siteDisplayName(project?: Site | null) {
-  if (!project) return "No site";
-  return project.name;
+function siteDisplayName(site?: Site | null) {
+  if (!site) return "No site";
+  return site.name;
 }
 
-function siteSelectLabel(project: Site) {
-  const domain = project.domain || "No website address";
-  return `${siteDisplayName(project)} · ${domain} · ${scanTargetShortDetail(project)}`;
+function siteSelectLabel(site: Site) {
+  const domain = site.domain || "No website address";
+  return `${siteDisplayName(site)} · ${domain} · ${scanTargetShortDetail(site)}`;
 }
 
 function ActiveSiteSelect({
@@ -1045,77 +1045,77 @@ function LoginScreen({ setupRequired, onSuccess }: { setupRequired: boolean; onS
   );
 }
 
-function Workspace() {
+function AppWorkspace() {
   return (
     <BrowserRouter>
-      <WorkspaceShell />
+      <AppShell />
     </BrowserRouter>
   );
 }
 
-function WorkspaceShell() {
-  const [projects, setProjects] = useState<Site[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState(
-    localStorage.getItem(activeSiteStorageKey) || localStorage.getItem(legacyProjectStorageKey) || "",
+function AppShell() {
+  const [sites, setSites] = useState<Site[]>([]);
+  const [activeSiteId, setActiveSiteId] = useState(
+    localStorage.getItem(activeSiteStorageKey) || localStorage.getItem(legacySiteStorageKey) || "",
   );
-  const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState("");
+  const [sitesLoading, setSitesLoading] = useState(true);
+  const [sitesError, setSitesError] = useState("");
   const [shellScanning, setShellScanning] = useState(false);
   const [shellScanError, setShellScanError] = useState("");
   const navigate = useNavigate();
-  const activeProject = useMemo(
-    () => projects.find((project) => project.id === activeProjectId) || projects[0],
-    [projects, activeProjectId],
+  const activeSite = useMemo(
+    () => sites.find((site) => site.id === activeSiteId) || sites[0],
+    [sites, activeSiteId],
   );
 
-  async function loadProjects() {
-    if (!projects.length) setProjectsLoading(true);
-    setProjectsError("");
+  async function loadSites() {
+    if (!sites.length) setSitesLoading(true);
+    setSitesError("");
     try {
       const rows = await api.sites();
-      setProjects(rows);
+      setSites(rows);
       if (rows.length === 0) {
-        setActiveProjectId("");
+        setActiveSiteId("");
         localStorage.removeItem(activeSiteStorageKey);
-        localStorage.removeItem(legacyProjectStorageKey);
+        localStorage.removeItem(legacySiteStorageKey);
         return;
       }
-      if (rows.length > 0 && !rows.some((project) => project.id === activeProjectId)) {
+      if (rows.length > 0 && !rows.some((site) => site.id === activeSiteId)) {
         const nextActive = rows[0];
-        setActiveProjectId(nextActive.id);
+        setActiveSiteId(nextActive.id);
         localStorage.setItem(activeSiteStorageKey, nextActive.id);
-        localStorage.removeItem(legacyProjectStorageKey);
+        localStorage.removeItem(legacySiteStorageKey);
       }
     } catch (err) {
-      setProjectsError(err instanceof Error ? err.message : "Could not load local sites");
+      setSitesError(err instanceof Error ? err.message : "Could not load local sites");
       throw err;
     } finally {
-      setProjectsLoading(false);
+      setSitesLoading(false);
     }
   }
 
   useEffect(() => {
-    loadProjects().catch(console.error);
+    loadSites().catch(console.error);
   }, []);
 
-  function selectProject(id: string) {
-    setActiveProjectId(id);
+  function selectSite(id: string) {
+    setActiveSiteId(id);
     localStorage.setItem(activeSiteStorageKey, id);
-    localStorage.removeItem(legacyProjectStorageKey);
+    localStorage.removeItem(legacySiteStorageKey);
     setShellScanError("");
   }
 
   async function scanActiveSite() {
-    if (!activeProject?.domain) {
+    if (!activeSite?.domain) {
       navigate("/sites");
       return;
     }
     setShellScanning(true);
     setShellScanError("");
     try {
-      const result = await api.scanSite(activeProject.id);
+      const result = await api.scanSite(activeSite.id);
       if (result.audit?.id) {
-        setSelectedAuditId(activeProject.id, result.audit.id);
+        setSelectedAuditId(activeSite.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
       } else {
         navigate("/audits");
@@ -1147,14 +1147,14 @@ function WorkspaceShell() {
 
           <div className="mt-6 space-y-2">
             <Label>Active site</Label>
-            <ActiveSiteSelect sites={projects} activeSiteId={activeProject?.id || ""} onSelect={selectProject} />
+            <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={selectSite} />
           </div>
 
-          {activeProject?.domain ? (
+          {activeSite?.domain ? (
             <div className="mt-3 rounded-md border bg-card p-3">
               <div className="text-xs font-medium text-muted-foreground">Scan plan</div>
               <div className="mt-2">
-                <ScanPlanSummary project={activeProject} compact />
+                <ScanPlanSummary site={activeSite} compact />
               </div>
               <Button className="mt-3 w-full justify-start" size="sm" onClick={scanActiveSite} disabled={shellScanning}>
                 <FileSearch /> {shellScanning ? "Starting scan" : "Scan website"}
@@ -1200,8 +1200,8 @@ function WorkspaceShell() {
             </Button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <ActiveSiteSelect sites={projects} activeSiteId={activeProject?.id || ""} onSelect={selectProject} />
-            {activeProject?.domain ? (
+            <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={selectSite} />
+            {activeSite?.domain ? (
               <Button size="sm" onClick={scanActiveSite} disabled={shellScanning}>
                 <FileSearch /> {shellScanning ? "Starting" : "Scan"}
               </Button>
@@ -1228,42 +1228,41 @@ function WorkspaceShell() {
 
         <main className="relative z-10 px-4 py-6 lg:ml-64 lg:px-8 lg:py-8">
           <div className="mx-auto w-full max-w-[1800px]">
-            {projectsError ? (
+            {sitesError ? (
               <EmptyState
                 title="Could not load local sites"
-                text={`${projectsError}. Your SQLite data was not cleared; the app could not read it from the local API.`}
+                text={`${sitesError}. Your SQLite data was not cleared; the app could not read it from the local API.`}
                 action={
-                  <Button type="button" onClick={() => loadProjects().catch(console.error)}>
+                  <Button type="button" onClick={() => loadSites().catch(console.error)}>
                     <RefreshCw /> Retry
                   </Button>
                 }
               />
-            ) : projectsLoading ? (
+            ) : sitesLoading ? (
               <div className="flex min-h-[50vh] items-center justify-center">
                 <Badge>Loading local SQLite sites</Badge>
               </div>
-            ) : activeProject ? (
-              <Routes key={activeProject.id}>
-                <Route path="/" element={<Overview project={activeProject} reloadProjects={loadProjects} selectProject={selectProject} />} />
-                <Route path="/sites" element={<SitesPage projects={projects} reloadProjects={loadProjects} activeProjectId={activeProject.id} selectProject={selectProject} />} />
-                <Route path="/projects" element={<Navigate to="/sites" replace />} />
-                <Route path="/keywords" element={<KeywordsPage project={activeProject} />} />
-                <Route path="/serp" element={<SerpPage project={activeProject} />} />
-                <Route path="/saved" element={<SavedPage project={activeProject} />} />
-                <Route path="/rank" element={<RankPage project={activeProject} />} />
-                <Route path="/domain" element={<DomainPage project={activeProject} />} />
-                <Route path="/backlinks" element={<BacklinksPage project={activeProject} />} />
-                <Route path="/brand" element={<BrandLookupPage project={activeProject} />} />
-                <Route path="/prompts" element={<PromptExplorerPage project={activeProject} />} />
-                <Route path="/audits" element={<AuditsPage project={activeProject} />} />
+            ) : activeSite ? (
+              <Routes key={activeSite.id}>
+                <Route path="/" element={<Overview site={activeSite} reloadSites={loadSites} selectSite={selectSite} />} />
+                <Route path="/sites" element={<SitesPage sites={sites} reloadSites={loadSites} activeSiteId={activeSite.id} selectSite={selectSite} />} />
+                <Route path="/keywords" element={<KeywordsPage site={activeSite} />} />
+                <Route path="/serp" element={<SerpPage site={activeSite} />} />
+                <Route path="/saved" element={<SavedPage site={activeSite} />} />
+                <Route path="/rank" element={<RankPage site={activeSite} />} />
+                <Route path="/domain" element={<DomainPage site={activeSite} />} />
+                <Route path="/backlinks" element={<BacklinksPage site={activeSite} />} />
+                <Route path="/brand" element={<BrandLookupPage site={activeSite} />} />
+                <Route path="/prompts" element={<PromptExplorerPage site={activeSite} />} />
+                <Route path="/audits" element={<AuditsPage site={activeSite} />} />
                 <Route path="/audits/:auditId" element={<AuditReportRoute />} />
-                <Route path="/gsc" element={<GscPage project={activeProject} />} />
-                <Route path="/ai" element={<AiPage project={activeProject} />} />
+                <Route path="/gsc" element={<GscPage site={activeSite} />} />
+                <Route path="/ai" element={<AiPage site={activeSite} />} />
                 <Route path="/mcp" element={<McpPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             ) : (
-              <SitesPage projects={projects} reloadProjects={loadProjects} activeProjectId="" selectProject={selectProject} />
+              <SitesPage sites={sites} reloadSites={loadSites} activeSiteId="" selectSite={selectSite} />
             )}
           </div>
         </main>
@@ -1272,13 +1271,13 @@ function WorkspaceShell() {
 }
 
 function Overview({
-  project,
-  reloadProjects,
-  selectProject,
+  site,
+  reloadSites,
+  selectSite,
 }: {
-  project: Site;
-  reloadProjects: () => Promise<void>;
-  selectProject: (id: string) => void;
+  site: Site;
+  reloadSites: () => Promise<void>;
+  selectSite: (id: string) => void;
 }) {
   const [summary, setSummary] = useState<any>(null);
   const [scan, setScan] = useState<any>(null);
@@ -1296,8 +1295,8 @@ function Overview({
   const scanLedgerRows = sortAuditRows(summary?.allAudits || summary?.latestAudits || []);
 
   useEffect(() => {
-    api.dashboard(project.id).then(setSummary).catch(console.error);
-  }, [project.id]);
+    api.dashboard(site.id).then(setSummary).catch(console.error);
+  }, [site.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1319,14 +1318,14 @@ function Overview({
     setScanning(true);
     setScanError("");
     try {
-      const result = await api.scanSite(project.id);
+      const result = await api.scanSite(site.id);
       setScan(result);
       setScanAudit(result.audit);
       if (result.audit?.id) {
-        setSelectedAuditId(project.id, result.audit.id);
+        setSelectedAuditId(site.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
       }
-      setSummary(await api.dashboard(project.id));
+      setSummary(await api.dashboard(site.id));
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "Could not start site scan");
     } finally {
@@ -1335,7 +1334,7 @@ function Overview({
   }
 
   function openAuditReport(auditId: string, row?: any) {
-    setSelectedAuditId(row?.project_id || project.id, auditId);
+    setSelectedAuditId(row?.project_id || site.id, auditId);
     navigate(`/audits/${auditId}`);
   }
 
@@ -1354,12 +1353,12 @@ function Overview({
         crawlProtocol: firstCrawlProtocol,
         crawlHost: firstCrawlHost,
       } as any);
-      selectProject(created.id);
+      selectSite(created.id);
       const result = await api.scanSite(created.id);
       if (result.audit?.id) {
         setSelectedAuditId(created.id, result.audit.id);
       }
-      await reloadProjects();
+      await reloadSites();
       if (result.audit?.id) navigate(`/audits/${result.audit.id}`);
       else navigate("/audits");
     } catch (err) {
@@ -1375,7 +1374,7 @@ function Overview({
       const nextAudit = await api.audit(scanAudit.id);
       setScanAudit(nextAudit);
       if (nextAudit?.status === "completed" || nextAudit?.status === "failed") {
-        setSummary(await api.dashboard(project.id));
+        setSummary(await api.dashboard(site.id));
       }
     }, 1500);
     return () => window.clearInterval(interval);
@@ -1391,11 +1390,11 @@ function Overview({
     <>
       <PageHeader
         eyebrow="Site overview"
-        title={siteDisplayName(project)}
-        description={project.domain ? "Reports, audits, crawl links, rankings, and Search Console use this site." : "Add a site to unlock scans, reports, rankings, and Search Console."}
-        action={<Badge>{project.domain || "No site yet"}</Badge>}
+        title={siteDisplayName(site)}
+        description={site.domain ? "Reports, audits, crawl links, rankings, and Search Console use this site." : "Add a site to unlock scans, reports, rankings, and Search Console."}
+        action={<Badge>{site.domain || "No site yet"}</Badge>}
       />
-      {!project.domain ? (
+      {!site.domain ? (
         <section className="mb-6 rounded-md border border-primary/40 bg-background p-5">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">Start with a site scan</h2>
@@ -1427,7 +1426,7 @@ function Overview({
                 </Select>
               </Field>
             </div>
-            <ScanPlanPreview project={firstScanPlan} />
+            <ScanPlanPreview site={firstScanPlan} />
           </form>
           {firstScanError && <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{firstScanError}</p>}
         </section>
@@ -1456,7 +1455,7 @@ function Overview({
           </div>
         </section>
       )}
-      <SiteCommandCenter project={project} summary={summary} scanning={scanning} onScan={scanSite} />
+      <SiteCommandCenter site={site} summary={summary} scanning={scanning} onScan={scanSite} />
       <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]">
         <section className="rounded-md border bg-background">
           <div className="border-b px-5 py-4">
@@ -1471,9 +1470,9 @@ function Overview({
             ) : (
               <EmptyState
                 title="No audits yet"
-                text={project.domain ? "Start a technical scan for this site." : "Add a website address to start scanning."}
+                text={site.domain ? "Start a technical scan for this site." : "Add a website address to start scanning."}
                 action={
-                  project.domain ? (
+                  site.domain ? (
                     <Button onClick={scanSite} disabled={scanning}>
                       <FileSearch /> {scanning ? "Starting" : "Scan site now"}
                     </Button>
@@ -1508,12 +1507,12 @@ function Overview({
 }
 
 function SiteCommandCenter({
-  project,
+  site,
   summary,
   scanning,
   onScan,
 }: {
-  project: Site;
+  site: Site;
   summary: any;
   scanning: boolean;
   onScan: () => void;
@@ -1525,18 +1524,18 @@ function SiteCommandCenter({
     {
       key: "site",
       area: "Selected site",
-      status: project.domain || "missing",
-      evidence: project.domain
-        ? `Scan plan: ${scanTargetShortDetail(project)} · starts at ${preferredAuditUrl(project)} · Keyword/rank defaults: ${keywordRankDefaultsLabel(project)}`
+      status: site.domain || "missing",
+      evidence: site.domain
+        ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredAuditUrl(site)} · Keyword/rank defaults: ${keywordRankDefaultsLabel(site)}`
         : "Add a site before running audits, rankings, Search Console imports, or AI work.",
-      action: project.domain ? (
+      action: site.domain ? (
         <Button size="sm" onClick={onScan} disabled={scanning}>
           <FileSearch /> {scanning ? "Starting" : "Scan website"}
         </Button>
       ) : (
         <Button asChild size="sm"><Link to="/sites"><Plus /> Add site</Link></Button>
       ),
-      secondary: project.domain ? (
+      secondary: site.domain ? (
         <Button asChild size="sm" variant="outline"><Link to="/sites"><Pencil /> Edit site</Link></Button>
       ) : null,
     },
@@ -1610,7 +1609,7 @@ function SiteCommandCenter({
               One selected site feeds audits, local link evidence, rankings, Search Console, and AI work.
             </p>
           </div>
-          {project.domain ? <Badge variant="outline">{scanTargetShortDetail(project)}</Badge> : null}
+          {site.domain ? <Badge variant="outline">{scanTargetShortDetail(site)}</Badge> : null}
         </div>
       </div>
       <Table>
@@ -1668,15 +1667,15 @@ function ScanCoverageList({ rows, auditStatus }: { rows: any[]; auditStatus?: st
 }
 
 function SitesPage({
-  projects,
-  reloadProjects,
-  activeProjectId,
-  selectProject,
+  sites,
+  reloadSites,
+  activeSiteId,
+  selectSite,
 }: {
-  projects: Site[];
-  reloadProjects: () => Promise<void>;
-  activeProjectId: string;
-  selectProject: (id: string) => void;
+  sites: Site[];
+  reloadSites: () => Promise<void>;
+  activeSiteId: string;
+  selectSite: (id: string) => void;
 }) {
   type SiteForm = {
     name: string;
@@ -1759,7 +1758,7 @@ function SitesPage({
         ...form,
         name: form.name.trim() || form.domain.trim() || "Untitled site",
       });
-      selectProject(created.id);
+      selectSite(created.id);
       setOpen(false);
       setForm(siteDefaults);
       if (scanAfterCreate) {
@@ -1767,12 +1766,12 @@ function SitesPage({
         if (result.audit?.id) {
           setSelectedAuditId(created.id, result.audit.id);
         }
-        await reloadProjects();
+        await reloadSites();
         if (result.audit?.id) navigate(`/audits/${result.audit.id}`);
         else navigate("/audits");
         return;
       }
-      await reloadProjects();
+      await reloadSites();
     } catch (err) {
       setError(err instanceof Error ? err.message : scanAfterCreate ? "Could not add and scan site" : "Could not add site");
     } finally {
@@ -1785,16 +1784,16 @@ function SitesPage({
     await createSite(true);
   }
 
-  function startEdit(project: Site) {
-    setEditing(project);
+  function startEdit(site: Site) {
+    setEditing(site);
     setEditForm({
-      name: project.name,
-      domain: project.domain || "",
-      notes: project.notes || "",
-      location_code: project.location_code || 2840,
-      language_code: project.language_code || "en",
-      crawl_protocol: project.crawl_protocol || "auto",
-      crawl_host: project.crawl_host || "auto",
+      name: site.name,
+      domain: site.domain || "",
+      notes: site.notes || "",
+      location_code: site.location_code || 2840,
+      language_code: site.language_code || "en",
+      crawl_protocol: site.crawl_protocol || "auto",
+      crawl_host: site.crawl_host || "auto",
     });
   }
 
@@ -1805,34 +1804,34 @@ function SitesPage({
     try {
       await api.updateSite(editing.id, editForm);
       setEditing(null);
-      await reloadProjects();
+      await reloadSites();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update site");
     }
   }
 
-  async function deleteSite(project: Site) {
+  async function deleteSite(site: Site) {
     setError("");
     try {
-      await api.deleteSite(project.id);
+      await api.deleteSite(site.id);
       setDeleting(null);
-      await reloadProjects();
+      await reloadSites();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete site");
     }
   }
 
-  async function scanSite(project: Site) {
-    if (!project.domain) return;
+  async function scanSite(site: Site) {
+    if (!site.domain) return;
     setError("");
-    setScanningSiteId(project.id);
+    setScanningSiteId(site.id);
     try {
-      const result = await api.scanSite(project.id);
+      const result = await api.scanSite(site.id);
       if (result.audit?.id) {
-        setSelectedAuditId(project.id, result.audit.id);
+        setSelectedAuditId(site.id, result.audit.id);
       }
       setScanningSiteId("");
-      selectProject(project.id);
+      selectSite(site.id);
       if (result.audit?.id) navigate(`/audits/${result.audit.id}`);
       else navigate("/audits");
     } catch (err) {
@@ -1913,7 +1912,7 @@ function SitesPage({
                     </Select>
                   </Field>
                 </div>
-                <ScanPlanPreview project={formScanPlan} />
+                <ScanPlanPreview site={formScanPlan} />
                 <Field label="Notes"><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1930,7 +1929,7 @@ function SitesPage({
         }
       />
       {error && <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p>}
-      {projects.length === 0 ? (
+      {sites.length === 0 ? (
         <section className="rounded-md border border-primary/40 bg-background p-5">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">Start with a site scan</h2>
@@ -1962,7 +1961,7 @@ function SitesPage({
                 </Select>
               </Field>
             </div>
-            <ScanPlanPreview project={formScanPlan} />
+            <ScanPlanPreview site={formScanPlan} />
           </form>
         </section>
       ) : (
@@ -1979,46 +1978,46 @@ function SitesPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects.map((project) => (
-                <TableRow key={project.id} className={activeProjectId === project.id ? "bg-accent/35" : ""}>
+              {sites.map((site) => (
+                <TableRow key={site.id} className={activeSiteId === site.id ? "bg-accent/35" : ""}>
                   <TableCell className="min-w-64">
-                    <div className="font-medium">{project.name}</div>
-                    <div className="text-xs text-muted-foreground">{project.domain || "Add a website address"}</div>
+                    <div className="font-medium">{site.name}</div>
+                    <div className="text-xs text-muted-foreground">{site.domain || "Add a website address"}</div>
                   </TableCell>
                   <TableCell className="min-w-56">
-                    <ScanPlanSummary project={project} compact />
+                    <ScanPlanSummary site={site} compact />
                   </TableCell>
                   <TableCell className="min-w-44">
-                    <div className="font-medium">{marketLabel(project.location_code)}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{languageLabel(project.language_code)} keywords</div>
+                    <div className="font-medium">{marketLabel(site.location_code)}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{languageLabel(site.language_code)} keywords</div>
                   </TableCell>
                   <TableCell className="max-w-md">
-                    <div className="line-clamp-2 text-sm text-muted-foreground">{project.notes || "No notes yet."}</div>
+                    <div className="line-clamp-2 text-sm text-muted-foreground">{site.notes || "No notes yet."}</div>
                   </TableCell>
-                  <TableCell>{activeProjectId === project.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}</TableCell>
+                  <TableCell>{activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}</TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
-                      {activeProjectId !== project.id ? (
-                        <Button size="sm" variant="secondary" onClick={() => selectProject(project.id)}>
+                      {activeSiteId !== site.id ? (
+                        <Button size="sm" variant="secondary" onClick={() => selectSite(site.id)}>
                           Select site
                         </Button>
                       ) : null}
-                      {project.domain ? (
+                      {site.domain ? (
                         <Button
                           size="sm"
                           variant="outline"
-                          aria-label={`Scan ${project.name}`}
-                          title={`Scan ${project.domain}`}
-                          disabled={scanningSiteId === project.id}
-                          onClick={() => scanSite(project)}
+                          aria-label={`Scan ${site.name}`}
+                          title={`Scan ${site.domain}`}
+                          disabled={scanningSiteId === site.id}
+                          onClick={() => scanSite(site)}
                         >
-                          <FileSearch /> {scanningSiteId === project.id ? "Starting" : "Scan"}
+                          <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan"}
                         </Button>
                       ) : null}
-                      <Button size="icon" variant="outline" aria-label={`Edit ${project.name}`} onClick={() => startEdit(project)}>
+                      <Button size="icon" variant="outline" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
                         <Pencil />
                       </Button>
-                      <Button size="icon" variant="destructive" aria-label={`Delete ${project.name}`} onClick={() => setDeleting(project)}>
+                      <Button size="icon" variant="destructive" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
                         <Trash2 />
                       </Button>
                     </div>
@@ -2080,7 +2079,7 @@ function SitesPage({
                 </Select>
               </Field>
             </div>
-            <ScanPlanPreview project={editScanPlan} />
+            <ScanPlanPreview site={editScanPlan} />
             <Field label="Notes"><Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></Field>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit"><Pencil /> Save changes</Button>
@@ -2108,8 +2107,8 @@ function SitesPage({
   );
 }
 
-function KeywordsPage({ project }: { project: Site }) {
-  const [query, setQuery] = useState(project.domain || "");
+function KeywordsPage({ site }: { site: Site }) {
+  const [query, setQuery] = useState(site.domain || "");
   const [limit, setLimit] = useState(25);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -2119,8 +2118,8 @@ function KeywordsPage({ project }: { project: Site }) {
   const selectedCount = Object.values(selected).filter(Boolean).length;
 
   useEffect(() => {
-    setQuery(project.domain || "");
-  }, [project.id, project.domain]);
+    setQuery(site.domain || "");
+  }, [site.id, site.domain]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -2128,7 +2127,7 @@ function KeywordsPage({ project }: { project: Site }) {
     setError("");
     setMessage("");
     try {
-      const data = await api.researchKeywords({ siteId: project.id, query, limit });
+      const data = await api.researchKeywords({ siteId: site.id, query, limit });
       setResult(data);
       setSelected(Object.fromEntries(data.rows.slice(0, 10).map((row) => [row.keyword, true])));
     } catch (err) {
@@ -2144,7 +2143,7 @@ function KeywordsPage({ project }: { project: Site }) {
     setError("");
     setMessage("");
     try {
-      await api.saveKeywords({ siteId: project.id, keywords: rows, source: result?.source || "research" });
+      await api.saveKeywords({ siteId: site.id, keywords: rows, source: result?.source || "research" });
       setMessage(`Saved ${rows.length} keywords.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save selected keywords");
@@ -2220,7 +2219,7 @@ function KeywordTable({
   );
 }
 
-function SavedPage({ project }: { project: Site }) {
+function SavedPage({ site }: { site: Site }) {
   const [rows, setRows] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -2236,7 +2235,7 @@ function SavedPage({ project }: { project: Site }) {
     setLoading(true);
     setError("");
     try {
-      const data = await api.querySavedKeywords(project.id, {
+      const data = await api.querySavedKeywords(site.id, {
         search,
         tagNames: tagFilter ? [tagFilter] : [],
         pageSize: 100,
@@ -2244,7 +2243,7 @@ function SavedPage({ project }: { project: Site }) {
         order: "desc",
       });
       setRows(data.rows || []);
-      setTags(data.tags || await api.keywordTags(project.id));
+      setTags(data.tags || await api.keywordTags(site.id));
       setSelected({});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load saved keywords");
@@ -2255,14 +2254,14 @@ function SavedPage({ project }: { project: Site }) {
 
   useEffect(() => {
     load().catch(console.error);
-  }, [project.id]);
+  }, [site.id]);
 
   async function applyTags(mode: "add" | "remove") {
     if (!selectedIds.length || !tagInput.trim()) return;
     setError("");
     setMessage("");
     try {
-      await api.updateKeywordTags(project.id, {
+      await api.updateKeywordTags(site.id, {
         savedKeywordIds: selectedIds,
         ...(mode === "add" ? { addTags: tagInput.split(/\n|,/) } : { removeTagNames: tagInput.split(/\n|,/) }),
       });
@@ -2279,7 +2278,7 @@ function SavedPage({ project }: { project: Site }) {
     setError("");
     setMessage("");
     try {
-      await api.removeSavedKeywords(project.id, selectedIds);
+      await api.removeSavedKeywords(site.id, selectedIds);
       setMessage(`Deleted ${selectedIds.length} keywords.`);
       await load();
     } catch (err) {
@@ -2296,7 +2295,7 @@ function SavedPage({ project }: { project: Site }) {
         action={
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="secondary">
-              <a href={api.savedKeywordsCsvUrl(project.id)}>
+              <a href={api.savedKeywordsCsvUrl(site.id)}>
                 <Download />
                 Export CSV
               </a>
@@ -2386,35 +2385,35 @@ function SavedKeywordsTable({
   );
 }
 
-function SerpPage({ project }: { project: Site }) {
+function SerpPage({ site }: { site: Site }) {
   const [keyword, setKeyword] = useState("");
-  const [target, setTarget] = useState(project.domain);
+  const [target, setTarget] = useState(site.domain);
   const [result, setResult] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setTarget(project.domain);
-  }, [project.id, project.domain]);
+    setTarget(site.domain);
+  }, [site.id, site.domain]);
 
   async function load() {
     try {
-      setRuns(await api.serpRuns(project.id));
+      setRuns(await api.serpRuns(site.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load SERP history");
     }
   }
   useEffect(() => {
     load().catch(console.error);
-  }, [project.id]);
+  }, [site.id]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
     try {
-      const data = await api.analyzeSerp({ siteId: project.id, keyword, target, depth: 20 });
+      const data = await api.analyzeSerp({ siteId: site.id, keyword, target, depth: 20 });
       setResult(data);
       await load();
     } catch (err) {
@@ -2435,7 +2434,7 @@ function SerpPage({ project }: { project: Site }) {
           <SiteTargetField
             label="SERP ownership site"
             value={target}
-            siteDomain={project.domain}
+            siteDomain={site.domain}
             hint="Use the selected site or enter a competitor domain to highlight matching ranking rows."
             onChange={setTarget}
           />
@@ -2488,9 +2487,9 @@ function SerpTable({ rows }: { rows: any[] }) {
   );
 }
 
-function RankPage({ project }: { project: Site }) {
+function RankPage({ site }: { site: Site }) {
   const [trackers, setTrackers] = useState<any[]>([]);
-  const [form, setForm] = useState({ domain: project.domain, keywords: "" });
+  const [form, setForm] = useState({ domain: site.domain, keywords: "" });
   const [keywordDrafts, setKeywordDrafts] = useState<Record<string, string>>({});
   const [selectedKeywords, setSelectedKeywords] = useState<Record<string, Record<string, boolean>>>({});
   const [loading, setLoading] = useState("");
@@ -2498,19 +2497,19 @@ function RankPage({ project }: { project: Site }) {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setForm((current) => ({ ...current, domain: project.domain }));
-  }, [project.id, project.domain]);
+    setForm((current) => ({ ...current, domain: site.domain }));
+  }, [site.id, site.domain]);
 
   async function load() {
     try {
-      setTrackers(await api.rankTrackers(project.id));
+      setTrackers(await api.rankTrackers(site.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load rank trackers");
     }
   }
   useEffect(() => {
     load().catch(console.error);
-  }, [project.id]);
+  }, [site.id]);
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -2519,11 +2518,11 @@ function RankPage({ project }: { project: Site }) {
     setMessage("");
     try {
       await api.createRankTracker({
-        siteId: project.id,
+        siteId: site.id,
         domain: form.domain,
         keywords: form.keywords.split(/\n|,/).map((item) => item.trim()).filter(Boolean),
       });
-      setForm({ domain: project.domain, keywords: "" });
+      setForm({ domain: site.domain, keywords: "" });
       setMessage("Rank tracker created.");
       await load();
     } catch (err) {
@@ -2727,9 +2726,9 @@ function RankRunsTable({ rows }: { rows: any[] }) {
   );
 }
 
-function DomainPage({ project }: { project: Site }) {
+function DomainPage({ site }: { site: Site }) {
   const navigate = useNavigate();
-  const [target, setTarget] = useState(project.domain);
+  const [target, setTarget] = useState(site.domain);
   const [overview, setOverview] = useState<any>(null);
   const [keywords, setKeywords] = useState<any>(null);
   const [pages, setPages] = useState<any>(null);
@@ -2746,17 +2745,17 @@ function DomainPage({ project }: { project: Site }) {
   );
 
   useEffect(() => {
-    setTarget(project.domain);
+    setTarget(site.domain);
     setOverview(null);
     setKeywords(null);
     setPages(null);
     setError("");
-  }, [project.id, project.domain]);
+  }, [site.id, site.domain]);
 
   async function loadHistory() {
     const [snapshots, audits] = await Promise.all([
-      api.domainSnapshots(project.id),
-      api.audits(project.id),
+      api.domainSnapshots(site.id),
+      api.audits(site.id),
     ]);
     setHistory(snapshots);
     const rows = sortAuditRows(audits);
@@ -2768,13 +2767,13 @@ function DomainPage({ project }: { project: Site }) {
   }
   useEffect(() => {
     loadHistory().catch(console.error);
-  }, [project.id]);
+  }, [site.id]);
 
   async function run(event?: FormEvent) {
     event?.preventDefault();
     setLoading(true);
     setError("");
-    const body = { siteId: project.id, domain: target, target, pageSize: 50 };
+    const body = { siteId: site.id, domain: target, target, pageSize: 50 };
     try {
       const [overviewData, keywordData, pageData] = await Promise.all([
         api.domainOverview(body),
@@ -2793,16 +2792,16 @@ function DomainPage({ project }: { project: Site }) {
   }
 
   async function scanSite() {
-    if (!project.domain) {
+    if (!site.domain) {
       navigate("/sites");
       return;
     }
     setScanning(true);
     setError("");
     try {
-      const result = await api.scanSite(project.id);
+      const result = await api.scanSite(site.id);
       if (result.audit?.id) {
-        setSelectedAuditId(project.id, result.audit.id);
+        setSelectedAuditId(site.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
       } else {
         navigate("/audits");
@@ -2822,7 +2821,7 @@ function DomainPage({ project }: { project: Site }) {
           <SiteTargetField
             label="Organic research site"
             value={target}
-            siteDomain={project.domain}
+            siteDomain={site.domain}
             hint="Use the selected site or enter a competitor domain. Local crawl evidence below comes from saved audits."
             onChange={setTarget}
           />
@@ -2839,7 +2838,7 @@ function DomainPage({ project }: { project: Site }) {
             audits={auditRows}
             selectedAuditId={selectedAudit?.id || ""}
             onAuditChange={setSelectedAuditIdState}
-            siteDomain={project.domain}
+            siteDomain={site.domain}
             onScan={scanSite}
             scanning={scanning}
           />
@@ -3117,9 +3116,9 @@ function DomainPagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function BacklinksPage({ project }: { project: Site }) {
+function BacklinksPage({ site }: { site: Site }) {
   const navigate = useNavigate();
-  const [target, setTarget] = useState(project.domain);
+  const [target, setTarget] = useState(site.domain);
   const [overview, setOverview] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
@@ -3137,16 +3136,16 @@ function BacklinksPage({ project }: { project: Site }) {
   );
 
   useEffect(() => {
-    setTarget(project.domain);
+    setTarget(site.domain);
     setOverview(null);
     setProfile(null);
     setError("");
-  }, [project.id, project.domain]);
+  }, [site.id, site.domain]);
 
   async function loadHistory() {
     const [snapshots, audits, appConfig] = await Promise.all([
-      api.backlinkSnapshots(project.id),
-      api.audits(project.id),
+      api.backlinkSnapshots(site.id),
+      api.audits(site.id),
       api.config(),
     ]);
     setHistory(snapshots);
@@ -3160,7 +3159,7 @@ function BacklinksPage({ project }: { project: Site }) {
   }
   useEffect(() => {
     loadHistory().catch(console.error);
-  }, [project.id]);
+  }, [site.id]);
 
   async function run(nextTab = tab) {
     if (!backlinkIndexConnected) {
@@ -3171,7 +3170,7 @@ function BacklinksPage({ project }: { project: Site }) {
     }
     setLoading(true);
     setError("");
-    const body = { siteId: project.id, target, tab: nextTab, pageSize: 50 };
+    const body = { siteId: site.id, target, tab: nextTab, pageSize: 50 };
     try {
       const [overviewData, profileData] = await Promise.all([
         api.backlinksOverview(body),
@@ -3198,16 +3197,16 @@ function BacklinksPage({ project }: { project: Site }) {
   }
 
   async function scanSite() {
-    if (!project.domain) {
+    if (!site.domain) {
       navigate("/sites");
       return;
     }
     setScanning(true);
     setError("");
     try {
-      const result = await api.scanSite(project.id);
+      const result = await api.scanSite(site.id);
       if (result.audit?.id) {
-        setSelectedAuditId(project.id, result.audit.id);
+        setSelectedAuditId(site.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
       } else {
         navigate("/audits");
@@ -3227,7 +3226,7 @@ function BacklinksPage({ project }: { project: Site }) {
           <SiteTargetField
             label="Backlink index site"
             value={target}
-            siteDomain={project.domain}
+            siteDomain={site.domain}
             hint="Use the selected site or enter a competitor domain. Local link evidence below comes from saved audits."
             onChange={setTarget}
           />
@@ -3260,7 +3259,7 @@ function BacklinksPage({ project }: { project: Site }) {
             audits={auditRows}
             selectedAuditId={selectedAudit?.id || ""}
             onAuditChange={setSelectedAuditIdState}
-            siteDomain={project.domain}
+            siteDomain={site.domain}
             onScan={scanSite}
             scanning={scanning}
           />
@@ -3561,27 +3560,27 @@ function BacklinkPagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function BrandLookupPage({ project }: { project: Site }) {
-  const [query, setQuery] = useState(project.domain || project.name);
+function BrandLookupPage({ site }: { site: Site }) {
+  const [query, setQuery] = useState(site.domain || site.name);
   const [competitors, setCompetitors] = useState("");
   const [result, setResult] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   async function load() {
-    setRuns(await api.brandLookupRuns(project.id));
+    setRuns(await api.brandLookupRuns(site.id));
   }
   useEffect(() => {
-    setQuery(project.domain || project.name);
+    setQuery(site.domain || site.name);
     setResult(null);
     load().catch(console.error);
-  }, [project.id, project.domain, project.name]);
+  }, [site.id, site.domain, site.name]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     try {
-      const data = await api.brandLookup({ siteId: project.id, query, competitors });
+      const data = await api.brandLookup({ siteId: site.id, query, competitors });
       setResult(data);
       await load();
     } finally {
@@ -3717,9 +3716,9 @@ function CitationList({ rows }: { rows: any[] }) {
   );
 }
 
-function PromptExplorerPage({ project }: { project: Site }) {
-  const [prompt, setPrompt] = useState(`What are the best options for ${project.domain || project.name}?`);
-  const [highlightBrand, setHighlightBrand] = useState(project.domain || project.name);
+function PromptExplorerPage({ site }: { site: Site }) {
+  const [prompt, setPrompt] = useState(`What are the best options for ${site.domain || site.name}?`);
+  const [highlightBrand, setHighlightBrand] = useState(site.domain || site.name);
   const [models, setModels] = useState<Record<string, boolean>>({
     chat_gpt: true,
     claude: true,
@@ -3731,21 +3730,21 @@ function PromptExplorerPage({ project }: { project: Site }) {
   const [loading, setLoading] = useState(false);
 
   async function load() {
-    setRuns(await api.promptExplorerRuns(project.id));
+    setRuns(await api.promptExplorerRuns(site.id));
   }
   useEffect(() => {
-    setPrompt(`What are the best options for ${project.domain || project.name}?`);
-    setHighlightBrand(project.domain || project.name);
+    setPrompt(`What are the best options for ${site.domain || site.name}?`);
+    setHighlightBrand(site.domain || site.name);
     setResult(null);
     load().catch(console.error);
-  }, [project.id, project.domain, project.name]);
+  }, [site.id, site.domain, site.name]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     try {
       const selectedModels = Object.entries(models).filter(([, enabled]) => enabled).map(([model]) => model);
-      const data = await api.promptExplorer({ siteId: project.id, prompt, highlightBrand, models: selectedModels });
+      const data = await api.promptExplorer({ siteId: site.id, prompt, highlightBrand, models: selectedModels });
       setResult(data);
       await load();
     } finally {
@@ -3953,8 +3952,8 @@ function AuditReportRoute() {
   );
 }
 
-function AuditsPage({ project }: { project: Site }) {
-  const [url, setUrl] = useState(preferredAuditUrl(project));
+function AuditsPage({ site }: { site: Site }) {
+  const [url, setUrl] = useState(preferredAuditUrl(site));
   const [audits, setAudits] = useState<any[]>([]);
   const [allAudits, setAllAudits] = useState<any[]>([]);
   const [detail, setDetail] = useState<any>(null);
@@ -3969,7 +3968,7 @@ function AuditsPage({ project }: { project: Site }) {
   const activeAudit = auditIsActive(detail) ? detail : allAudits.find(auditIsActive);
   async function load() {
     const [siteRows, ledgerRows] = await Promise.all([
-      api.audits(project.id),
+      api.audits(site.id),
       api.allAudits(),
     ]);
     const rows = sortAuditRows(siteRows);
@@ -3977,16 +3976,16 @@ function AuditsPage({ project }: { project: Site }) {
     setAudits(rows);
     setAllAudits(ledger);
     const currentDetail = detail?.id ? ledger.find((row) => row.id === detail.id) : null;
-    const currentDetailBelongsToSite = currentDetail?.project_id === project.id;
-    const manualAudit = manualLedgerAuditId && manualLedgerSiteId === project.id
+    const currentDetailBelongsToSite = currentDetail?.project_id === site.id;
+    const manualAudit = manualLedgerAuditId && manualLedgerSiteId === site.id
       ? ledger.find((row) => row.id === manualLedgerAuditId)
       : null;
-    const selectedAuditId = getSelectedAuditId(project.id);
+    const selectedAuditId = getSelectedAuditId(site.id);
     const selectedAudit = selectedAuditId ? rows.find((row) => row.id === selectedAuditId) : null;
     const nextDetail = manualAudit || (currentDetailBelongsToSite ? currentDetail : null) || selectedAudit || rows[0] || null;
     setDetail(nextDetail);
-    if (nextDetail?.id) setSelectedAuditId(nextDetail.project_id || project.id, nextDetail.id);
-    else clearSelectedAuditId(project.id);
+    if (nextDetail?.id) setSelectedAuditId(nextDetail.project_id || site.id, nextDetail.id);
+    else clearSelectedAuditId(site.id);
     if (manualLedgerAuditId && !manualAudit) {
       setManualLedgerAuditId("");
       setManualLedgerSiteId("");
@@ -3995,12 +3994,12 @@ function AuditsPage({ project }: { project: Site }) {
   }
   useEffect(() => {
     load().catch(console.error);
-  }, [project.id]);
+  }, [site.id]);
   useEffect(() => {
-    setUrl(preferredAuditUrl(project));
+    setUrl(preferredAuditUrl(site));
     setError("");
     setShowCustomUrl(false);
-  }, [project.id, project.domain, project.crawl_protocol, project.crawl_host]);
+  }, [site.id, site.domain, site.crawl_protocol, site.crawl_host]);
   useEffect(() => {
     const hasActiveScan = allAudits.some(auditIsActive);
     if (!hasActiveScan) return;
@@ -4008,7 +4007,7 @@ function AuditsPage({ project }: { project: Site }) {
       load().catch(console.error);
     }, 1500);
     return () => window.clearInterval(interval);
-  }, [project.id, allAudits, detail?.id]);
+  }, [site.id, allAudits, detail?.id]);
   useEffect(() => {
     if (!detail?.id || !auditIsActive(detail)) return;
     let cancelled = false;
@@ -4039,11 +4038,11 @@ function AuditsPage({ project }: { project: Site }) {
     setManualLedgerAuditId("");
     setManualLedgerSiteId("");
     try {
-      const audit = await api.startAudit({ siteId: project.id, url });
+      const audit = await api.startAudit({ siteId: site.id, url });
       setDetail(audit);
       setAudits((rows) => upsertAuditRow(rows, audit));
       setAllAudits((rows) => upsertAuditRow(rows, audit));
-      if (audit?.id) setSelectedAuditId(project.id, audit.id);
+      if (audit?.id) setSelectedAuditId(site.id, audit.id);
       load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start scan");
@@ -4052,17 +4051,17 @@ function AuditsPage({ project }: { project: Site }) {
     }
   }
   async function startSelectedSite() {
-    if (!project.domain) return;
+    if (!site.domain) return;
     setError("");
     setStarting(true);
     setManualLedgerAuditId("");
     setManualLedgerSiteId("");
     try {
-      const result = await api.scanSite(project.id);
+      const result = await api.scanSite(site.id);
       setDetail(result.audit);
       setAudits((rows) => upsertAuditRow(rows, result.audit));
       setAllAudits((rows) => upsertAuditRow(rows, result.audit));
-      if (result.audit?.id) setSelectedAuditId(project.id, result.audit.id);
+      if (result.audit?.id) setSelectedAuditId(site.id, result.audit.id);
       load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start site scan");
@@ -4072,12 +4071,12 @@ function AuditsPage({ project }: { project: Site }) {
   }
   async function inspect(id: string, row?: any) {
     setManualLedgerAuditId(id);
-    setManualLedgerSiteId(project.id);
-    setSelectedAuditId(row?.project_id || project.id, id);
+    setManualLedgerSiteId(site.id);
+    setSelectedAuditId(row?.project_id || site.id, id);
     setDetail(await api.audit(id));
   }
   async function remove(id: string, row?: any) {
-    const siteId = row?.project_id || project.id;
+    const siteId = row?.project_id || site.id;
     await api.deleteAudit(siteId, id);
     if (getSelectedAuditId(siteId) === id) {
       clearSelectedAuditId(siteId);
@@ -4093,8 +4092,8 @@ function AuditsPage({ project }: { project: Site }) {
     setError("");
     setClearingAudits(true);
     try {
-      await api.clearAudits(project.id);
-      clearSelectedAuditId(project.id);
+      await api.clearAudits(site.id);
+      clearSelectedAuditId(site.id);
       setManualLedgerAuditId("");
       setManualLedgerSiteId("");
       setDetail(null);
@@ -4114,17 +4113,17 @@ function AuditsPage({ project }: { project: Site }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">Scan plan</span>
-              {project.domain ? <Badge variant="outline">{scanTargetShortDetail(project)}</Badge> : null}
+              {site.domain ? <Badge variant="outline">{scanTargetShortDetail(site)}</Badge> : null}
             </div>
             <div className="mt-3">
-              {project.domain ? <ScanTargetPills project={project} /> : <p className="text-xl font-semibold">Add a website address</p>}
+              {site.domain ? <ScanTargetPills site={site} /> : <p className="text-xl font-semibold">Add a website address</p>}
             </div>
-            {project.domain ? <p className="mt-2 text-sm text-muted-foreground">{scanTargetDetail(project)}</p> : null}
+            {site.domain ? <p className="mt-2 text-sm text-muted-foreground">{scanTargetDetail(site)}</p> : null}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row xl:justify-end">
-            {project.domain ? (
+            {site.domain ? (
               <Button disabled={starting} onClick={startSelectedSite}>
-                <FileSearch /> {starting ? "Starting" : `Scan ${project.domain}`}
+                <FileSearch /> {starting ? "Starting" : `Scan ${site.domain}`}
               </Button>
             ) : (
               <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
@@ -4137,7 +4136,7 @@ function AuditsPage({ project }: { project: Site }) {
         {showCustomUrl ? (
           <form className="mt-4 grid gap-3 border-t pt-4 lg:grid-cols-[1fr_auto]" onSubmit={start}>
             <Field label="URL to scan">
-              <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredAuditUrl(project) || "https://example.com"}/page`} />
+              <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredAuditUrl(site) || "https://example.com"}/page`} />
             </Field>
             <div className="flex items-end">
               <Button variant="secondary" disabled={starting || !url.trim()}><FileSearch /> Scan URL</Button>
@@ -4164,7 +4163,7 @@ function AuditsPage({ project }: { project: Site }) {
               text={allAudits.length ? "Every saved scan is still listed below. Open a row to inspect it, or run a scan for the selected site." : "Start a local site scan to fill this report with crawl evidence."}
               action={
                 !allAudits.length
-                  ? project.domain
+                  ? site.domain
                     ? (
                       <Button onClick={startSelectedSite} disabled={starting}>
                         <FileSearch /> {starting ? "Starting" : "Scan site now"}
@@ -4201,8 +4200,8 @@ function AuditsPage({ project }: { project: Site }) {
             ) : (
               <EmptyState
                 title="No audits yet"
-                text={project.domain ? "Start a technical scan for this site." : "Add a website address before running an audit."}
-                action={project.domain ? (
+                text={site.domain ? "Start a technical scan for this site." : "Add a website address before running an audit."}
+                action={site.domain ? (
                   <Button onClick={startSelectedSite} disabled={starting}>
                     <FileSearch /> {starting ? "Starting" : "Scan site now"}
                   </Button>
@@ -4235,7 +4234,7 @@ function AuditsPage({ project }: { project: Site }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete selected-site scans?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes all saved scan reports for {project.domain || project.name} from local SQLite. The saved site, keywords, rankings, and settings stay in place.
+              This removes all saved scan reports for {site.domain || site.name} from local SQLite. The saved site, keywords, rankings, and settings stay in place.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -5868,9 +5867,9 @@ function AuditLinkInventoryTable({ rows }: { rows: any[] }) {
   );
 }
 
-function GscPage({ project }: { project: Site }) {
-  const defaultInspectionUrl = project.domain ? `${preferredAuditUrl(project).replace(/\/$/, "")}/` : "";
-  const defaultGscProperty = project.domain ? `sc-domain:${cleanSiteDomain(project.domain).replace(/^www\./i, "")}` : "";
+function GscPage({ site }: { site: Site }) {
+  const defaultInspectionUrl = site.domain ? `${preferredAuditUrl(site).replace(/\/$/, "")}/` : "";
+  const defaultGscProperty = site.domain ? `sc-domain:${cleanSiteDomain(site.domain).replace(/^www\./i, "")}` : "";
   const [status, setStatus] = useState<any>(null);
   const [sites, setSites] = useState<any[]>([]);
   const [imports, setImports] = useState<any[]>([]);
@@ -5889,8 +5888,8 @@ function GscPage({ project }: { project: Site }) {
 
   async function load() {
     const [nextStatus, nextImports] = await Promise.all([
-      api.gscStatus(project.id),
-      api.gscImports(project.id),
+      api.gscStatus(site.id),
+      api.gscImports(site.id),
     ]);
     setStatus(nextStatus);
     setImports(nextImports);
@@ -5904,7 +5903,7 @@ function GscPage({ project }: { project: Site }) {
     setImportSiteUrl(defaultGscProperty);
     setInspectUrls(defaultInspectionUrl);
     load().catch(console.error);
-  }, [project.id, project.domain, project.crawl_protocol, project.crawl_host]);
+  }, [site.id, site.domain, site.crawl_protocol, site.crawl_host]);
 
   function showImport(row: any) {
     setPerformance({ source: "import", import: row, rows: row.rows || [] });
@@ -5914,7 +5913,7 @@ function GscPage({ project }: { project: Site }) {
   async function connect() {
     setError("");
     try {
-      const { url } = await api.gscStart(project.id);
+      const { url } = await api.gscStart(site.id);
       window.open(url, "_blank", "width=680,height=780");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start Google connection");
@@ -5924,7 +5923,7 @@ function GscPage({ project }: { project: Site }) {
     setLoading("sites");
     setError("");
     try {
-      setSites(await api.gscSites(project.id));
+      setSites(await api.gscSites(site.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load Search Console properties");
     } finally {
@@ -5935,7 +5934,7 @@ function GscPage({ project }: { project: Site }) {
     setLoading("site");
     setError("");
     try {
-      setStatus(await api.gscSetSite(project.id, siteUrl));
+      setStatus(await api.gscSetSite(site.id, siteUrl));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not select property");
     } finally {
@@ -5947,7 +5946,7 @@ function GscPage({ project }: { project: Site }) {
     setError("");
     try {
       setPerformance(await api.gscPerformance({
-        siteId: project.id,
+        siteId: site.id,
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
         dimensions: [dimension],
@@ -5968,8 +5967,8 @@ function GscPage({ project }: { project: Site }) {
     try {
       const csv = await file.text();
       const result = await api.gscImport({
-        siteId: project.id,
-        siteUrl: importSiteUrl || project.domain,
+        siteId: site.id,
+        siteUrl: importSiteUrl || site.domain,
         sourceName: file.name,
         csv,
       });
@@ -5986,7 +5985,7 @@ function GscPage({ project }: { project: Site }) {
     setLoading("inspection");
     setError("");
     try {
-      setInspection(await api.gscInspect({ siteId: project.id, urls: inspectUrls }));
+      setInspection(await api.gscInspect({ siteId: site.id, urls: inspectUrls }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not inspect URLs");
     } finally {
@@ -5997,7 +5996,7 @@ function GscPage({ project }: { project: Site }) {
     setLoading("disconnect");
     setError("");
     try {
-      await api.gscDisconnect(project.id);
+      await api.gscDisconnect(site.id);
       setSites([]);
       setPerformance(null);
       setInspection(null);
@@ -6279,11 +6278,11 @@ function GscInspectionResults({ rows }: { rows: any[] }) {
   );
 }
 
-function AiPage({ project }: { project: Site }) {
+function AiPage({ site }: { site: Site }) {
   const [prompts, setPrompts] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [type, setType] = useState("seo.coach");
-  const [context, setContext] = useState(`Site: ${project.name}\nDomain: ${project.domain}`);
+  const [context, setContext] = useState(`Site: ${site.name}\nDomain: ${site.domain}`);
   const [activeJobId, setActiveJobId] = useState("");
   const activeJob = jobs.find((job) => job.id === activeJobId) || jobs[0] || null;
 
@@ -6297,9 +6296,9 @@ function AiPage({ project }: { project: Site }) {
     setActiveJobId((current) => current && nextJobs.some((job: any) => job.id === current) ? current : nextJobs[0]?.id || "");
   }
   useEffect(() => {
-    setContext(`Site: ${project.name}\nDomain: ${project.domain}`);
+    setContext(`Site: ${site.name}\nDomain: ${site.domain}`);
     load().catch(console.error);
-  }, [project.id, project.name, project.domain]);
+  }, [site.id, site.name, site.domain]);
   useEffect(() => {
     if (!jobs.some((job) => job.status === "queued" || job.status === "running")) return;
     const interval = window.setInterval(() => {
@@ -6712,5 +6711,5 @@ export default function App() {
     return <LoginScreen setupRequired={setupRequired} onSuccess={() => setAuthenticated(true)} />;
   }
 
-  return <Workspace />;
+  return <AppWorkspace />;
 }

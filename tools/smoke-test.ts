@@ -294,6 +294,9 @@ try {
     throw new Error("The web client should send siteId in request bodies instead of projectId.");
   }
   const webAppClient = await readFile(path.join(rootDir, "web/src/App.tsx"), "utf8");
+  if (webAppClient.includes('path="/projects"') || webAppClient.includes('to="/projects"')) {
+    throw new Error("The React app should not expose or redirect a legacy /projects route.");
+  }
   for (const legacyWebCall of ["api.projects", "api.project", "api.createProject", "api.updateProject", "api.deleteProject", "api.scanProject"]) {
     if (webAppClient.includes(legacyWebCall)) {
       throw new Error(`The app should call site-named API helpers, not ${legacyWebCall}.`);
