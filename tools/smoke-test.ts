@@ -327,6 +327,9 @@ try {
   if (webAppClient.includes("target domain")) {
     throw new Error("SERP analysis should not expose vague target-domain placeholder copy.");
   }
+  if (seoSource.includes("Target is required")) {
+    throw new Error("SEO API errors should ask for a domain, not a vague target.");
+  }
   for (const vagueTargetCopy of [
     "competitor target analyzed",
     "Top pages returned for this target",
@@ -1055,6 +1058,39 @@ try {
   const projectPropertyTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.properties?.projectId);
   if (projectPropertyTool) {
     throw new Error(`MCP tools/list still exposes projectId: ${projectPropertyTool.name}`);
+  }
+  const targetRequiredTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.required?.includes("target"));
+  if (targetRequiredTool) {
+    throw new Error(`MCP tools/list still requires target instead of domain: ${targetRequiredTool.name}`);
+  }
+  const targetPropertyTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.properties?.target);
+  if (targetPropertyTool) {
+    throw new Error(`MCP tools/list still exposes target instead of domain: ${targetPropertyTool.name}`);
+  }
+  for (const [name, requiredInput] of [
+    ["get_domain_overview", "domain"],
+    ["get_backlinks_overview", "domain"],
+    ["get_backlinks_profile", "domain"],
+  ] as const) {
+    const tool = (mcp.result?.tools || []).find((row: any) => row.name === name);
+    if (!tool?.inputSchema?.required?.includes(requiredInput)) {
+      throw new Error(`MCP ${name} should require ${requiredInput}.`);
+    }
+  }
+  const mcpDomainOverview = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: {
+        name: "get_domain_overview",
+        arguments: { siteId: project.id, domain: "example.com" },
+      },
+    }),
+  });
+  if (mcpDomainOverview.error || mcpDomainOverview.result?.structuredContent?.target !== "example.com") {
+    throw new Error(`MCP get_domain_overview should accept domain and map it internally: ${JSON.stringify(mcpDomainOverview)}`);
   }
   const mcpGsc = await request("/mcp", {
     method: "POST",

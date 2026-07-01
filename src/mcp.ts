@@ -91,7 +91,7 @@ const tools = [
       properties: {
         ...siteIdInput,
         keyword: { type: "string" },
-        target: { type: "string" },
+        domain: { type: "string", description: "Optional selected-site or competitor domain to highlight in the ranking rows." },
         depth: { type: "number" },
       },
       required: ["siteId", "keyword"],
@@ -154,9 +154,9 @@ const tools = [
       type: "object",
       properties: {
         ...siteIdInput,
-        target: { type: "string" },
+        domain: { type: "string" },
       },
-      required: ["siteId", "target"],
+      required: ["siteId", "domain"],
     },
   },
   {
@@ -209,9 +209,9 @@ const tools = [
       type: "object",
       properties: {
         ...siteIdInput,
-        target: { type: "string" },
+        domain: { type: "string" },
       },
-      required: ["siteId", "target"],
+      required: ["siteId", "domain"],
     },
   },
   {
@@ -221,12 +221,12 @@ const tools = [
       type: "object",
       properties: {
         ...siteIdInput,
-        target: { type: "string" },
+        domain: { type: "string" },
         tab: { type: "string", enum: ["backlinks", "domains", "pages"] },
         page: { type: "number" },
         pageSize: { type: "number" },
       },
-      required: ["siteId", "target"],
+      required: ["siteId", "domain"],
     },
   },
   {
@@ -412,6 +412,10 @@ async function callTool(name: string, args: any) {
   if (args?.siteId && !args.projectId) {
     args = { ...args, projectId: args.siteId };
   }
+  const withDomainAsTarget = (input: any) => {
+    const domain = input?.domain || input?.domainOrUrl || input?.url || input?.target;
+    return domain ? { ...input, domain, target: domain } : input;
+  };
   switch (name) {
     case "whoami":
       return { server: "local-seo", mode: "local-sqlite", cloudflare: false };
@@ -424,7 +428,7 @@ async function callTool(name: string, args: any) {
     case "research_keywords":
       return researchKeywords(args);
     case "analyze_serp":
-      return getSerpAnalysis(args);
+      return getSerpAnalysis(withDomainAsTarget(args));
     case "list_saved_keywords":
       return listSavedKeywords(args.projectId);
     case "query_saved_keywords":
@@ -434,17 +438,17 @@ async function callTool(name: string, args: any) {
     case "update_saved_keyword_tags":
       return updateSavedKeywordTags(args);
     case "get_domain_overview":
-      return domainOverview(args);
+      return domainOverview(withDomainAsTarget(args));
     case "get_domain_keyword_suggestions":
       return getDomainKeywordSuggestions(args);
     case "get_domain_keywords_page":
-      return getDomainKeywordsPage(args);
+      return getDomainKeywordsPage(withDomainAsTarget(args));
     case "get_domain_pages_page":
-      return getDomainPagesPage(args);
+      return getDomainPagesPage(withDomainAsTarget(args));
     case "get_backlinks_overview":
-      return backlinksOverview(args);
+      return backlinksOverview(withDomainAsTarget(args));
     case "get_backlinks_profile":
-      return getBacklinksProfile(args);
+      return getBacklinksProfile(withDomainAsTarget(args));
     case "get_rank_tracker": {
       const trackers = listRankTrackers(args.projectId);
       return args.trackerId ? trackers.find((tracker) => tracker.id === args.trackerId) || null : trackers;

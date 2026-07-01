@@ -1258,7 +1258,7 @@ export async function backlinksOverview(input: { projectId: string; target: stri
   const project = getProject(input.projectId);
   if (!project) throw new Error("Site not found.");
   const target = normalizeDomain(input.target || project.domain);
-  if (!target) throw new Error("Target is required.");
+  if (!target) throw new Error("Domain is required.");
   if (!dataForSeoReady()) {
     return emptyProviderResult("Backlink index data", {
       target,
@@ -1315,7 +1315,7 @@ export async function getBacklinksProfile(input: {
   const project = getProject(input.projectId);
   if (!project) throw new Error("Site not found.");
   const target = normalizeDomain(input.target || project.domain);
-  if (!target) throw new Error("Target is required.");
+  if (!target) throw new Error("Domain is required.");
   const tab = input.tab || "backlinks";
   const page = Math.max(1, Number(input.page || 1));
   const pageSize = Math.max(10, Math.min(200, Number(input.pageSize || 50)));

@@ -6396,6 +6396,14 @@ function McpPage() {
       title: "Read Search Console",
       body: { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get_gsc_performance", arguments: { siteId: "site-id", startDate: "2026-06-01", endDate: "2026-06-30", dimensions: ["query"] } } },
     },
+    {
+      title: "Read organic domain",
+      body: { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_domain_overview", arguments: { siteId: "site-id", domain: "example.com" } } },
+    },
+    {
+      title: "Read link index",
+      body: { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "get_backlinks_profile", arguments: { siteId: "site-id", domain: "example.com", tab: "domains" } } },
+    },
   ];
   return (
     <>

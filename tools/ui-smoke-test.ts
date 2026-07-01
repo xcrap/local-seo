@@ -338,6 +338,11 @@ try {
     if (await page.getByText(/workspace/i).count()) {
       throw new Error("MCP page exposes workspace wording.");
     }
+    if (await page.getByText(/\btarget\b/i).count()) {
+      throw new Error("MCP page exposes target wording instead of domain/site/url inputs.");
+    }
+    await page.getByRole("row", { name: /get_domain_overview.*domain/i }).waitFor();
+    await page.getByRole("row", { name: /get_backlinks_profile.*domain/i }).waitFor();
 
     await page.getByRole("navigation").getByRole("link", { name: /^AI lab$/ }).click();
     await page.getByRole("heading", { name: /^AI lab$/ }).waitFor();
