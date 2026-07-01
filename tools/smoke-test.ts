@@ -545,6 +545,16 @@ try {
       throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
     }
   }
+  for (const explicitDashboardStatus of ["Ready for research", "Local graph ready", "Manual checks", "Ready for import", "Ready for Codex"]) {
+    if (!webAppClient.includes(explicitDashboardStatus)) {
+      throw new Error(`Dashboard status labels should be concrete, missing ${explicitDashboardStatus}.`);
+    }
+  }
+  for (const vagueDashboardStatus of ['"has keywords"', '"has jobs"', '"ready"', '"manual"', '"needs scan"', '"not run"', '"local graph"']) {
+    if (webAppClient.includes(vagueDashboardStatus)) {
+      throw new Error(`Dashboard status labels should not expose vague internal wording: ${vagueDashboardStatus}.`);
+    }
+  }
   for (const vagueDashboardAction of ["Open organic</Link>", "Open links</Link>", "Open ranks</Link>"]) {
     if (webAppClient.includes(vagueDashboardAction)) {
       throw new Error(`Dashboard actions should use destination names, not shortened labels: ${vagueDashboardAction}.`);

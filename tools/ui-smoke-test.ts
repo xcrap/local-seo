@@ -288,8 +288,15 @@ try {
     }
     const siteControl = page.locator("section", { hasText: "Site control" });
     await siteControl.getByRole("row", { name: /Active site.*Keyword tools:/i }).waitFor();
+    await siteControl.getByRole("row", { name: /Links.*Local graph ready/i }).waitFor();
+    await siteControl.getByRole("row", { name: /Rank tracking.*Manual checks/i }).waitFor();
+    await siteControl.getByRole("row", { name: /Search Console.*Ready for import/i }).waitFor();
+    await siteControl.getByRole("row", { name: /AI lab.*Ready for Codex/i }).waitFor();
     if (await page.getByText(/Search defaults|Search locale/i).count()) {
       throw new Error("Overview still presents keyword tool defaults as site search defaults or a site locale.");
+    }
+    if (await siteControl.getByText(/has keywords|has jobs|needs scan|not run/i).count() || await siteControl.getByText("manual", { exact: true }).count()) {
+      throw new Error("Overview still exposes vague internal status labels.");
     }
     await siteControl.getByRole("link", { name: /^Open site audits$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open organic research$/ }).waitFor();
@@ -384,8 +391,7 @@ try {
     await page.getByRole("cell", { name: "local crawler" }).waitFor();
     await page.getByRole("navigation").getByRole("link", { name: /^Overview$/ }).click();
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByRole("row", { name: /Search Console/i }).getByText("local import").waitFor();
-    await page.getByRole("row", { name: /Search Console/i }).getByText(/CSV imports/i).waitFor();
+    await page.getByRole("row", { name: /Search Console/i }).getByText("Local CSV imports").waitFor();
     if (await page.getByText("local OAuth").count()) {
       throw new Error("Overview still labels Search Console as local OAuth.");
     }

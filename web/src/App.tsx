@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type FormEvent, type ReactElement, type ReactNode } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type ComponentProps, type FormEvent, type ReactElement, type ReactNode } from "react";
 import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
@@ -1713,7 +1713,7 @@ function SiteCommandCenter({
     {
       key: "site",
       area: "Active site",
-      status: site.domain || "missing",
+      status: site.domain || "Needs website address",
       evidence: site.domain
         ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredAuditUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
         : "Add a site before running audits, rankings, Search Console imports, or AI work.",
@@ -1731,7 +1731,7 @@ function SiteCommandCenter({
     {
       key: "audit",
       area: "Technical audit",
-      status: latestAudit ? latestAudit.status : "not run",
+      status: latestAudit ? scanStatusLabel(latestAudit.status) : "Needs scan",
       evidence: latestAudit
         ? `${formatNumber(latestAudit.pages_crawled)} pages · ${formatNumber(latestAudit.issue_count)} issues · ${formatNumber(latestAuditSummary.checkedLinks || 0)} links checked`
         : "No crawl evidence saved yet.",
@@ -1745,7 +1745,7 @@ function SiteCommandCenter({
     {
       key: "organic",
       area: "Organic research",
-      status: summary?.savedKeywordCount ? "has keywords" : "ready",
+      status: summary?.savedKeywordCount ? "Keywords saved" : "Ready for research",
       evidence: `${formatNumber(summary?.savedKeywordCount || 0)} saved keywords · local crawl pages feed this screen`,
       action: <Button asChild size="sm" variant="secondary"><Link to="/domain"><Globe2 /> Open organic research</Link></Button>,
       secondary: null,
@@ -1753,7 +1753,7 @@ function SiteCommandCenter({
     {
       key: "links",
       area: "Links",
-      status: latestAudit ? "local graph" : "needs scan",
+      status: latestAudit ? "Local graph ready" : "Needs scan",
       evidence: latestAudit
         ? `${formatNumber(latestAuditSummary.linkTags || 0)} link tags · ${formatNumber(latestAuditSummary.brokenLinks || 0)} broken`
         : "Run a site scan to build the local link graph.",
@@ -1763,7 +1763,7 @@ function SiteCommandCenter({
     {
       key: "rank",
       area: "Rank tracking",
-      status: summary?.trackerCount ? "tracking" : "manual",
+      status: summary?.trackerCount ? "Tracking keywords" : "Manual checks",
       evidence: `${formatNumber(summary?.trackerCount || 0)} trackers · ${formatNumber(summary?.serpRunCount || 0)} SERP runs`,
       action: <Button asChild size="sm" variant="secondary"><Link to="/rank"><Target /> Open rank tracking</Link></Button>,
       secondary: null,
@@ -1771,7 +1771,7 @@ function SiteCommandCenter({
     {
       key: "gsc",
       area: "Search Console",
-      status: summary?.gscImportCount ? "local import" : "ready",
+      status: summary?.gscImportCount ? "Local CSV imports" : "Ready for import",
       evidence: summary?.gscImportCount
         ? `${formatNumber(summary.gscImportCount)} CSV imports · latest has ${formatNumber(latestGscImport?.rowCount || 0)} rows and ${formatNumber(latestGscImport?.totals?.clicks || 0)} clicks`
         : "Import a Search Console CSV locally, or connect Google for live performance and inspection.",
@@ -1781,7 +1781,7 @@ function SiteCommandCenter({
     {
       key: "ai",
       area: "AI lab",
-      status: summary?.latestAiJobs?.length ? "has jobs" : "ready",
+      status: summary?.latestAiJobs?.length ? "Jobs saved" : "Ready for Codex",
       evidence: `${formatNumber(summary?.latestAiJobs?.length || 0)} saved Codex jobs · runs locally with medium reasoning`,
       action: <Button asChild size="sm" variant="secondary"><Link to="/ai"><Bot /> Open AI lab</Link></Button>,
       secondary: null,
@@ -1806,7 +1806,7 @@ function SiteCommandCenter({
           <div key={row.key} className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-medium">{row.area}</h3>
-              <Badge variant={row.status === "needs scan" || row.status === "not run" || row.status === "missing" ? "warn" : "outline"}>{row.status}</Badge>
+              <Badge variant={siteCommandStatusVariant(row.status)}>{row.status}</Badge>
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{row.evidence}</p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -1830,7 +1830,7 @@ function SiteCommandCenter({
             {rows.map((row) => (
               <TableRow key={row.key}>
                 <TableCell className="font-medium">{row.area}</TableCell>
-                <TableCell className="min-w-36"><Badge variant={row.status === "needs scan" || row.status === "not run" || row.status === "missing" ? "warn" : "outline"}>{row.status}</Badge></TableCell>
+                <TableCell className="min-w-36"><Badge variant={siteCommandStatusVariant(row.status)}>{row.status}</Badge></TableCell>
                 <TableCell className="min-w-96 break-words text-sm text-muted-foreground">{row.evidence}</TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-2">
@@ -1845,6 +1845,10 @@ function SiteCommandCenter({
       </div>
     </section>
   );
+}
+
+function siteCommandStatusVariant(status: string): ComponentProps<typeof Badge>["variant"] {
+  return /^Needs/i.test(status) ? "warn" : "outline";
 }
 
 function ScanCoverageList({ rows, auditStatus }: { rows: any[]; auditStatus?: string }) {
