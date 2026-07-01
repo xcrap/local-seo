@@ -291,8 +291,8 @@ try {
   if (webAppClient.includes("rows[0] || ledger[0]")) {
     throw new Error("Audit report selection should not hide context by auto-opening the newest global scan.");
   }
-  if (/First scan target|tries \$\{formatNumber\(candidates\.length\)\} targets|tries \d+ targets/i.test(webAppClient)) {
-    throw new Error("The app should present saved-site crawl settings as an explicit scan plan, not a hidden first-target rule.");
+  if (/First scan target|target candidates|Resolve target|tries \$\{formatNumber\(candidates\.length\)\} targets|tries \d+ targets/i.test(webAppClient)) {
+    throw new Error("The app should present saved-site crawl settings as explicit crawl URLs, not vague target wording.");
   }
   if (!webAppClient.includes("Scan plan")) {
     throw new Error("The main site flow should expose the saved site's scan plan.");

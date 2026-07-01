@@ -255,18 +255,18 @@ function scanTargetDetail(project?: ScanPlanTarget | null) {
   const candidates = scanTargetCandidates(project);
   if (!candidates.length) return "Set a website address to scan.";
   if (candidates.length === 1) return `${crawlPreferenceLabel(project)} · ${candidates[0]}`;
-  return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} target candidates`;
+  return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} possible crawl URLs`;
 }
 
 function scanTargetShortDetail(project?: ScanPlanTarget | null) {
   const candidates = scanTargetCandidates(project);
-  if (!candidates.length) return "No scan target";
-  return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} target${candidates.length === 1 ? "" : "s"}`;
+  if (!candidates.length) return "No crawl URL";
+  return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} crawl URL${candidates.length === 1 ? "" : "s"}`;
 }
 
 function scanTargetCountLabel(project?: ScanPlanTarget | null) {
   const count = scanTargetCandidates(project).length;
-  return `${formatNumber(count)} target${count === 1 ? "" : "s"}`;
+  return `${formatNumber(count)} crawl URL${count === 1 ? "" : "s"}`;
 }
 
 function ScanTargetPills({
@@ -776,7 +776,7 @@ function auditPhaseLabel(audit: any) {
     links: "Checking links",
     crawl: "Crawling pages",
     robots: "Reading robots and sitemap",
-    target: "Resolving scan target",
+    target: "Resolving start URL",
   };
   return labels[auditPhaseKey(audit)] || "Scanning";
 }
@@ -1796,7 +1796,7 @@ function ProjectsPage({
       <PageHeader
         eyebrow="Websites"
         title="Sites"
-        description="A site is one saved website address plus its scan target preferences. The selected site feeds scans, reports, crawl links, rankings, and Search Console."
+        description="A site is one saved website address plus its crawl URL preferences. The selected site feeds scans, reports, crawl links, rankings, and Search Console."
         action={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -4877,7 +4877,7 @@ function AuditProgressPanel({
   const progress = auditProgress(audit);
   const steps = [
     {
-      label: "Resolve target",
+      label: "Resolve start URL",
       detail: result.startUrl || audit.url,
       evidence: "Saved scan URL and crawl scope.",
     },
@@ -5029,7 +5029,7 @@ function AuditReportOverview({
       action: <Badge variant={summary.imageIssues || coverage.brokenImages ? "warn" : "good"}>{summary.imageIssues || coverage.brokenImages ? "inspect" : "clear"}</Badge>,
     },
     {
-      area: "Scan target",
+      area: "Start URL",
       status: audit.status,
       evidence: (
         <span className="break-all">
