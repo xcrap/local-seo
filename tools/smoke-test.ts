@@ -394,6 +394,12 @@ try {
   if (!webAppClient.includes("Keyword tool defaults") || !webAppClient.includes("Audits crawl every page language they find") || !webAppClient.includes('Field label="Result language"')) {
     throw new Error("Keyword market/language controls should be optional keyword-tool defaults, not primary site fields.");
   }
+  if (webAppClient.includes("firstLocationCode") || webAppClient.includes("firstLanguageCode")) {
+    throw new Error("First-run site scan should not carry hidden keyword market/language fields.");
+  }
+  if (!webAppClient.includes('<Field label="Website address">') || !webAppClient.includes('<Field label="Site name">')) {
+    throw new Error("First-run site forms should use visible labels, not only placeholders.");
+  }
   if (!webAppClient.includes("<TableHead>URL</TableHead>") || !webAppClient.includes("<TableHead>Window</TableHead>")) {
     throw new Error("Audit link tables should label URL columns and HTML target-window attributes clearly.");
   }

@@ -1359,8 +1359,6 @@ function Overview({
   const [scanError, setScanError] = useState("");
   const [firstDomain, setFirstDomain] = useState("");
   const [firstName, setFirstName] = useState("");
-  const [firstLocationCode, setFirstLocationCode] = useState(2840);
-  const [firstLanguageCode, setFirstLanguageCode] = useState("en");
   const [firstCrawlProtocol, setFirstCrawlProtocol] = useState<Site["crawl_protocol"]>("auto");
   const [firstCrawlHost, setFirstCrawlHost] = useState<Site["crawl_host"]>("auto");
   const [firstScanError, setFirstScanError] = useState("");
@@ -1376,8 +1374,6 @@ function Overview({
     api.config()
       .then((data) => {
         if (cancelled) return;
-        setFirstLocationCode(defaultLocationCodeFromConfig(data));
-        setFirstLanguageCode(defaultLanguageCodeFromConfig(data));
         setFirstCrawlProtocol(defaultCrawlProtocolFromConfig(data));
         setFirstCrawlHost(defaultCrawlHostFromConfig(data));
       })
@@ -1421,8 +1417,6 @@ function Overview({
       const created = await api.createSite({
         name: firstName.trim() || domain,
         domain,
-        locationCode: firstLocationCode,
-        languageCode: firstLanguageCode,
         crawlProtocol: firstCrawlProtocol,
         crawlHost: firstCrawlHost,
       } as any);
@@ -1474,10 +1468,14 @@ function Overview({
             <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the website address once. The scan report opens automatically and stays saved locally.</p>
           </div>
           <form className="space-y-3" onSubmit={createSiteAndScan}>
-            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
-              <Input value={firstDomain} onChange={(event) => setFirstDomain(event.target.value)} placeholder="example.com" required />
-              <Input value={firstName} onChange={(event) => setFirstName(event.target.value)} placeholder="Site name (optional)" />
-              <Button type="submit" disabled={scanning}>
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+              <Field label="Website address">
+                <Input value={firstDomain} onChange={(event) => setFirstDomain(event.target.value)} placeholder="example.com" required />
+              </Field>
+              <Field label="Site name">
+                <Input value={firstName} onChange={(event) => setFirstName(event.target.value)} placeholder="Site name (optional)" />
+              </Field>
+              <Button type="submit" disabled={scanning} className="lg:mb-px">
                 <FileSearch /> {scanning ? "Starting" : "Add site and scan"}
               </Button>
             </div>
@@ -1999,10 +1997,14 @@ function SitesPage({
             <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the website address once. The scan report opens automatically and stays saved locally.</p>
           </div>
           <form className="space-y-4" onSubmit={submit}>
-            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
-              <Input value={form.domain} onChange={(event) => setForm({ ...form, domain: event.target.value })} placeholder="example.com" required />
-              <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Site name (optional)" />
-              <Button type="submit" disabled={Boolean(creatingAction)}>
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+              <Field label="Website address">
+                <Input value={form.domain} onChange={(event) => setForm({ ...form, domain: event.target.value })} placeholder="example.com" required />
+              </Field>
+              <Field label="Site name">
+                <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Site name (optional)" />
+              </Field>
+              <Button type="submit" disabled={Boolean(creatingAction)} className="lg:mb-px">
                 <FileSearch /> {creatingAction === "scan" ? "Starting scan" : "Add site and scan"}
               </Button>
             </div>

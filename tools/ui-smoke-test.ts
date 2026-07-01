@@ -153,8 +153,8 @@ try {
     await page.getByRole("button", { name: /Create admin/i }).click();
 
     await page.getByRole("heading", { name: /Start with a site scan/i }).waitFor();
-    await page.getByPlaceholder("example.com").fill(`localhost:${fixtureServer.port}`);
-    await page.getByPlaceholder("Site name (optional)").fill("Fixture Site");
+    await page.getByLabel("Website address").fill(`localhost:${fixtureServer.port}`);
+    await page.getByLabel("Site name").fill("Fixture Site");
     await page.getByText("Scan protocol").waitFor();
     await page.getByText("Host variant").waitFor();
     await page.getByText("Scan plan preview").waitFor();
