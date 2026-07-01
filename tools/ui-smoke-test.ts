@@ -106,7 +106,6 @@ const api = Bun.spawn([process.execPath, "src/index.ts"], {
     PORT: String(apiPort),
     DB_PATH: path.join(tempDir, "ui.sqlite"),
     AUTH_SESSION_SECRET: "ui-smoke-secret-000000000000000000000",
-    SEO_METRICS_API_KEY: "",
   },
 });
 
@@ -392,8 +391,8 @@ try {
     if (!localLinkGraphBox || localLinkGraphBox.width < 1000) {
       throw new Error(`Local link graph should use the full desktop width, got ${localLinkGraphBox?.width}.`);
     }
-    await page.getByText("External backlink index", { exact: true }).waitFor();
-    await page.getByRole("button", { name: /Backlink index not connected/i }).waitFor();
+    await page.getByText("Web-wide backlink index", { exact: true }).waitFor();
+    await page.getByRole("button", { name: /Backlink import unavailable/i }).waitFor();
     await page.getByText("No web-wide backlink rows are generated locally").waitFor();
     await page.goto(`${webUrl}/backlinks`, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /^Page not found$/ }).waitFor();

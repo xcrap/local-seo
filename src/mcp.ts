@@ -86,7 +86,7 @@ const tools = [
   },
   {
     name: "research_keywords",
-    description: "Run local keyword research from real DuckDuckGo suggestions, with metrics only when a real metrics source is configured.",
+    description: "Run local keyword research from real DuckDuckGo suggestions. Third-party metrics are not generated locally.",
     inputSchema: {
       type: "object",
       properties: {
@@ -317,7 +317,7 @@ const tools = [
   },
   {
     name: "brand_lookup",
-    description: "Run AI visibility brand lookup with share of voice and citation recommendations.",
+    description: "Run brand lookup from real web-search citations and local recommendations.",
     inputSchema: {
       type: "object",
       properties: {
@@ -330,7 +330,7 @@ const tools = [
   },
   {
     name: "prompt_explorer",
-    description: "Run a prompt through local Codex, or through connected AI visibility answer models when configured.",
+    description: "Run a prompt through local Codex and save the job in SQLite.",
     inputSchema: {
       type: "object",
       properties: {

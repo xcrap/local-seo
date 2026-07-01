@@ -320,41 +320,14 @@ export function deleteSite(siteId: string) {
   return { id: siteId, deleted: Number(info.changes || 0) > 0 };
 }
 
-async function dataForSeo(pathname: string, payload: unknown) {
-  const apiKey = getConfigValue("seo_metrics_api_key");
-  if (!apiKey) throw new Error("SEO metrics source is not configured.");
-  const response = await fetch(`https://api.dataforseo.com${pathname}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(`Connected SEO metrics source ${response.status}: ${JSON.stringify(data).slice(0, 300)}`);
-  }
-  return data as Record<string, any>;
-}
-
-function dataForSeoReady() {
-  return Boolean(getConfigValue("seo_metrics_api_key"));
-}
-
 function providerRequiredMessage(feature: string) {
-  return `${feature} needs a connected data source. No generated SEO metrics are shown.`;
-}
-
-function numberOrNull(value: unknown) {
-  const number = Number(value);
-  return Number.isFinite(number) && number !== 0 ? number : null;
+  return `${feature} needs a real imported dataset. No generated SEO metrics are shown.`;
 }
 
 function emptyProviderResult(feature: string, extra: Record<string, unknown> = {}) {
   return {
     source: "provider-not-configured",
-    providerRequired: "external-data-source",
+    providerRequired: "imported-dataset",
     warning: providerRequiredMessage(feature),
     ...extra,
   };
@@ -433,21 +406,6 @@ async function duckDuckGoSuggestions(query: string, limit: number): Promise<Keyw
     }));
 }
 
-function mapKeywordItem(item: any, query: string): KeywordRow | null {
-  const keyword = String(item.keyword || item.keyword_data?.keyword || "").trim();
-  if (!keyword) return null;
-  const info = item.keyword_info || item.keyword_data?.keyword_info || {};
-  return {
-    keyword,
-    searchVolume: Number(info.search_volume || item.search_volume || 0) || null,
-    difficulty:
-      Number(item.keyword_properties?.keyword_difficulty || item.keyword_difficulty || 0) ||
-      null,
-    cpc: Number(info.cpc || item.cpc || 0) || null,
-    intent: String(item.search_intent_info?.main_intent || item.intent || "unknown"),
-  };
-}
-
 export async function researchKeywords(input: {
   siteId: string;
   query: string;
@@ -464,31 +422,13 @@ export async function researchKeywords(input: {
   const limit = Math.max(5, Math.min(100, input.limit || 25));
   let source = "duckduckgo-suggest";
   let rows: KeywordRow[] = [];
-  let warning = "Keyword suggestions are real, but volume, CPC, and difficulty need a connected metrics data source.";
+  let warning = "Keyword suggestions are real. Volume, CPC, and difficulty are unavailable because this local app does not generate third-party metrics.";
 
-  if (dataForSeoReady()) {
-    try {
-      const data = await dataForSeo("/v3/dataforseo_labs/google/keyword_suggestions/live", [
-        { keyword: query, location_code: locationCode, language_code: languageCode, limit },
-      ]);
-      const items = data.tasks?.[0]?.result?.[0]?.items || [];
-      const mapped = items.map((item: any) => mapKeywordItem(item, query)).filter(Boolean);
-      if (mapped.length > 0) {
-        rows = mapped.slice(0, limit);
-      }
-      source = "dataforseo";
-      warning = "";
-    } catch (error) {
-      source = "dataforseo-error";
-      warning = error instanceof Error ? error.message : "Connected SEO metrics source failed";
-    }
-  } else {
-    try {
-      rows = await duckDuckGoSuggestions(query, limit);
-    } catch (error) {
-      source = "suggest-error";
-      warning = error instanceof Error ? error.message : "Keyword suggestions failed";
-    }
+  try {
+    rows = await duckDuckGoSuggestions(query, limit);
+  } catch (error) {
+    source = "suggest-error";
+    warning = error instanceof Error ? error.message : "Keyword suggestions failed";
   }
 
   const id = randomUUID();
@@ -912,110 +852,17 @@ export function refreshRankKeywordMetrics(trackerId: string) {
   const tracker = get<any>("SELECT * FROM rank_trackers WHERE id = ?", [trackerId]);
   if (!tracker) throw new Error("Tracker not found.");
   const keywords = all<any>("SELECT * FROM rank_keywords WHERE tracker_id = ?", [trackerId]);
-  if (!dataForSeoReady()) {
-    return {
-      updated: 0,
-      skipped: keywords.length,
-      source: "provider-not-configured",
-      warning: providerRequiredMessage("Rank keyword metrics"),
-      tracker: listRankTrackers(tracker.site_id).find((item) => item.id === trackerId),
-    };
-  }
-  queueMicrotask(async () => {
-    try {
-      const data = await dataForSeo("/v3/keywords_data/google_ads/search_volume/live", [
-        {
-          keywords: keywords.map((row) => row.keyword),
-          location_code: tracker.location_code,
-          language_code: tracker.language_code,
-        },
-      ]);
-      const rows = data.tasks?.[0]?.result || [];
-      for (const item of rows) {
-        const keyword = String(item.keyword || "").trim();
-        if (!keyword) continue;
-        run(
-          `
-          UPDATE rank_keywords
-          SET search_volume = ?, keyword_difficulty = NULL, cpc = ?, metrics_fetched_at = CURRENT_TIMESTAMP
-          WHERE tracker_id = ? AND keyword = ?
-          `,
-          [
-            numberOrNull(item.search_volume),
-            numberOrNull(item.cpc),
-            trackerId,
-            keyword,
-          ],
-        );
-      }
-    } catch {
-      // The manual refresh endpoint reports data-source availability immediately;
-      // failed background requests leave existing values unchanged.
-    }
-  });
   return {
     updated: 0,
-    pending: keywords.length,
-    source: "dataforseo",
+    skipped: keywords.length,
+    source: "provider-not-configured",
+    warning: providerRequiredMessage("Rank keyword metrics"),
     tracker: listRankTrackers(tracker.site_id).find((item) => item.id === trackerId),
   };
 }
 
-async function refreshRankKeywordMetricsNow(tracker: any, keywords: any[]) {
-  if (!dataForSeoReady()) return 0;
-  const data = await dataForSeo("/v3/keywords_data/google_ads/search_volume/live", [
-    {
-      keywords: keywords.map((row) => row.keyword),
-      location_code: tracker.location_code,
-      language_code: tracker.language_code,
-    },
-  ]);
-  const rows = data.tasks?.[0]?.result || [];
-  let updated = 0;
-  for (const item of rows) {
-    const keyword = String(item.keyword || "").trim();
-    if (!keyword) continue;
-    run(
-      `
-      UPDATE rank_keywords
-      SET search_volume = ?, keyword_difficulty = NULL, cpc = ?, metrics_fetched_at = CURRENT_TIMESTAMP
-      WHERE tracker_id = ? AND keyword = ?
-      `,
-      [
-        numberOrNull(item.search_volume),
-        numberOrNull(item.cpc),
-        tracker.id,
-        keyword,
-      ],
-    );
-    updated += 1;
-  }
-  return updated;
-}
-
 async function serpPosition(keyword: string, tracker: any) {
   const target = normalizeDomain(tracker.domain);
-  if (dataForSeoReady()) {
-    const data = await dataForSeo("/v3/serp/google/organic/live/advanced", [
-      {
-        keyword,
-        location_code: tracker.location_code,
-        language_code: tracker.language_code,
-        device: tracker.device,
-        depth: tracker.serp_depth,
-      },
-    ]);
-    const items = data.tasks?.[0]?.result?.[0]?.items || [];
-    const match = items.find((item: any) => normalizeDomain(item.domain || item.url || "").includes(target));
-    if (match) {
-      return {
-        position: Number(match.rank_group || match.rank_absolute || match.position || 0) || null,
-        url: String(match.url || ""),
-        title: String(match.title || ""),
-      };
-    }
-    return { position: null, url: "", title: "" };
-  }
   const rows = await searchWeb(keyword, Math.max(10, tracker.serp_depth)).catch(() => []);
   const match = rows.find((row) => target && row.domain.includes(target));
   if (match) return { position: match.rank, url: match.url, title: match.title };
@@ -1073,50 +920,14 @@ export async function domainOverview(input: { siteId: string; domain?: string })
   if (!site) throw new Error("Site not found.");
   const domain = normalizeDomain(input.domain || site.domain);
   if (!domain) throw new Error("Domain is required.");
-  if (!dataForSeoReady()) {
-    return emptyProviderResult("Organic research", {
-      domain,
-      organicKeywords: null,
-      organicTraffic: null,
-      estimatedValue: null,
-      competitors: [],
-      topPages: [],
-    });
-  }
-
-  let result: any;
-  try {
-    const data = await dataForSeo("/v3/dataforseo_labs/google/domain_rank_overview/live", [
-      { target: domain, location_code: site.location_code, language_code: site.language_code },
-    ]);
-    const raw = data.tasks?.[0]?.result?.[0] || {};
-    const metrics = raw.metrics?.organic || raw.metrics || {};
-    result = {
-      domain,
-      organicKeywords: numberOrNull(metrics.count ?? raw.organic_keywords),
-      organicTraffic: numberOrNull(metrics.etv ?? raw.organic_traffic),
-      estimatedValue: numberOrNull(metrics.estimated_paid_traffic_cost ?? raw.estimated_value),
-      competitors: raw.competitors || [],
-      topPages: raw.top_pages || [],
-      raw,
-    };
-  } catch (error) {
-    return emptyProviderResult("Organic research", {
-      source: "dataforseo-error",
-      domain,
-      organicKeywords: null,
-      organicTraffic: null,
-      estimatedValue: null,
-      competitors: [],
-      topPages: [],
-      warning: error instanceof Error ? error.message : "Connected SEO metrics source failed",
-    });
-  }
-  run(
-    "INSERT INTO domain_snapshots (id, site_id, domain, source, result_json) VALUES (?, ?, ?, ?, ?)",
-    [randomUUID(), site.id, domain, "dataforseo", JSON.stringify(result)],
-  );
-  return { source: "dataforseo", ...result };
+  return emptyProviderResult("Organic research", {
+    domain,
+    organicKeywords: null,
+    organicTraffic: null,
+    estimatedValue: null,
+    competitors: [],
+    topPages: [],
+  });
 }
 
 function relativePath(url: string) {
@@ -1126,24 +937,6 @@ function relativePath(url: string) {
   } catch {
     return null;
   }
-}
-
-function mapDomainRankedKeyword(item: any, target: string) {
-  const data = item.keyword_data || item;
-  const serp = item.ranked_serp_element?.serp_item || item.serp_item || {};
-  const info = data.keyword_info || item.keyword_info || {};
-  const keyword = String(data.keyword || item.keyword || "").trim();
-  if (!keyword) return null;
-  return {
-    keyword,
-    position: Number(serp.rank_group || serp.rank_absolute || item.position || 0) || null,
-    searchVolume: Number(info.search_volume || item.search_volume || 0) || null,
-    traffic: Math.round(Number(serp.etv || item.etv || 0)) || null,
-    cpc: Number(info.cpc || item.cpc || 0) || null,
-    url: String(serp.url || item.url || `https://${target}`),
-    relativeUrl: relativePath(String(serp.url || item.url || `https://${target}`)),
-    keywordDifficulty: Number(data.keyword_properties?.keyword_difficulty || item.keyword_difficulty || 0) || null,
-  };
 }
 
 function localScanPagesForDomain(siteId: string, domain: string, page: number, pageSize: number, search: string) {
@@ -1193,7 +986,7 @@ function localScanPagesForDomain(siteId: string, domain: string, page: number, p
       hasMore: offset + pageSize < filtered.length,
       pages: filtered.slice(offset, offset + pageSize),
       fetchedAt: nowIso(),
-      warning: "Showing real pages from the latest local scan. Traffic and keyword counts stay unavailable without a connected organic dataset.",
+      warning: "Showing real pages from the latest local scan. Traffic and keyword counts stay unavailable without an imported organic dataset.",
     };
   }
 
@@ -1248,49 +1041,6 @@ export async function getDomainKeywordsPage(input: {
   };
   let source = "provider-not-configured";
 
-  if (dataForSeoReady()) {
-    try {
-      const orderField =
-        input.sortMode === "rank"
-          ? "ranked_serp_element.serp_item.rank_group"
-          : input.sortMode === "volume"
-            ? "keyword_data.keyword_info.search_volume"
-            : input.sortMode === "cpc"
-              ? "keyword_data.keyword_info.cpc"
-              : input.sortMode === "score"
-                ? "keyword_data.keyword_properties.keyword_difficulty"
-                : "ranked_serp_element.serp_item.etv";
-      const data = await dataForSeo("/v3/dataforseo_labs/google/ranked_keywords/live", [
-        {
-          target,
-          location_code: site.location_code,
-          language_code: site.language_code,
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
-          order_by: [`${orderField},${input.sortOrder === "asc" ? "asc" : "desc"}`],
-          include_subdomains: input.includeSubdomains ?? true,
-        },
-      ]);
-      const task = data.tasks?.[0]?.result?.[0] || {};
-      const rows = (task.items || []).map((item: any) => mapDomainRankedKeyword(item, target)).filter(Boolean);
-      if (rows.length > 0) {
-        result = {
-          domain: target,
-          page,
-          pageSize,
-          totalCount: task.total_count ?? null,
-          hasMore: task.total_count != null ? page * pageSize < task.total_count : rows.length === pageSize,
-          keywords: rows,
-          fetchedAt: nowIso(),
-        };
-        source = "dataforseo";
-      }
-    } catch (error) {
-      source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "Connected ranked-keyword source failed";
-    }
-  }
-
   const search = String(input.search || "").trim().toLowerCase();
   if (search) {
     result.keywords = result.keywords.filter((row: any) => String(row.keyword).toLowerCase().includes(search));
@@ -1326,50 +1076,6 @@ export async function getDomainPagesPage(input: {
   };
   let source = "provider-not-configured";
 
-  if (dataForSeoReady()) {
-    try {
-      const orderField = input.sortMode === "keywords" ? "metrics.organic.count" : "metrics.organic.etv";
-      const data = await dataForSeo("/v3/dataforseo_labs/google/relevant_pages/live", [
-        {
-          target,
-          location_code: site.location_code,
-          language_code: site.language_code,
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
-          order_by: [`${orderField},${input.sortOrder === "asc" ? "asc" : "desc"}`],
-        },
-      ]);
-      const task = data.tasks?.[0]?.result?.[0] || {};
-      const rows = (task.items || [])
-        .map((item: any) => {
-          const pageUrl = String(item.page_address || item.page || item.url || "");
-          if (!pageUrl) return null;
-          return {
-            page: pageUrl,
-            relativePath: relativePath(pageUrl),
-            organicTraffic: Math.round(Number(item.metrics?.organic?.etv || item.organicTraffic || 0)) || null,
-            keywords: Math.round(Number(item.metrics?.organic?.count || item.keywords || 0)) || null,
-          };
-        })
-        .filter(Boolean);
-      if (rows.length > 0) {
-        result = {
-          domain: target,
-          page,
-          pageSize,
-          totalCount: task.total_count ?? null,
-          hasMore: task.total_count != null ? page * pageSize < task.total_count : rows.length === pageSize,
-          pages: rows,
-          fetchedAt: nowIso(),
-        };
-        source = "dataforseo";
-      }
-    } catch (error) {
-      source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "Connected top-pages source failed";
-    }
-  }
-
   const search = String(input.search || "").trim().toLowerCase();
   if (source === "provider-not-configured" && sameSiteUrl(`https://${target}`, `https://${site.domain}`)) {
     const localPages = localScanPagesForDomain(site.id, target, page, pageSize, search);
@@ -1395,46 +1101,14 @@ export async function backlinksOverview(input: { siteId: string; domain?: string
   if (!site) throw new Error("Site not found.");
   const domain = normalizeDomain(input.domain || site.domain);
   if (!domain) throw new Error("Domain is required.");
-  if (!dataForSeoReady()) {
-    return emptyProviderResult("Backlink index data", {
-      domain,
-      backlinks: null,
-      referringDomains: null,
-      dofollowRatio: null,
-      topAnchors: [],
-      prospects: [],
-    });
-  }
-  let result: any;
-  try {
-    const data = await dataForSeo("/v3/backlinks/summary/live", [{ target: domain }]);
-    const raw = data.tasks?.[0]?.result?.[0] || {};
-    result = {
-      domain,
-      backlinks: numberOrNull(raw.backlinks),
-      referringDomains: numberOrNull(raw.referring_domains),
-      dofollowRatio: numberOrNull(raw.dofollow_ratio),
-      topAnchors: raw.top_anchors || [],
-      prospects: [],
-      raw,
-    };
-  } catch (error) {
-    return emptyProviderResult("Backlink index data", {
-      source: "dataforseo-error",
-      domain,
-      backlinks: null,
-      referringDomains: null,
-      dofollowRatio: null,
-      topAnchors: [],
-      prospects: [],
-      warning: error instanceof Error ? error.message : "Connected backlink index failed",
-    });
-  }
-  run(
-    "INSERT INTO backlink_snapshots (id, site_id, domain, source, result_json) VALUES (?, ?, ?, ?, ?)",
-    [randomUUID(), site.id, domain, "dataforseo", JSON.stringify(result)],
-  );
-  return { source: "dataforseo", ...result };
+  return emptyProviderResult("Backlink index data", {
+    domain,
+    backlinks: null,
+    referringDomains: null,
+    dofollowRatio: null,
+    topAnchors: [],
+    prospects: [],
+  });
 }
 
 export async function getBacklinksProfile(input: {
@@ -1465,84 +1139,6 @@ export async function getBacklinksProfile(input: {
     fetchedAt: nowIso(),
     warning: providerRequiredMessage("Backlink index data"),
   };
-
-  if (dataForSeoReady()) {
-    try {
-      const path =
-        tab === "domains"
-          ? "/v3/backlinks/referring_domains/live"
-          : tab === "pages"
-            ? "/v3/backlinks/domain_pages_summary/live"
-            : "/v3/backlinks/backlinks/live";
-      const data = await dataForSeo(path, [
-        {
-          target: domain,
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
-          order_by: [
-            `${input.sortField || (tab === "domains" ? "backlinks" : "rank")},${input.sortOrder === "asc" ? "asc" : "desc"}`,
-          ],
-          ...(tab === "backlinks" ? { mode: input.mode || "one_per_domain" } : {}),
-        },
-      ]);
-      const task = data.tasks?.[0]?.result?.[0] || {};
-      const rows = (task.items || []).map((item: any) => {
-        if (tab === "domains") {
-          return {
-            domain: item.domain ?? null,
-            backlinks: item.backlinks ?? null,
-            referringPages: item.referring_pages ?? null,
-            rank: item.rank ?? null,
-            spamScore: item.backlinks_spam_score ?? null,
-            firstSeen: item.first_seen ?? null,
-            brokenBacklinks: item.broken_backlinks ?? null,
-            brokenPages: item.broken_pages ?? null,
-          };
-        }
-        if (tab === "pages") {
-          return {
-            page: item.page ?? item.url ?? null,
-            backlinks: item.backlinks ?? null,
-            referringDomains: item.referring_domains ?? null,
-            rank: item.rank ?? null,
-            brokenBacklinks: item.broken_backlinks ?? null,
-          };
-        }
-        return {
-          domainFrom: item.domain_from ?? null,
-          urlFrom: item.url_from ?? null,
-          urlTo: item.url_to ?? null,
-          anchor: item.anchor ?? null,
-          itemType: item.item_type ?? null,
-          isDofollow: item.dofollow ?? null,
-          relAttributes: item.rel_attributes ?? item.attributes ?? [],
-          rank: item.rank ?? null,
-          domainFromRank: item.domain_from_rank ?? null,
-          pageFromRank: item.page_from_rank ?? null,
-          spamScore: item.backlink_spam_score ?? item.backlinks_spam_score ?? null,
-          firstSeen: item.first_seen ?? null,
-          lastSeen: item.lost_date ?? item.last_visited ?? null,
-          isLost: item.is_lost ?? Boolean(item.lost_date),
-          isBroken: item.is_broken ?? false,
-          linksCount: item.links_count ?? null,
-        };
-      });
-      if (rows.length > 0) {
-        result = {
-          rows,
-          totalCount: task.total_count ?? null,
-          hasMore: task.total_count != null ? page * pageSize < task.total_count : rows.length === pageSize,
-          page,
-          pageSize,
-          fetchedAt: nowIso(),
-        };
-        source = "dataforseo";
-      }
-    } catch (error) {
-      source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "Connected backlink index failed";
-    }
-  }
 
   return { source, domain, tab, ...result };
 }
@@ -1655,59 +1251,20 @@ export async function getSerpAnalysis(input: {
   let source = "duckduckgo";
   let result: any = emptySerpResult(keyword, domain);
 
-  if (dataForSeoReady()) {
-    try {
-      const data = await dataForSeo("/v3/serp/google/organic/live/advanced", [
-        {
-          keyword,
-          location_code: site.location_code,
-          language_code: site.language_code,
-          depth,
-        },
-      ]);
-      const items = data.tasks?.[0]?.result?.[0]?.items || [];
-      const rows = items
-        .filter((item: any) => item.type === "organic" || item.rank_group)
-        .map((item: any) => ({
-          rank: Number(item.rank_group || item.rank_absolute || 0),
-          domain: normalizeDomain(item.domain || item.url || ""),
-          url: String(item.url || ""),
-          title: String(item.title || ""),
-          description: String(item.description || ""),
-          isDomain: domain ? normalizeDomain(item.domain || item.url || "").includes(domain) : false,
-        }))
-        .filter((row: any) => row.rank > 0);
-      if (rows.length > 0) {
-        result = {
-          keyword,
-          domain,
-          domainPosition: rows.find((row: any) => row.isDomain)?.rank ?? null,
-          rows,
-          opportunities: emptySerpResult(keyword, domain).opportunities,
-          rawCost: data.cost,
-        };
-        source = "dataforseo";
-      }
-    } catch (error) {
-      source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "Connected SERP source failed";
-    }
-  } else {
-    try {
-      const rows = await searchWeb(keyword, depth);
-      result = {
-        ...result,
-        rows: rows.map((row) => ({
-          ...row,
-          isDomain: domain ? row.domain.includes(domain) : false,
-        })),
-      };
-      result.domainPosition = result.rows.find((row: any) => row.isDomain)?.rank ?? null;
-      source = rows[0]?.source || "duckduckgo";
-    } catch (error) {
-      source = "search-error";
-      result.warning = error instanceof Error ? error.message : "Search failed";
-    }
+  try {
+    const rows = await searchWeb(keyword, depth);
+    result = {
+      ...result,
+      rows: rows.map((row) => ({
+        ...row,
+        isDomain: domain ? row.domain.includes(domain) : false,
+      })),
+    };
+    result.domainPosition = result.rows.find((row: any) => row.isDomain)?.rank ?? null;
+    source = rows[0]?.source || "duckduckgo";
+  } catch (error) {
+    source = "search-error";
+    result.warning = error instanceof Error ? error.message : "Search failed";
   }
 
   const id = randomUUID();
@@ -1770,46 +1327,30 @@ export async function brandLookup(input: {
     ],
   };
 
-  if (dataForSeoReady()) {
-    try {
-      const data = await dataForSeo("/v3/ai_optimization/chat_gpt/llm_mentions/search/live", [
-        { target: [query], limit: 50 },
-      ]);
-      result = {
-        ...result,
-        raw: data.tasks?.[0]?.result?.[0] || data,
-      };
-      source = "dataforseo";
-    } catch (error) {
-      source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "Connected AI visibility source failed";
-    }
-  } else {
-    try {
-      const labels = [query, ...competitors];
-      const rowsByLabel = await Promise.all(
-        labels.map(async (label) => ({
-          label,
-          isPrimary: label === query,
-          rows: await searchWeb(`"${label}"`, 10),
-        })),
-      );
-      result.citations = rowsByLabel[0]?.rows || [];
-      result.shareOfVoice = rowsByLabel
-        .map((item) => ({ label: item.label, value: item.rows.length, isPrimary: item.isPrimary }))
-        .sort((a, b) => b.value - a.value);
-      result.platforms = [
-        {
-          platform: "web_search",
-          visibility: result.citations.length,
-          mentions: result.citations.length,
-          citations: result.citations,
-        },
-      ];
-    } catch (error) {
-      source = "search-error";
-      result.warning = error instanceof Error ? error.message : "Brand lookup search failed";
-    }
+  try {
+    const labels = [query, ...competitors];
+    const rowsByLabel = await Promise.all(
+      labels.map(async (label) => ({
+        label,
+        isPrimary: label === query,
+        rows: await searchWeb(`"${label}"`, 10),
+      })),
+    );
+    result.citations = rowsByLabel[0]?.rows || [];
+    result.shareOfVoice = rowsByLabel
+      .map((item) => ({ label: item.label, value: item.rows.length, isPrimary: item.isPrimary }))
+      .sort((a, b) => b.value - a.value);
+    result.platforms = [
+      {
+        platform: "web_search",
+        visibility: result.citations.length,
+        mentions: result.citations.length,
+        citations: result.citations,
+      },
+    ];
+  } catch (error) {
+    source = "search-error";
+    result.warning = error instanceof Error ? error.message : "Brand lookup search failed";
   }
 
   const id = randomUUID();
@@ -1846,10 +1387,7 @@ export async function promptExplorer(input: {
   const prompt = input.prompt.trim();
   if (!prompt) throw new Error("Prompt is required.");
   const highlightBrand = input.highlightBrand?.trim() || site.domain || site.name;
-  const hasConnectedAiVisibilitySource = dataForSeoReady();
-  const models = hasConnectedAiVisibilitySource
-    ? (input.models?.length ? input.models : ["chat_gpt", "claude", "gemini", "perplexity"])
-    : ["local_codex"];
+  const models = ["local_codex"];
   let source = "codex";
   const result: any = {
     prompt,
@@ -1858,70 +1396,31 @@ export async function promptExplorer(input: {
     results: [],
   };
 
-  if (hasConnectedAiVisibilitySource) {
-    source = "dataforseo";
-    for (const model of models) {
-      const target: any = {
-        model,
-        status: "pending",
-        brandMentioned: null,
-        text: "",
-        citations: [],
-        fanOutQueries: [
-          `${prompt} ${highlightBrand}`,
-          `best sources for ${prompt}`,
-          `${highlightBrand} reviews`,
-        ],
-      };
-      result.results.push(target);
-      try {
-        const data = await dataForSeo(`/v3/ai_optimization/${model}/llm_responses/live`, [
-          {
-            user_prompt: prompt,
-            max_output_tokens: 2048,
-          },
-        ]);
-        const raw = data.tasks?.[0]?.result?.[0];
-        if (raw) {
-          target.status = "success";
-          target.text = String(raw.text || raw.response || raw.content || "");
-          target.brandMentioned = target.text.toLowerCase().includes(highlightBrand.toLowerCase());
-          target.citations = raw.citations || raw.references || [];
-          (target as any).raw = raw;
-          source = "dataforseo";
-        }
-      } catch (error) {
-        target.status = "failed";
-        (target as any).warning = error instanceof Error ? error.message : "Model unavailable";
-      }
-    }
-  } else {
-    const job = createAiJob({
-      type: "prompt.explorer",
-      prompt: [
-        "Analyze this prompt for SEO and AI-answer visibility using only real evidence supplied in the prompt.",
-        "Do not invent rankings, citations, traffic, or model mentions.",
-        `Prompt: ${prompt}`,
-        `Brand/domain to watch: ${highlightBrand}`,
-        `Site domain: ${site.domain || "not set"}`,
-      ].join("\n"),
-    });
-    result.jobId = job.id;
-    result.results = [
-      {
-        model: "local_codex",
-        status: job.status,
-        brandMentioned: null,
-        text: "Queued a local Codex analysis job. Open AI lab to read the result when it completes.",
-        citations: [],
-        fanOutQueries: [
-          `${prompt} ${highlightBrand}`,
-          `best sources for ${prompt}`,
-          `${highlightBrand} reviews`,
-        ],
-      },
-    ];
-  }
+  const job = createAiJob({
+    type: "prompt.explorer",
+    prompt: [
+      "Analyze this prompt for SEO and AI-answer visibility using only real evidence supplied in the prompt.",
+      "Do not invent rankings, citations, traffic, or model mentions.",
+      `Prompt: ${prompt}`,
+      `Brand/domain to watch: ${highlightBrand}`,
+      `Site domain: ${site.domain || "not set"}`,
+    ].join("\n"),
+  });
+  result.jobId = job.id;
+  result.results = [
+    {
+      model: "local_codex",
+      status: job.status,
+      brandMentioned: null,
+      text: "Queued a local Codex analysis job. Open AI lab to read the result when it completes.",
+      citations: [],
+      fanOutQueries: [
+        `${prompt} ${highlightBrand}`,
+        `best sources for ${prompt}`,
+        `${highlightBrand} reviews`,
+      ],
+    },
+  ];
 
   const id = randomUUID();
   run(

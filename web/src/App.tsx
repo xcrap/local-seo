@@ -771,9 +771,7 @@ function formatDate(value: string) {
 
 function sourceLabel(source?: string) {
   const labels: Record<string, string> = {
-    dataforseo: "Connected SEO source",
     "provider-not-configured": "Not connected",
-    "dataforseo-error": "Data source error",
     "duckduckgo-suggest": "DuckDuckGo suggest",
     duckduckgo: "DuckDuckGo",
     searxng: "SearXNG",
@@ -789,7 +787,6 @@ function sourceLabel(source?: string) {
 
 function sourceVariant(source?: string) {
   if (
-    source === "dataforseo" ||
     source === "duckduckgo" ||
     source === "duckduckgo-suggest" ||
     source === "searxng" ||
@@ -2430,7 +2427,7 @@ function KeywordsPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Research" title="Keyword research" description="Find real keyword suggestions. Volume, CPC, and difficulty show as unavailable unless a real metrics source is connected." />
+      <PageHeader eyebrow="Research" title="Keyword research" description="Find real keyword suggestions. Volume, CPC, and difficulty stay unavailable unless you import real metrics later." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_140px_auto] lg:items-end" onSubmit={submit}>
           <Field label="Seed keyword">
@@ -2877,7 +2874,7 @@ function RankPage({ site }: { site: Site }) {
     setMessage("");
     try {
       await api.refreshRankMetrics(trackerId);
-      setMessage("Keyword metrics refreshed where a real metrics source is available.");
+      setMessage("Keyword metrics are not generated locally. Positions still update from real SERP checks.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not refresh keyword metrics");
@@ -3134,17 +3131,6 @@ function DomainPage({ site }: { site: Site }) {
         {overview?.warning ? (
           <ProviderNotice title="External ranked-keyword dataset unavailable" text={overview.warning} source={overview.source} />
         ) : null}
-        {overview?.source === "dataforseo" ? (
-          <StatsBand
-            title="Connected organic dataset"
-            items={[
-              { title: "Organic keywords", value: metricValue(overview.organicKeywords), icon: Search },
-              { title: "Organic traffic", value: metricValue(overview.organicTraffic), icon: BarChart3 },
-              { title: "Traffic value", value: metricValue(overview.estimatedValue), icon: Gauge },
-              { title: "Top pages", value: metricValue(pages?.pages?.length, overview.topPages?.length), icon: Globe2 },
-            ]}
-          />
-        ) : null}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="keywords">Keywords</TabsTrigger>
@@ -3358,9 +3344,9 @@ function OrganicSnapshot({ result, domain, keywordRows, pageRows }: { result: an
           { title: "Research site", status: domain || result.domain || "-", tone: "good", text: "The active site or competitor domain analyzed in this run." },
           { title: "Keyword rows", status: formatNumber(keywordRows), tone: keywordRows ? "good" : "warn", text: "Rows returned by the real organic search dataset." },
           { title: "Page rows", status: formatNumber(pageRows), tone: pageRows ? "good" : "warn", text: "Top pages returned for this domain." },
-          { title: "Organic keywords", status: formatMetricStatus(organicKeywords), tone: hasMetric(organicKeywords) ? "good" : "warn", text: "Metric returned by the connected organic dataset." },
-          { title: "Organic traffic", status: formatMetricStatus(organicTraffic), tone: hasMetric(organicTraffic) ? "good" : "warn", text: "Estimate from the connected organic dataset." },
-          { title: "Traffic value", status: formatMetricStatus(estimatedValue), tone: hasMetric(estimatedValue) ? "good" : "warn", text: "Estimate from the connected organic dataset." },
+          { title: "Organic keywords", status: formatMetricStatus(organicKeywords), tone: hasMetric(organicKeywords) ? "good" : "warn", text: "Metric from an imported organic dataset when available." },
+          { title: "Organic traffic", status: formatMetricStatus(organicTraffic), tone: hasMetric(organicTraffic) ? "good" : "warn", text: "External estimate from an imported organic dataset when available." },
+          { title: "Traffic value", status: formatMetricStatus(estimatedValue), tone: hasMetric(estimatedValue) ? "good" : "warn", text: "External estimate from an imported organic dataset when available." },
         ]}
       />
     </ReportSection>
@@ -3407,7 +3393,7 @@ function DomainPagesTable({ rows }: { rows: any[] }) {
                   <Badge variant={row.issues ? "warn" : "outline"}>{formatNumber(row.issues || 0)} issues</Badge>
                 </div>
               ) : (
-                <span className="text-sm text-muted-foreground">Connected organic dataset</span>
+                <span className="text-sm text-muted-foreground">Imported organic dataset</span>
               )}
             </TableCell>
           </TableRow>
@@ -3422,7 +3408,6 @@ function LinksPage({ site }: { site: Site }) {
   const [domain, setDomain] = useState(site.domain);
   const [overview, setOverview] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [config, setConfig] = useState<any>(null);
   const [scanRows, setScanRows] = useState<any[]>([]);
   const [selectedScanId, setSelectedScanIdState] = useState("");
   const [history, setHistory] = useState<any[]>([]);
@@ -3430,7 +3415,7 @@ function LinksPage({ site }: { site: Site }) {
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
-  const backlinkIndexConnected = Boolean(config?.seo_metrics_source_connected);
+  const backlinkIndexAvailable = false;
   const selectedScan = useMemo(
     () => scanRows.find((scan) => scan.id === selectedScanId) || defaultEvidenceScan(scanRows),
     [scanRows, selectedScanId],
@@ -3444,10 +3429,9 @@ function LinksPage({ site }: { site: Site }) {
   }, [site.id, site.domain]);
 
   async function loadHistory() {
-    const [snapshots, scans, appConfig] = await Promise.all([
+    const [snapshots, scans] = await Promise.all([
       api.backlinkSnapshots(site.id),
       api.scans(site.id),
-      api.config(),
     ]);
     setHistory(snapshots);
     const rows = sortScanRows(scans);
@@ -3456,17 +3440,16 @@ function LinksPage({ site }: { site: Site }) {
       if (currentId && rows.some((scan) => scan.id === currentId)) return currentId;
       return defaultEvidenceScan(rows)?.id || "";
     });
-    setConfig(appConfig);
   }
   useEffect(() => {
     loadHistory().catch(console.error);
   }, [site.id]);
 
   async function run(nextTab = tab) {
-    if (!backlinkIndexConnected) {
+    if (!backlinkIndexAvailable) {
       setOverview(null);
       setProfile(null);
-      setError("A web-wide backlink index is not connected. Use the local link graph from a saved scan, or connect a real backlink index before running this analysis.");
+      setError("Web-wide backlink rows are not generated locally. Use the local link graph from a saved scan until a real backlink import is available.");
       return;
     }
     setLoading(true);
@@ -3521,33 +3504,28 @@ function LinksPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Authority" title="Links" description="Local crawl links are available from saved scans. Web-wide backlinks are shown only when a real backlink index is connected." />
+      <PageHeader eyebrow="Authority" title="Links" description="Local crawl links are available from saved scans. Web-wide backlinks require a real imported index; no rows are generated locally." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
           <SiteTargetField
-            label="Backlink domain"
+            label="Web-wide backlink domain"
             value={domain}
             siteDomain={site.domain}
-            hint="Use the active site or enter a competitor domain. Saved site scans provide the local link evidence below."
+            hint="Saved site scans provide the usable local link evidence below."
             onChange={setDomain}
           />
           <div className="flex items-end">
-            <Button disabled={loading || !domain.trim() || !backlinkIndexConnected}><Link2 /> {loading ? "Checking" : backlinkIndexConnected ? "Check backlink index" : "Backlink index not connected"}</Button>
+            <Button disabled={loading || !domain.trim() || !backlinkIndexAvailable}><Link2 /> {loading ? "Checking" : "Backlink import unavailable"}</Button>
           </div>
         </form>
         <div className="mt-4 rounded-md border bg-muted/25">
-          <div className="grid gap-0 md:grid-cols-[220px_1fr_auto]">
+          <div className="grid gap-0 md:grid-cols-[220px_1fr]">
             <div className="border-b px-4 py-3 md:border-b-0 md:border-r">
-              <div className="text-sm font-medium">External backlink index</div>
-              <Badge className="mt-2" variant={backlinkIndexConnected ? "good" : "warn"}>{backlinkIndexConnected ? "Connected" : "Not connected"}</Badge>
+              <div className="text-sm font-medium">Web-wide backlink index</div>
+              <Badge className="mt-2" variant="warn">Import unavailable</Badge>
             </div>
-            <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
-              {backlinkIndexConnected
-                ? "Backlink rows, referring domains, and top linked pages will come from the connected real index."
-                : "No web-wide backlink rows are generated locally. The usable local data on this screen is the crawl link graph below."}
-            </div>
-            <div className="flex items-center px-4 py-3">
-              <Button asChild size="sm" variant="outline"><Link to="/settings"><Settings /> Settings</Link></Button>
+            <div className="px-4 py-3 text-sm leading-6 text-muted-foreground">
+              No web-wide backlink rows are generated locally. The usable data on this screen is the saved-scan link graph below.
             </div>
           </div>
         </div>
@@ -3566,16 +3544,6 @@ function LinksPage({ site }: { site: Site }) {
         {overview?.warning ? (
           <ProviderNotice title="External backlink index unavailable" text={overview.warning} source={overview.source} />
         ) : null}
-        {overview?.source === "dataforseo" ? (
-          <StatsBand
-            title="Connected backlink index"
-            items={[
-              { title: "Backlinks", value: metricValue(overview.backlinks, overview.summary?.backlinks), icon: Link2 },
-              { title: "Ref. domains", value: metricValue(overview.referringDomains, overview.summary?.referringDomains), icon: Globe2 },
-              { title: "Dofollow %", value: metricValue(overview.dofollowRatio), icon: CheckCircle2 },
-            ]}
-          />
-        ) : null}
         <Tabs value={tab} onValueChange={changeTab}>
           <TabsList>
             <TabsTrigger value="backlinks">Backlinks</TabsTrigger>
@@ -3584,8 +3552,8 @@ function LinksPage({ site }: { site: Site }) {
             <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
           </TabsList>
           <TabsContent value="backlinks">
-            <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Connect a real backlink index, then run a check."}>
-              {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title={backlinkIndexConnected ? "No backlink rows" : "No external backlink index connected"} text={profile?.warning || (backlinkIndexConnected ? "Check a domain to load real backlink rows." : "Local scans do not invent web-wide backlinks. Use the local link graph above until a real backlink index is connected.")} />}
+            <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Import a real backlink index before running this check."}>
+              {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title="No web-wide backlink index" text={profile?.warning || "Local scans do not invent web-wide backlinks. Use the local link graph above until real backlink import exists."} />}
             </ReportSection>
           </TabsContent>
           <TabsContent value="domains">
@@ -3889,7 +3857,7 @@ function BrandLookupPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Visibility" title="Brand lookup" description="Check real web-search evidence for a brand or domain. Connected AI visibility sources can add answer-model data." />
+      <PageHeader eyebrow="Visibility" title="Brand lookup" description="Check real web-search evidence for a brand or domain. The app does not invent answer-model visibility." />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
         <ReportSection title="Lookup" description="Competitors can be comma-separated or one per line. Local mode compares real search evidence and saves the run in SQLite.">
           <form className="space-y-4" onSubmit={submit}>
@@ -4018,25 +3986,13 @@ function CitationList({ rows }: { rows: any[] }) {
 function PromptExplorerPage({ site }: { site: Site }) {
   const [prompt, setPrompt] = useState(`What are the best options for ${site.domain || site.name}?`);
   const [highlightBrand, setHighlightBrand] = useState(site.domain || site.name);
-  const [config, setConfig] = useState<any>(null);
-  const [models, setModels] = useState<Record<string, boolean>>({
-    chat_gpt: true,
-    claude: true,
-    gemini: true,
-    perplexity: true,
-  });
   const [result, setResult] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const externalAiVisibilityConnected = Boolean(config?.seo_metrics_source_connected);
 
   async function load() {
-    const [history, nextConfig] = await Promise.all([
-      api.promptExplorerRuns(site.id),
-      api.config(),
-    ]);
+    const history = await api.promptExplorerRuns(site.id);
     setRuns(history);
-    setConfig(nextConfig);
   }
   useEffect(() => {
     setPrompt(`What are the best options for ${site.domain || site.name}?`);
@@ -4049,10 +4005,7 @@ function PromptExplorerPage({ site }: { site: Site }) {
     event.preventDefault();
     setLoading(true);
     try {
-      const selectedModels = externalAiVisibilityConnected
-        ? Object.entries(models).filter(([, enabled]) => enabled).map(([model]) => model)
-        : ["local_codex"];
-      const data = await api.promptExplorer({ siteId: site.id, prompt, highlightBrand, models: selectedModels });
+      const data = await api.promptExplorer({ siteId: site.id, prompt, highlightBrand, models: ["local_codex"] });
       setResult(data);
       await load();
     } finally {
@@ -4062,44 +4015,33 @@ function PromptExplorerPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="AI answers" title="Prompt explorer" description="Run prompts through local Codex by default. Compare external answer models only when a real AI visibility source is connected." />
+      <PageHeader eyebrow="AI answers" title="Prompt explorer" description="Run prompts through local Codex. The app does not invent model-specific external answer data." />
       <div className="grid gap-6 2xl:grid-cols-[480px_minmax(0,1fr)]">
-        <ReportSection title="Prompt" description={externalAiVisibilityConnected ? "Connected AI visibility source available. Choose the answer models to query." : "Local mode queues one Codex medium job and does not invent model-specific responses."}>
+        <ReportSection title="Prompt" description="Local mode queues one Codex medium job and saves the result in SQLite.">
           <form className="space-y-4" onSubmit={submit}>
             <Field label="Prompt"><Textarea className="min-h-32" value={prompt} onChange={(event) => setPrompt(event.target.value)} required /></Field>
             <Field label="Highlight brand"><Input value={highlightBrand} onChange={(event) => setHighlightBrand(event.target.value)} /></Field>
-            {externalAiVisibilityConnected ? (
-              <div className="grid grid-cols-2 gap-2">
-                {Object.keys(models).map((model) => (
-                  <label key={model} className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                    <Checkbox checked={models[model]} onCheckedChange={(checked) => setModels({ ...models, [model]: checked === true })} />
-                    {model.replaceAll("_", " ")}
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <StatusEvidenceTable
-                rows={[
-                  {
-                    title: "Local runner",
-                    status: "Local Codex",
-                    tone: "good",
-                    text: "Prompt explorer queues one local Codex job and saves the run in SQLite.",
-                  },
-                  {
-                    title: "Reasoning",
-                    status: "Medium",
-                    tone: "outline",
-                    text: "Matches the app AI default. The full job output is read from the AI lab when complete.",
-                  },
-                ]}
-              />
-            )}
+            <StatusEvidenceTable
+              rows={[
+                {
+                  title: "Local runner",
+                  status: "Local Codex",
+                  tone: "good",
+                  text: "Prompt explorer queues one local Codex job and saves the run in SQLite.",
+                },
+                {
+                  title: "Reasoning",
+                  status: "Medium",
+                  tone: "outline",
+                  text: "Matches the app AI default. The full job output is read from the AI lab when complete.",
+                },
+              ]}
+            />
             <Button disabled={loading}><Bot /> {loading ? "Exploring" : "Explore prompt"}</Button>
           </form>
         </ReportSection>
         <div className="space-y-6">
-          {result ? <PromptResult result={result} /> : <EmptyState title="No prompt run" text="Run a prompt to compare AI answer surfaces." />}
+          {result ? <PromptResult result={result} /> : <EmptyState title="No prompt run" text="Run a prompt to queue local Codex analysis." />}
           <HistoryList title="Prompt history" rows={runs} labelKey="prompt" labelTitle="Prompt" />
         </div>
       </div>
@@ -4119,8 +4061,8 @@ function PromptResult({ result }: { result: any }) {
           <StatusEvidenceTable
             rows={[
               { title: "Prompt", status: "Saved", tone: "good", text: result.prompt || "Prompt saved with this run." },
-              { title: "Models", status: formatNumber(result.results?.length || 0), tone: "good", text: "Each section below is a connected AI data-source response or a local Codex job state." },
-              { title: "Local job", status: result.jobId ? "Queued" : "None", tone: result.jobId ? "warn" : "good", text: result.jobId ? "Open AI lab to read the Codex result when it finishes." : "No local Codex job was needed for this run." },
+              { title: "Runner", status: "Local Codex", tone: "good", text: "This run uses the local Codex job queue." },
+              { title: "Local job", status: result.jobId ? "Queued" : "None", tone: result.jobId ? "warn" : "good", text: result.jobId ? "Open AI lab to read the Codex result when it finishes." : "No local Codex job was queued for this run." },
             ]}
           />
           {result.jobId ? <Button asChild variant="secondary"><Link to="/ai"><Bot /> Open AI lab</Link></Button> : null}
@@ -7296,7 +7238,7 @@ function SettingsPage() {
             <Button disabled={saving}><Settings /> {saving ? "Saving settings" : "Save app settings"}</Button>
           </form>
         </ReportSection>
-        <ReportSection title="Data sources" description="What the app can run locally now and what needs a real connected source.">
+        <ReportSection title="Data sources" description="What the app can run locally now and what needs real imported data or a local provider.">
           <StatusEvidenceTable
             rows={[
               {
@@ -7310,10 +7252,10 @@ function SettingsPage() {
                 ),
               },
               { title: "Technical scans", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
-              { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless a metrics source is connected." },
+              { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless real metrics are imported later." },
               { title: "SERP and rank checks", status: serpProviderStatus(config), tone: "good", text: "Uses local/self-hosted OpenSERP or SearXNG when configured, otherwise live DuckDuckGo results. The source is shown on each report." },
               { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally. Google connection is optional for live performance and URL inspection." },
-              { title: "Backlink index", status: config.seo_metrics_source_connected ? "Connected" : "Not connected", tone: config.seo_metrics_source_connected ? "good" : "warn", text: "No generated backlink rows are shown. Web-wide backlink rows require a real backlink index." },
+              { title: "Backlink index", status: "Import unavailable", tone: "warn", text: "No generated backlink rows are shown. Web-wide backlink rows require a real imported index." },
               { title: "MCP endpoint", status: "Local", tone: "good", text: "The local JSON-RPC endpoint is available from the MCP screen." },
             ]}
           />

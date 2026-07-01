@@ -264,13 +264,6 @@ async function startSavedSiteScan(c: any) {
   const candidateUrls = siteScanCandidates(site);
   const url = await resolveSavedSiteScanUrl(site);
   const scan = startScan(site.id, url);
-  const config = listPublicConfig();
-  queueMicrotask(() => {
-    Promise.allSettled([
-      domainOverview({ siteId: site.id, domain: site.domain }),
-      backlinksOverview({ siteId: site.id, domain: site.domain }),
-    ]).catch((error) => console.error("Site scan snapshots failed:", error));
-  });
   return c.json({
     site: site.domain,
     scan,
@@ -292,20 +285,16 @@ async function startSavedSiteScan(c: any) {
       {
         key: "domain-intelligence",
         label: "Organic research",
-        status: config.seo_metrics_source_connected ? "queued" : "local",
+        status: "local",
         route: "/domain",
-        message: config.seo_metrics_source_connected
-          ? "Ranked keyword and top-page snapshot is queued."
-          : "Local crawl evidence will be available from this scan. Connect a real organic dataset only for ranked keywords and traffic estimates.",
+        message: "Local crawl page evidence will be available from this scan. Third-party ranked keywords and traffic estimates are not generated locally.",
       },
       {
         key: "links",
         label: "Links",
-        status: config.seo_metrics_source_connected ? "queued" : "local",
+        status: "local",
         route: "/links",
-        message: config.seo_metrics_source_connected
-          ? "Backlink overview snapshot is queued."
-          : "Local internal, external, and broken-link evidence will be available from this scan. Connect or import a backlink index only for web-wide backlinks.",
+        message: "Local internal, external, and broken-link evidence will be available from this scan. Web-wide backlinks require a real imported index.",
       },
     ],
     scanUrl: url,

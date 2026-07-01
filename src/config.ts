@@ -8,7 +8,6 @@ type ConfigRow = {
 };
 
 const SECRET_KEYS = new Set([
-  "seo_metrics_api_key",
   "google_client_secret",
   "mcp_token",
 ]);
@@ -30,7 +29,6 @@ export function getConfigValue(key: string): string {
   const envKey = key.toUpperCase();
   const envValue =
     process.env[envKey] ||
-    (key === "seo_metrics_api_key" ? process.env.SEO_METRICS_API_KEY : undefined) ||
     (key === "google_client_id" ? process.env.GOOGLE_CLIENT_ID : undefined) ||
     (key === "google_client_secret" ? process.env.GOOGLE_CLIENT_SECRET : undefined) ||
     (key === "mcp_token" ? process.env.MCP_TOKEN : undefined);
@@ -60,7 +58,6 @@ export function setConfigValue(key: string, value: string) {
 
 export function listPublicConfig(): Record<string, string | boolean | number> {
   const keys = [
-    "seo_metrics_api_key",
     "google_client_id",
     "google_client_secret",
     "mcp_token",
@@ -81,7 +78,6 @@ export function listPublicConfig(): Record<string, string | boolean | number> {
   );
   return {
     ...config,
-    seo_metrics_source_connected: Boolean(getConfigValue("seo_metrics_api_key")),
     local_db_path: dbPath,
     local_site_count: get<{ count: number }>("SELECT count(*) AS count FROM sites")?.count || 0,
     local_scan_count: get<{ count: number }>("SELECT count(*) AS count FROM scans")?.count || 0,

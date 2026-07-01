@@ -11,7 +11,6 @@ data connectors only when you configure them.
 - Real local crawler data for technical SEO scans
 - Real DuckDuckGo suggestions/search results for free keyword ideas and web SERP checks
 - Optional self-hosted OpenSERP or SearXNG for free/local SERP and rank checks
-- Optional external SEO metrics/index datasets only when a real source is configured
 - Google Search Console OAuth and performance querying
 - Local Codex jobs with medium reasoning by default
 - Local MCP JSON-RPC endpoint at `/mcp`
@@ -20,15 +19,15 @@ data connectors only when you configure them.
 ## Local Workflows
 
 - **Sites:** saved websites with domain, crawl URL preferences, optional keyword tool defaults, and notes.
-- **Keyword research:** real DuckDuckGo suggestions, with metrics only when a real metrics source or import is configured.
+- **Keyword research:** real DuckDuckGo suggestions. Volume, CPC, and difficulty stay unavailable unless real metric imports are added later.
 - **SERP analysis:** live web result snapshots, active-site ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
-- **Organic research:** local scan pages for the active site, plus ranked keywords and traffic estimates only when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
-- **Links and backlinks:** local crawl link graph from scans, plus backlink overview, backlink rows, referring domains, and top linked pages only from a real backlink index.
+- **Organic research:** local scan pages for the active site. Ranked keywords and traffic estimates are not generated locally.
+- **Links and backlinks:** local crawl link graph from scans. Web-wide backlink overview, backlink rows, referring domains, and top linked pages require a real imported backlink index and are not generated locally.
 - **Site scans:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, page response timing, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
-- **Brand lookup:** real web-search evidence and optional AI visibility datasets when connected.
-- **Prompt explorer:** local Codex jobs or optional real AI visibility data-source responses.
+- **Brand lookup:** real web-search evidence without generated answer-model claims.
+- **Prompt explorer:** local Codex jobs saved in SQLite.
 - **Google Search Console:** OAuth connection, property picker, disconnect, search analytics query endpoint, and URL inspection helper.
 - **Local AI lab:** Codex-backed SEO coach, clustering, scan prioritization, competitor gaps, and AI visibility jobs.
 - **MCP:** local tools for sites, keyword research, saved keywords, organic research, backlinks, SERP, rank trackers, scans, GSC performance, GSC URL inspection, brand lookup, prompt explorer, and Codex jobs.
@@ -46,7 +45,7 @@ Open `http://localhost:5173` during development. The API runs on
 
 `.env` is optional for the local product. Create it only when connecting
 optional data-source credentials such as Google OAuth, a self-hosted OpenSERP
-or SearXNG URL, an external SEO metrics/index credential, MCP token, or a custom Codex
+or SearXNG URL, MCP token, or a custom Codex
 model. In-app Settings are for app preferences, not secret fields.
 
 The first load lets you create the local admin user in the browser. You can also
@@ -67,10 +66,10 @@ domain.
 SERP and rank checks can use self-hosted OpenSERP, self-hosted SearXNG, or the
 built-in DuckDuckGo fallback. External SEO metrics are never generated locally.
 Backlink indexes, Google keyword volumes, CPC, keyword difficulty, and
-third-party traffic estimates require a real data source or imported data. Local
-scans still feed technical pages, internal/external links, images, assets,
-sitemap, robots, and response timing into reports. The app shows not-connected
-states instead of invented rows.
+third-party traffic estimates require future import support or a deliberately
+built adapter. Local scans still feed technical pages, internal/external links,
+images, assets, sitemap, robots, and response timing into reports. The app shows
+unavailable states instead of invented rows.
 
 This app is local-first. Hosted product concerns such as billing, teams/orgs,
 hosted auth, queues, and hosted cron workflows are not part of this fresh local

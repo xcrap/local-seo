@@ -7,7 +7,6 @@ import { randomUUID } from "node:crypto";
 const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
 process.env.DB_PATH = path.join(tempDir, "scope.sqlite");
-process.env.SEO_METRICS_API_KEY = "";
 process.env.CODEX_MODEL = "";
 process.env.CODEX_REASONING_EFFORT = "";
 
@@ -313,10 +312,10 @@ try {
     throw new Error("The env example should leave CODEX_MODEL blank so the local Codex CLI default is used.");
   }
   if (!/OpenSERP/i.test(envExampleSource + readmeSource) || !/SearXNG/i.test(envExampleSource + readmeSource)) {
-    throw new Error("Docs should expose free/self-hosted SERP providers before optional paid metrics.");
+    throw new Error("Docs should expose free/self-hosted SERP providers.");
   }
-  if (/DataForSEO|DATAFORSEO/.test(envExampleSource + readmeSource)) {
-    throw new Error("Docs and env examples should stay vendor-neutral for optional external metrics sources.");
+  if (/DataForSEO|DATAFORSEO|SEO_METRICS/i.test(envExampleSource + readmeSource)) {
+    throw new Error("Docs and env examples should not keep paid SEO metrics provider hooks.");
   }
   const apiServerSource = await readFile(path.join(rootDir, "src/index.ts"), "utf8");
   const mcpSource = await readFile(path.join(rootDir, "src/mcp.ts"), "utf8");
@@ -340,6 +339,9 @@ try {
   }
   if (/\bAudit[A-Za-z0-9_]*\b|\baudit[A-Za-z0-9_]*\b/.test(seoSource)) {
     throw new Error("Crawler service internals should use scan naming, not audit-era identifiers.");
+  }
+  if (/dataforseo|DataForSEO|SEO_METRICS|seo_metrics/i.test(seoSource)) {
+    throw new Error("Backend SEO services should not keep paid metrics provider hooks in the fresh local app.");
   }
   if (!seoSource.includes("activeSite:") || !/^\s*sites:/m.test(seoSource)) {
     throw new Error("Dashboard API should return activeSite/sites terminology.");
@@ -368,8 +370,8 @@ try {
   if (!webAppClient.includes("One local admin account for this install.") || !webAppClient.includes("SQLite is the source of truth on this machine.") || !webAppClient.includes("No hosted auth service is required.")) {
     throw new Error("First-run setup should explain the single local admin, SQLite source of truth, and no hosted auth model.");
   }
-  if (/DataForSEO|DATAFORSEO/.test(webAppClient)) {
-    throw new Error("The React UI should not advertise a paid metrics provider by name.");
+  if (/DataForSEO|DATAFORSEO|seo_metrics|SEO_METRICS/.test(webAppClient)) {
+    throw new Error("The React UI should not keep paid metrics provider hooks.");
   }
   if (!webAppClient.includes('path="/links"') || !webAppClient.includes('to="/links"')) {
     throw new Error("The React app should expose Links at /links.");
@@ -652,8 +654,8 @@ try {
       throw new Error(`Keyword metric tables should render unavailable metrics explicitly, not with ${pattern}.`);
     }
   }
-  if (!webAppClient.includes("show as unavailable unless a real metrics source is connected")) {
-    throw new Error("Keyword research copy should explain unavailable metric values clearly.");
+  if (!webAppClient.includes("Volume, CPC, and difficulty stay unavailable unless you import real metrics later.")) {
+    throw new Error("Keyword research copy should explain unavailable metric values clearly without pointing to secret settings.");
   }
   for (const keywordFormLabel of ['Field label="Seed keyword"', 'Field label="Suggestion limit"', 'Field label="Search keywords"', 'Field label="Tag filter"', 'Field label="Tag names"']) {
     if (!webAppClient.includes(keywordFormLabel)) {
@@ -698,7 +700,7 @@ try {
   const rejectedSecretConfig = await requestFailure("/api/config", {
     method: "PUT",
     body: JSON.stringify({
-      seo_metrics_api_key: "should-not-save-here",
+      google_client_secret: "should-not-save-here",
     }),
   });
   if (!/App settings cannot save/i.test(String(rejectedSecretConfig.data?.error || ""))) {
