@@ -761,16 +761,26 @@ function sourceLabel(source?: string) {
     "dataforseo-error": "Data source error",
     "duckduckgo-suggest": "DuckDuckGo suggest",
     duckduckgo: "DuckDuckGo",
+    searxng: "SearXNG",
     "web-search": "Web search",
     codex: "Local Codex",
     "search-error": "Search error",
     "suggest-error": "Suggest error",
   };
+  if (source?.startsWith("openserp:")) return `OpenSERP ${source.split(":")[1] || ""}`.trim();
   return labels[source || ""] || source || "No source";
 }
 
 function sourceVariant(source?: string) {
-  if (source === "dataforseo" || source === "duckduckgo" || source === "duckduckgo-suggest" || source === "web-search" || source === "codex") return "good";
+  if (
+    source === "dataforseo" ||
+    source === "duckduckgo" ||
+    source === "duckduckgo-suggest" ||
+    source === "searxng" ||
+    source === "web-search" ||
+    source === "codex" ||
+    source?.startsWith("openserp:")
+  ) return "good";
   if (source?.includes("error")) return "bad";
   if (source === "provider-not-configured") return "warn";
   return "outline";
@@ -789,6 +799,12 @@ function TagList({ tags }: { tags: string[] }) {
 
 function SourceBadge({ source }: { source?: string }) {
   return <Badge variant={sourceVariant(source) as any}>{sourceLabel(source)}</Badge>;
+}
+
+function serpProviderStatus(config: any) {
+  if (config?.openserp_url) return "OpenSERP";
+  if (config?.searxng_url) return "SearXNG";
+  return "DuckDuckGo";
 }
 
 function scanStatusLabel(status?: string) {
@@ -6684,7 +6700,7 @@ function SettingsPage() {
               },
               { title: "Technical audits", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
               { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless a metrics source is connected." },
-              { title: "SERP and rank checks", status: config.openserp_url ? "OpenSERP" : "DuckDuckGo", tone: "good", text: "Uses OpenSERP when available, otherwise live DuckDuckGo results. The source is shown on each report." },
+              { title: "SERP and rank checks", status: serpProviderStatus(config), tone: "good", text: "Uses local/self-hosted OpenSERP or SearXNG when configured, otherwise live DuckDuckGo results. The source is shown on each report." },
               { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally. Google connection is optional for live performance and URL inspection." },
               { title: "Backlink index", status: config.dataforseo_api_key ? "Connected" : "Not connected", tone: config.dataforseo_api_key ? "good" : "warn", text: "No generated backlink rows are shown. Web-wide backlink rows require a real backlink index." },
               { title: "MCP endpoint", status: "Local", tone: "good", text: "The local JSON-RPC endpoint is available from the MCP screen." },

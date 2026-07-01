@@ -10,7 +10,8 @@ auth service.
 - Local SQLite sites, keywords, rank tracking, audits, AI jobs, config, and cache
 - Real local crawler data for technical SEO audits
 - Real DuckDuckGo suggestions/search results for free keyword ideas and web SERP checks
-- Optional DataForSEO-backed SEO datasets when a real API key is configured
+- Optional self-hosted OpenSERP or SearXNG for free/local SERP and rank checks
+- Optional external SEO metrics/index datasets only when a real API key is configured
 - Google Search Console OAuth and performance querying
 - Local Codex jobs with medium reasoning by default
 - Local MCP JSON-RPC endpoint at `/mcp`
@@ -18,8 +19,8 @@ auth service.
 
 ## OpenSEO-Inspired Local Workflows
 
-- **Sites:** saved websites with domain, crawl URL preferences, keyword/rank market and language defaults, and notes.
-- **Keyword research:** real DuckDuckGo suggestions, with DataForSEO metrics when configured.
+- **Sites:** saved websites with domain, crawl URL preferences, optional keyword tool defaults, and notes.
+- **Keyword research:** real DuckDuckGo suggestions, with metrics only when a real metrics source is configured.
 - **SERP analysis:** live web result snapshots, selected-site ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
@@ -44,9 +45,9 @@ Open `http://localhost:5173` during development. The API runs on
 `http://localhost:3031` by default.
 
 `.env` is optional for the local product. Create it only when connecting
-optional data-source credentials such as Google OAuth, a DataForSEO-compatible
-external SEO index, MCP token, or a custom Codex model. In-app Settings are for
-app preferences, not secret fields.
+optional data-source credentials such as Google OAuth, a self-hosted OpenSERP
+or SearXNG URL, an external SEO metrics/index key, MCP token, or a custom Codex
+model. In-app Settings are for app preferences, not secret fields.
 
 The first load lets you create the local admin user in the browser. You can also
 create or update it from the terminal:
@@ -63,10 +64,11 @@ rank trackers, Search Console, keyword saves, AI jobs, and local history. Each
 audit run is stored separately in SQLite, even when multiple scans use the same
 domain.
 
-External SEO datasets are never generated locally. Backlink indexes, Google
-keyword volumes, CPC, keyword difficulty, and third-party traffic estimates
-require a real data source or imported data. The app shows not-connected states
-instead of invented rows.
+SERP and rank checks can use self-hosted OpenSERP, self-hosted SearXNG, or the
+built-in DuckDuckGo fallback. External SEO metrics are never generated locally.
+Backlink indexes, Google keyword volumes, CPC, keyword difficulty, and
+third-party traffic estimates require a real data source or imported data. The
+app shows not-connected states instead of invented rows.
 
 This app is local-first and intentionally removes OpenSEO hosted features:
 billing, teams/orgs, hosted auth, Cloudflare Workers, D1, KV, R2, queues, and

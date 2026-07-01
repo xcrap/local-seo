@@ -270,6 +270,9 @@ try {
   if (/save these in Settings|save .* in Settings/i.test(envExampleSource + readmeSource)) {
     throw new Error("Docs should not imply app Settings are used for secret environment credentials.");
   }
+  if (!/OpenSERP/i.test(envExampleSource + readmeSource) || !/SearXNG/i.test(envExampleSource + readmeSource)) {
+    throw new Error("Docs should expose free/self-hosted SERP providers before optional paid metrics.");
+  }
   const apiServerSource = await readFile(path.join(rootDir, "src/index.ts"), "utf8");
   if (apiServerSource.includes('"/api/projects')) {
     throw new Error("Public API routes should expose /api/sites only, not legacy /api/projects aliases.");
@@ -280,6 +283,9 @@ try {
   }
   if (/slice\(0,\s*5\)/.test(seoSource)) {
     throw new Error("Crawler audit issues should keep full local evidence arrays instead of five-item samples.");
+  }
+  if (!seoSource.includes("function searchSearxng") || !seoSource.includes("process.env.SEARXNG_URL")) {
+    throw new Error("SERP/rank search should support self-hosted SearXNG before falling back to DuckDuckGo.");
   }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
   if (webApiClient.includes("/api/projects")) {

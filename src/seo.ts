@@ -185,6 +185,29 @@ async function searchOpenSerp(query: string, limit: number, engine = "duckduckgo
     .filter(Boolean) as WebSearchResult[];
 }
 
+async function searchSearxng(query: string, limit: number) {
+  const base = (getConfigValue("searxng_url") || process.env.SEARXNG_URL || "").replace(/\/$/, "");
+  if (!base) return null;
+  const url = `${base}/search?q=${encodeURIComponent(query)}&format=json`;
+  const response = await fetchJson(url);
+  if (!response.ok) throw new Error(`SearXNG ${response.status}`);
+  const data = response.data || {};
+  const items = data.results || data.items || data.organic || [];
+  return (Array.isArray(items) ? items : [])
+    .map((item, index) => normalizeSearchResult(
+      {
+        url: item.url || item.link,
+        title: item.title,
+        description: item.content || item.description || item.snippet,
+        domain: item.parsed_url?.[1] || item.domain,
+      },
+      index + 1,
+      "searxng",
+    ))
+    .filter(Boolean)
+    .slice(0, limit) as WebSearchResult[];
+}
+
 async function searchDuckDuckGo(query: string, limit: number) {
   const response = await fetchText(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`);
   if (!response.ok) throw new Error(`DuckDuckGo ${response.status}`);
@@ -212,6 +235,8 @@ async function searchDuckDuckGo(query: string, limit: number) {
 async function searchWeb(query: string, limit: number) {
   const openSerpRows = await searchOpenSerp(query, limit).catch(() => null);
   if (openSerpRows?.length) return openSerpRows.slice(0, limit);
+  const searxngRows = await searchSearxng(query, limit).catch(() => null);
+  if (searxngRows?.length) return searxngRows.slice(0, limit);
   return searchDuckDuckGo(query, limit);
 }
 

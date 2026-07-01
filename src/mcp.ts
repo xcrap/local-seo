@@ -82,7 +82,7 @@ const tools = [
   },
   {
     name: "research_keywords",
-    description: "Run keyword research through DataForSEO when configured, otherwise real DuckDuckGo suggestions without metric estimates.",
+    description: "Run local keyword research from real DuckDuckGo suggestions, with metrics only when a real metrics source is configured.",
     inputSchema: {
       type: "object",
       properties: {

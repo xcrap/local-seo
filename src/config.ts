@@ -52,6 +52,7 @@ export function listPublicConfig(): Record<string, string | boolean | number> {
     "google_client_secret",
     "mcp_token",
     "openserp_url",
+    "searxng_url",
     "codex_model",
     "codex_reasoning_effort",
     "default_location_code",
