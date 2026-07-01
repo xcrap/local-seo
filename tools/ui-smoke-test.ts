@@ -308,6 +308,8 @@ try {
     if (await page.getByText(/target candidates|Resolve target/i).count()) {
       throw new Error("Sites flow still exposes crawl setup as vague scan targets.");
     }
+    await page.getByRole("button", { name: /Scan Fixture Site/i }).waitFor();
+    await page.getByRole("button", { name: /Delete Fixture Site/i }).waitFor();
     await page.getByRole("button", { name: /Edit Fixture Site/i }).click();
     await page.getByRole("heading", { name: /Edit site/i }).waitFor();
     await page.getByText("Scan protocol").waitFor();

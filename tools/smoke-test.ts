@@ -400,6 +400,9 @@ try {
   if (!webAppClient.includes('<Field label="Website address">') || !webAppClient.includes('<Field label="Site name">')) {
     throw new Error("First-run site forms should use visible labels, not only placeholders.");
   }
+  if (!webAppClient.includes("<Pencil /> Edit") || !webAppClient.includes("<Trash2 /> Delete") || !webAppClient.includes('"Scan site"')) {
+    throw new Error("Saved-site table actions should be visible text buttons for scan, edit, and delete.");
+  }
   if (!webAppClient.includes("<TableHead>URL</TableHead>") || !webAppClient.includes("<TableHead>Window</TableHead>")) {
     throw new Error("Audit link tables should label URL columns and HTML target-window attributes clearly.");
   }

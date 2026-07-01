@@ -2056,7 +2056,7 @@ function SitesPage({
                   </TableCell>
                   <TableCell>{activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}</TableCell>
                   <TableCell>
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       {activeSiteId !== site.id ? (
                         <Button size="sm" variant="secondary" onClick={() => selectSite(site.id)}>
                           Select site
@@ -2071,14 +2071,14 @@ function SitesPage({
                           disabled={scanningSiteId === site.id}
                           onClick={() => scanSite(site)}
                         >
-                          <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan"}
+                          <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan site"}
                         </Button>
                       ) : null}
-                      <Button size="icon" variant="outline" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
-                        <Pencil />
+                      <Button size="sm" variant="outline" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
+                        <Pencil /> Edit
                       </Button>
-                      <Button size="icon" variant="destructive" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
-                        <Trash2 />
+                      <Button size="sm" variant="destructive" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
+                        <Trash2 /> Delete
                       </Button>
                     </div>
                   </TableCell>
