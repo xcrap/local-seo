@@ -214,6 +214,9 @@ try {
     await page.getByText("Scan plan").first().waitFor();
     await page.getByText(/2 crawl URLs/i).first().waitFor();
     await page.getByText(fixtureUrl).first().waitFor();
+    await page.getByRole("combobox").first().click();
+    await page.getByRole("option", { name: new RegExp(`Fixture Site.*localhost:${fixtureServer.port}.*2 crawl URLs`, "i") }).waitFor();
+    await page.keyboard.press("Escape");
     await page.getByRole("row", { name: /Selected site.*Scan website/i }).getByRole("button", { name: /Scan website/i }).click();
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });

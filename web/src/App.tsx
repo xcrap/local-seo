@@ -354,6 +354,11 @@ function siteDisplayName(project?: Project | null) {
   return project.name;
 }
 
+function siteSelectLabel(project: Project) {
+  const domain = project.domain || "No website address";
+  return `${siteDisplayName(project)} · ${domain} · ${scanTargetShortDetail(project)}`;
+}
+
 function ActiveSiteSelect({
   sites,
   activeSiteId,
@@ -372,13 +377,13 @@ function ActiveSiteSelect({
   }
   return (
     <Select value={activeSiteId} onValueChange={onSelect}>
-      <SelectTrigger>
+      <SelectTrigger className="min-w-0 [&_[data-slot=select-value]]:truncate">
         <SelectValue placeholder="Select site" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="max-w-[min(34rem,calc(100vw-2rem))]">
         {sites.map((site) => (
-          <SelectItem key={site.id} value={site.id}>
-            {siteDisplayName(site)}
+          <SelectItem key={site.id} value={site.id} className="whitespace-normal leading-snug">
+            {siteSelectLabel(site)}
           </SelectItem>
         ))}
       </SelectContent>
