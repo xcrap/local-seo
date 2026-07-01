@@ -100,7 +100,6 @@ async function readJson(c: any) {
 
 function siteScopedBody(body: Record<string, any>) {
   if ("projectId" in body) throw new Error("Use siteId.");
-  if (body.siteId) return { ...body, projectId: body.siteId };
   return body;
 }
 
@@ -263,8 +262,8 @@ async function startSavedSiteScan(c: any) {
   const config = listPublicConfig();
   queueMicrotask(() => {
     Promise.allSettled([
-      domainOverview({ projectId: site.id, domain: site.domain }),
-      backlinksOverview({ projectId: site.id, domain: site.domain }),
+      domainOverview({ siteId: site.id, domain: site.domain }),
+      backlinksOverview({ siteId: site.id, domain: site.domain }),
     ]).catch((error) => console.error("Site scan snapshots failed:", error));
   });
   return c.json({
@@ -330,7 +329,7 @@ app.get(
 );
 app.post(
   "/api/sites/:id/keywords/query",
-  safe(async (c) => c.json(querySavedKeywords({ projectId: c.req.param("id"), ...(await readJson(c)) }))),
+  safe(async (c) => c.json(querySavedKeywords({ siteId: c.req.param("id"), ...(await readJson(c)) }))),
 );
 app.get(
   "/api/sites/:id/keyword-tags",
@@ -339,18 +338,18 @@ app.get(
 app.post(
   "/api/sites/:id/keywords/tags",
   safe(async (c) =>
-    c.json(updateSavedKeywordTags({ projectId: c.req.param("id"), ...(await readJson(c)) } as any)),
+    c.json(updateSavedKeywordTags({ siteId: c.req.param("id"), ...(await readJson(c)) } as any)),
   ),
 );
 app.put(
   "/api/sites/:id/keyword-tags/:tagId",
   safe(async (c) =>
-    c.json(updateSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId"), ...(await readJson(c)) })),
+    c.json(updateSavedKeywordTag({ siteId: c.req.param("id"), tagId: c.req.param("tagId"), ...(await readJson(c)) })),
   ),
 );
 app.delete(
   "/api/sites/:id/keyword-tags/:tagId",
-  safe((c) => c.json(deleteSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId") }))),
+  safe((c) => c.json(deleteSavedKeywordTag({ siteId: c.req.param("id"), tagId: c.req.param("tagId") }))),
 );
 app.post(
   "/api/sites/:id/keywords/remove",

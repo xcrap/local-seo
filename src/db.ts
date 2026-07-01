@@ -44,6 +44,40 @@ function migrate(name: string, sql: string) {
   apply();
 }
 
+function migrateStep(name: string, applyMigration: () => void) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  const existing = db
+    .prepare(`SELECT name FROM ${MIGRATIONS_TABLE} WHERE name = ?`)
+    .get(name);
+  if (existing) return;
+
+  const apply = db.transaction(() => {
+    applyMigration();
+    db.prepare(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?)`).run(name);
+  });
+  apply();
+}
+
+function tableExists(name: string) {
+  return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
+}
+
+function columnExists(table: string, column: string) {
+  return db.prepare(`PRAGMA table_info(${table})`).all().some((row: any) => row.name === column);
+}
+
+function renameColumnIfExists(table: string, from: string, to: string) {
+  if (tableExists(table) && columnExists(table, from) && !columnExists(table, to)) {
+    db.exec(`ALTER TABLE ${table} RENAME COLUMN ${from} TO ${to}`);
+  }
+}
+
 migrate(
   "001_local_seo_init",
   `
@@ -63,7 +97,7 @@ migrate(
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS projects (
+  CREATE TABLE IF NOT EXISTS sites (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     domain TEXT NOT NULL DEFAULT '',
@@ -75,11 +109,11 @@ migrate(
     archived_at TEXT
   );
 
-  CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(archived_at, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_sites_active ON sites(archived_at, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS keyword_research_runs (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     query TEXT NOT NULL,
     location_code INTEGER NOT NULL,
     language_code TEXT NOT NULL,
@@ -90,7 +124,7 @@ migrate(
 
   CREATE TABLE IF NOT EXISTS saved_keywords (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     keyword TEXT NOT NULL,
     location_code INTEGER NOT NULL DEFAULT 2840,
     language_code TEXT NOT NULL DEFAULT 'en',
@@ -101,12 +135,12 @@ migrate(
     tags TEXT NOT NULL DEFAULT '[]',
     source TEXT NOT NULL DEFAULT 'manual',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(project_id, keyword, location_code, language_code)
+    UNIQUE(site_id, keyword, location_code, language_code)
   );
 
   CREATE TABLE IF NOT EXISTS rank_trackers (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     domain TEXT NOT NULL,
     location_code INTEGER NOT NULL DEFAULT 2840,
     language_code TEXT NOT NULL DEFAULT 'en',
@@ -150,8 +184,8 @@ migrate(
 
   CREATE TABLE IF NOT EXISTS domain_snapshots (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    target TEXT NOT NULL,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    domain TEXT NOT NULL,
     source TEXT NOT NULL,
     result_json TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -159,8 +193,8 @@ migrate(
 
   CREATE TABLE IF NOT EXISTS backlink_snapshots (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    target TEXT NOT NULL,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    domain TEXT NOT NULL,
     source TEXT NOT NULL,
     result_json TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -168,7 +202,7 @@ migrate(
 
   CREATE TABLE IF NOT EXISTS audits (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
     status TEXT NOT NULL,
     score INTEGER NOT NULL DEFAULT 0,
@@ -182,7 +216,7 @@ migrate(
 
   CREATE TABLE IF NOT EXISTS gsc_connections (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     site_url TEXT NOT NULL DEFAULT '',
     access_token TEXT NOT NULL DEFAULT '',
     refresh_token TEXT NOT NULL DEFAULT '',
@@ -190,7 +224,7 @@ migrate(
     account_email TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(project_id)
+    UNIQUE(site_id)
   );
 
   CREATE TABLE IF NOT EXISTS ai_jobs (
@@ -228,9 +262,9 @@ migrate(
   `
   CREATE TABLE IF NOT EXISTS serp_runs (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     keyword TEXT NOT NULL,
-    target TEXT NOT NULL DEFAULT '',
+    domain TEXT NOT NULL DEFAULT '',
     location_code INTEGER NOT NULL DEFAULT 2840,
     language_code TEXT NOT NULL DEFAULT 'en',
     source TEXT NOT NULL,
@@ -238,11 +272,11 @@ migrate(
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE INDEX IF NOT EXISTS idx_serp_runs_project_created ON serp_runs(project_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_serp_runs_site_created ON serp_runs(site_id, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS brand_lookup_runs (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     query TEXT NOT NULL,
     competitors TEXT NOT NULL DEFAULT '[]',
     source TEXT NOT NULL,
@@ -250,11 +284,11 @@ migrate(
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE INDEX IF NOT EXISTS idx_brand_lookup_project_created ON brand_lookup_runs(project_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_brand_lookup_site_created ON brand_lookup_runs(site_id, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS prompt_explorer_runs (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     prompt TEXT NOT NULL,
     highlight_brand TEXT NOT NULL DEFAULT '',
     models TEXT NOT NULL DEFAULT '[]',
@@ -263,7 +297,7 @@ migrate(
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE INDEX IF NOT EXISTS idx_prompt_explorer_project_created ON prompt_explorer_runs(project_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_prompt_explorer_site_created ON prompt_explorer_runs(site_id, created_at DESC);
   `,
 );
 
@@ -272,15 +306,15 @@ migrate(
   `
   CREATE TABLE IF NOT EXISTS saved_keyword_tags (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     color TEXT NOT NULL DEFAULT 'slate',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(project_id, name)
+    UNIQUE(site_id, name)
   );
 
-  CREATE INDEX IF NOT EXISTS idx_saved_keyword_tags_project ON saved_keyword_tags(project_id, name);
+  CREATE INDEX IF NOT EXISTS idx_saved_keyword_tags_site ON saved_keyword_tags(site_id, name);
 
   ALTER TABLE rank_trackers ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;
   ALTER TABLE rank_trackers ADD COLUMN next_check_at TEXT;
@@ -294,8 +328,8 @@ migrate(
 migrate(
   "004_project_crawl_preferences",
   `
-  ALTER TABLE projects ADD COLUMN crawl_protocol TEXT NOT NULL DEFAULT 'auto';
-  ALTER TABLE projects ADD COLUMN crawl_host TEXT NOT NULL DEFAULT 'auto';
+  ALTER TABLE sites ADD COLUMN crawl_protocol TEXT NOT NULL DEFAULT 'auto';
+  ALTER TABLE sites ADD COLUMN crawl_host TEXT NOT NULL DEFAULT 'auto';
   `,
 );
 
@@ -304,7 +338,7 @@ migrate(
   `
   CREATE TABLE IF NOT EXISTS gsc_imports (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     site_url TEXT NOT NULL DEFAULT '',
     source_name TEXT NOT NULL DEFAULT '',
     dimensions_json TEXT NOT NULL DEFAULT '[]',
@@ -314,7 +348,7 @@ migrate(
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE INDEX IF NOT EXISTS idx_gsc_imports_project_created ON gsc_imports(project_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_gsc_imports_site_created ON gsc_imports(site_id, created_at DESC);
   `,
 );
 
@@ -325,6 +359,49 @@ migrate(
   DELETE FROM backlink_snapshots WHERE source = 'local-fallback';
   `,
 );
+
+migrateStep("007_site_schema_names", () => {
+  db.exec("PRAGMA foreign_keys = OFF");
+  if (tableExists("projects") && !tableExists("sites")) {
+    db.exec("ALTER TABLE projects RENAME TO sites");
+  }
+
+  for (const table of [
+    "keyword_research_runs",
+    "saved_keywords",
+    "rank_trackers",
+    "domain_snapshots",
+    "backlink_snapshots",
+    "audits",
+    "gsc_connections",
+    "serp_runs",
+    "brand_lookup_runs",
+    "prompt_explorer_runs",
+    "saved_keyword_tags",
+    "gsc_imports",
+  ]) {
+    renameColumnIfExists(table, "project_id", "site_id");
+  }
+  renameColumnIfExists("domain_snapshots", "target", "domain");
+  renameColumnIfExists("backlink_snapshots", "target", "domain");
+  renameColumnIfExists("serp_runs", "target", "domain");
+
+  db.exec(`
+    DROP INDEX IF EXISTS idx_projects_active;
+    DROP INDEX IF EXISTS idx_serp_runs_project_created;
+    DROP INDEX IF EXISTS idx_brand_lookup_project_created;
+    DROP INDEX IF EXISTS idx_prompt_explorer_project_created;
+    DROP INDEX IF EXISTS idx_saved_keyword_tags_project;
+    DROP INDEX IF EXISTS idx_gsc_imports_project_created;
+    CREATE INDEX IF NOT EXISTS idx_sites_active ON sites(archived_at, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_serp_runs_site_created ON serp_runs(site_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_brand_lookup_site_created ON brand_lookup_runs(site_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_prompt_explorer_site_created ON prompt_explorer_runs(site_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_saved_keyword_tags_site ON saved_keyword_tags(site_id, name);
+    CREATE INDEX IF NOT EXISTS idx_gsc_imports_site_created ON gsc_imports(site_id, created_at DESC);
+    PRAGMA foreign_keys = ON;
+  `);
+});
 
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];

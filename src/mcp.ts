@@ -40,10 +40,6 @@ function publicMcpResult(result: any): any {
   const output: Record<string, any> = {};
   for (const [key, value] of Object.entries(result)) {
     let publicKey = key;
-    if (key === "projectId") publicKey = "siteId";
-    if (key === "project_id") publicKey = "site_id";
-    if (key === "project_name") publicKey = "site_name";
-    if (key === "project_domain") publicKey = "site_domain";
     if (key === "target" && typeof value === "string" && !("domain" in result)) publicKey = "domain";
     if (key === "targetPosition") publicKey = "domainPosition";
     if (key === "isTarget") publicKey = "isDomain";
@@ -429,7 +425,6 @@ export async function handleMcp(c: Context) {
 async function callTool(name: string, args: any) {
   if ("projectId" in (args || {})) throw new Error("Use siteId.");
   if ("target" in (args || {})) throw new Error("Use domain.");
-  args = args?.siteId ? { ...args, projectId: args.siteId } : args;
   const withDomainInput = (input: any) => {
     const domain = input?.domain;
     return domain ? { ...input, domain } : input;
@@ -448,7 +443,7 @@ async function callTool(name: string, args: any) {
     case "analyze_serp":
       return getSerpAnalysis(withDomainInput(args));
     case "list_saved_keywords":
-      return listSavedKeywords(args.projectId);
+      return listSavedKeywords(args.siteId);
     case "query_saved_keywords":
       return querySavedKeywords(args);
     case "save_keywords":
@@ -468,11 +463,11 @@ async function callTool(name: string, args: any) {
     case "get_backlinks_profile":
       return getBacklinksProfile(withDomainInput(args));
     case "get_rank_tracker": {
-      const trackers = listRankTrackers(args.projectId);
+      const trackers = listRankTrackers(args.siteId);
       return args.trackerId ? trackers.find((tracker) => tracker.id === args.trackerId) || null : trackers;
     }
     case "start_audit":
-      return startAudit(args.projectId, args.url);
+      return startAudit(args.siteId, args.url);
     case "scan_site": {
       const siteId = args.siteId;
       const site = getSite(siteId);

@@ -77,7 +77,7 @@ export function listPublicConfig(): Record<string, string | boolean | number> {
   return {
     ...config,
     local_db_path: dbPath,
-    local_site_count: get<{ count: number }>("SELECT count(*) AS count FROM projects")?.count || 0,
+    local_site_count: get<{ count: number }>("SELECT count(*) AS count FROM sites")?.count || 0,
     local_audit_count: get<{ count: number }>("SELECT count(*) AS count FROM audits")?.count || 0,
     local_gsc_import_count: get<{ count: number }>("SELECT count(*) AS count FROM gsc_imports")?.count || 0,
   };

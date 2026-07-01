@@ -240,6 +240,24 @@ try {
   if (initialSites.length !== 0) {
     throw new Error(`Fresh setup should keep the site list empty until the user adds a real site: ${JSON.stringify(initialSites)}`);
   }
+  const schemaDb = new Database(serverDbPath, { readonly: true });
+  try {
+    const tables = new Set(schemaDb.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name));
+    if (!tables.has("sites") || tables.has("projects")) {
+      throw new Error(`Fresh SQLite schema should create sites, not projects: ${JSON.stringify([...tables].sort())}`);
+    }
+    for (const table of ["saved_keywords", "audits", "gsc_imports", "domain_snapshots", "backlink_snapshots", "serp_runs"]) {
+      const columns = schemaDb.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((row) => row.name);
+      if (columns.includes("project_id")) {
+        throw new Error(`Fresh SQLite table ${table} should use site_id, not project_id.`);
+      }
+      if (["domain_snapshots", "backlink_snapshots", "serp_runs"].includes(table) && columns.includes("target")) {
+        throw new Error(`Fresh SQLite table ${table} should use domain, not target.`);
+      }
+    }
+  } finally {
+    schemaDb.close();
+  }
   const legacyProjectsResponse = await fetch(`${baseUrl}/api/projects`, {
     headers: cookieJar.size ? { Cookie: cookieHeader() } : {},
   });
@@ -251,7 +269,7 @@ try {
     throw new Error(`Dashboard should reject projectId query input: ${JSON.stringify(legacyDashboardQuery)}`);
   }
   const dbSource = await readFile(path.join(rootDir, "src/db.ts"), "utf8");
-  if (/DELETE\s+FROM\s+(projects|audits|gsc_imports)\b/i.test(dbSource)) {
+  if (/DELETE\s+FROM\s+(sites|audits|gsc_imports)\b/i.test(dbSource)) {
     throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
   }
   const gscSource = await readFile(path.join(rootDir, "src/gsc.ts"), "utf8");
@@ -825,13 +843,13 @@ try {
   const smokeDb = new Database(path.join(tempDir, "smoke.sqlite"), { readonly: true });
   const deletionEvidence = smokeDb
     .query<
-      { projectRows: number; keywordRows: number; archivedRows: number; generatedFallbackRows: number },
+      { siteRows: number; keywordRows: number; archivedRows: number; generatedFallbackRows: number },
       [string, string]
     >(`
       SELECT
-        (SELECT count(*) FROM projects WHERE id = ?) AS projectRows,
-        (SELECT count(*) FROM saved_keywords WHERE project_id = ?) AS keywordRows,
-        (SELECT count(*) FROM projects WHERE archived_at IS NOT NULL) AS archivedRows,
+        (SELECT count(*) FROM sites WHERE id = ?) AS siteRows,
+        (SELECT count(*) FROM saved_keywords WHERE site_id = ?) AS keywordRows,
+        (SELECT count(*) FROM sites WHERE archived_at IS NOT NULL) AS archivedRows,
         (SELECT count(*) FROM domain_snapshots WHERE source = 'local-fallback') +
         (SELECT count(*) FROM backlink_snapshots WHERE source = 'local-fallback') AS generatedFallbackRows
     `)
@@ -839,7 +857,7 @@ try {
   smokeDb.close();
   if (
     !deletionEvidence ||
-    deletionEvidence.projectRows !== 0 ||
+    deletionEvidence.siteRows !== 0 ||
     deletionEvidence.keywordRows !== 0 ||
     deletionEvidence.archivedRows !== 0
   ) {
@@ -911,33 +929,33 @@ try {
   const localHistoryDb = new Database(serverDbPath);
   try {
     const insertDomainSnapshot = localHistoryDb.prepare(`
-      INSERT INTO domain_snapshots (id, project_id, target, source, result_json, created_at)
+      INSERT INTO domain_snapshots (id, site_id, domain, source, result_json, created_at)
       VALUES (?, ?, ?, 'smoke-history', '{}', ?)
     `);
     const insertBacklinkSnapshot = localHistoryDb.prepare(`
-      INSERT INTO backlink_snapshots (id, project_id, target, source, result_json, created_at)
+      INSERT INTO backlink_snapshots (id, site_id, domain, source, result_json, created_at)
       VALUES (?, ?, ?, 'smoke-history', '{}', ?)
     `);
     const insertSerpRun = localHistoryDb.prepare(`
-      INSERT INTO serp_runs (id, project_id, keyword, target, location_code, language_code, source, result_json, created_at)
+      INSERT INTO serp_runs (id, site_id, keyword, domain, location_code, language_code, source, result_json, created_at)
       VALUES (?, ?, ?, 'example.com', 2840, 'en', 'smoke-history', '{}', ?)
     `);
     const insertBrandRun = localHistoryDb.prepare(`
-      INSERT INTO brand_lookup_runs (id, project_id, query, competitors, source, result_json, created_at)
+      INSERT INTO brand_lookup_runs (id, site_id, query, competitors, source, result_json, created_at)
       VALUES (?, ?, ?, '[]', 'smoke-history', '{}', ?)
     `);
     const insertPromptRun = localHistoryDb.prepare(`
-      INSERT INTO prompt_explorer_runs (id, project_id, prompt, highlight_brand, models, source, result_json, created_at)
+      INSERT INTO prompt_explorer_runs (id, site_id, prompt, highlight_brand, models, source, result_json, created_at)
       VALUES (?, ?, ?, 'Example', '[]', 'smoke-history', '{}', ?)
     `);
     const insertSavedKeyword = localHistoryDb.prepare(`
-      INSERT INTO saved_keywords (id, project_id, keyword, location_code, language_code, intent, source, created_at)
+      INSERT INTO saved_keywords (id, site_id, keyword, location_code, language_code, intent, source, created_at)
       VALUES (?, ?, ?, 2840, 'en', 'manual', 'smoke-history', ?)
     `);
     const trackerId = randomUUID();
     localHistoryDb
       .prepare(`
-        INSERT INTO rank_trackers (id, project_id, domain, location_code, language_code, created_at, updated_at)
+        INSERT INTO rank_trackers (id, site_id, domain, location_code, language_code, created_at, updated_at)
         VALUES (?, ?, 'example.com', 2840, 'en', '2026-06-30 15:00:00', '2026-06-30 15:00:00')
       `)
       .run(trackerId, project.id);
@@ -1090,7 +1108,7 @@ try {
   const scanHistoryDb = new Database(serverDbPath);
   try {
     const insertAudit = scanHistoryDb.prepare(`
-      INSERT INTO audits (id, project_id, url, status, score, pages_crawled, issue_count, result_json, created_at, updated_at)
+      INSERT INTO audits (id, site_id, url, status, score, pages_crawled, issue_count, result_json, created_at, updated_at)
       VALUES (?, ?, ?, 'completed', 88, 1, 0, '{}', ?, ?)
     `);
     const insertedAuditIds: string[] = [];
@@ -1175,7 +1193,7 @@ try {
   try {
     const insertGscImport = gscHistoryDb.prepare(`
       INSERT INTO gsc_imports
-        (id, project_id, site_url, source_name, dimensions_json, row_count, totals_json, rows_json, created_at)
+        (id, site_id, site_url, source_name, dimensions_json, row_count, totals_json, rows_json, created_at)
       VALUES (?, ?, 'sc-domain:example.com', ?, '["query"]', 1, '{"clicks":1,"impressions":2}', '[]', ?)
     `);
     const insertedGscImportIds: string[] = [];

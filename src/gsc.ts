@@ -8,7 +8,7 @@ const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 
 type GscConnection = {
   id: string;
-  project_id: string;
+  site_id: string;
   site_url: string;
   access_token: string;
   refresh_token: string;
@@ -18,7 +18,7 @@ type GscConnection = {
 
 type GscImportRecord = {
   id: string;
-  project_id: string;
+  site_id: string;
   site_url: string;
   source_name: string;
   dimensions_json: string;
@@ -64,7 +64,7 @@ function redirectUri(baseUrl: string, siteId: string) {
 }
 
 export function gscStatus(siteId: string) {
-  const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
+  const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE site_id = ?", [
     siteId,
   ]);
   const config = googleClientConfig();
@@ -138,16 +138,16 @@ function saveGscConnection(input: {
   refreshToken: string;
   expiresIn: number;
 }) {
-  const existing = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
+  const existing = get<GscConnection>("SELECT * FROM gsc_connections WHERE site_id = ?", [
     input.siteId,
   ]);
   const refreshToken = input.refreshToken || existing?.refresh_token || "";
   run(
     `
     INSERT INTO gsc_connections
-      (id, project_id, access_token, refresh_token, expires_at, updated_at)
+      (id, site_id, access_token, refresh_token, expires_at, updated_at)
     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(project_id) DO UPDATE SET
+    ON CONFLICT(site_id) DO UPDATE SET
       access_token = excluded.access_token,
       refresh_token = excluded.refresh_token,
       expires_at = excluded.expires_at,
@@ -164,7 +164,7 @@ function saveGscConnection(input: {
 }
 
 async function getAccessToken(siteId: string) {
-  const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
+  const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE site_id = ?", [
     siteId,
   ]);
   if (!connection) throw new Error("Google Search Console is not connected.");
@@ -208,7 +208,7 @@ export async function listGscSites(siteId: string) {
 
 export function setGscSite(siteId: string, siteUrl: string) {
   run(
-    "UPDATE gsc_connections SET site_url = ?, updated_at = CURRENT_TIMESTAMP WHERE project_id = ?",
+    "UPDATE gsc_connections SET site_url = ?, updated_at = CURRENT_TIMESTAMP WHERE site_id = ?",
     [siteUrl, siteId],
   );
   return gscStatus(siteId);
@@ -224,7 +224,7 @@ export async function queryGscPerformance(input: {
 }) {
   const siteId = String(input.siteId || "");
   if (!siteId) throw new Error("Site id is required.");
-  const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
+  const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE site_id = ?", [
     siteId,
   ]);
   const siteUrl = input.siteUrl || connection?.site_url;
@@ -392,7 +392,7 @@ function parseGscCsv(csv: string) {
 function mapGscImport(row: GscImportRecord) {
   return {
     id: row.id,
-    siteId: row.project_id,
+    siteId: row.site_id,
     siteUrl: row.site_url,
     sourceName: row.source_name,
     dimensions: jsonParse<string[]>(row.dimensions_json, []),
@@ -405,7 +405,7 @@ function mapGscImport(row: GscImportRecord) {
 
 export function listGscImports(siteId: string) {
   return all<GscImportRecord>(
-    "SELECT * FROM gsc_imports WHERE project_id = ? ORDER BY created_at DESC",
+    "SELECT * FROM gsc_imports WHERE site_id = ? ORDER BY created_at DESC",
     [siteId],
   ).map(mapGscImport);
 }
@@ -440,7 +440,7 @@ export function importGscPerformance(input: {
   run(
     `
     INSERT INTO gsc_imports
-      (id, project_id, site_url, source_name, dimensions_json, row_count, totals_json, rows_json)
+      (id, site_id, site_url, source_name, dimensions_json, row_count, totals_json, rows_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
@@ -501,7 +501,7 @@ export async function getGscPerformance(input: {
 export function listGscConnections() {
   return all<GscConnection>("SELECT * FROM gsc_connections ORDER BY updated_at DESC").map(
     (row) => ({
-      siteId: row.project_id,
+      siteId: row.site_id,
       siteUrl: row.site_url,
       connected: Boolean(row.refresh_token || row.access_token),
       expiresAt: row.expires_at,
@@ -510,7 +510,7 @@ export function listGscConnections() {
 }
 
 export function disconnectGsc(siteId: string) {
-  run("DELETE FROM gsc_connections WHERE project_id = ?", [siteId]);
+  run("DELETE FROM gsc_connections WHERE site_id = ?", [siteId]);
   return { connected: false };
 }
 
@@ -521,7 +521,7 @@ export async function inspectGscUrls(input: {
 }) {
   const siteId = String(input.siteId || "");
   if (!siteId) throw new Error("Site id is required.");
-  const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
+  const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE site_id = ?", [
     siteId,
   ]);
   const siteUrl = input.siteUrl || connection?.site_url;
