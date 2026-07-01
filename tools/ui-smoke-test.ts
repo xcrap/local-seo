@@ -238,6 +238,12 @@ try {
     if (await page.getByText(/Search defaults|Search locale/i).count()) {
       throw new Error("Overview still presents keyword tool defaults as site search defaults or a site locale.");
     }
+    const siteControl = page.locator("section", { hasText: "Site control" });
+    await siteControl.getByRole("link", { name: /^Open organic$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open links$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open ranks$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open AI lab$/ }).waitFor();
 
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
@@ -320,6 +326,7 @@ try {
 
     await page.getByRole("navigation").getByRole("link", { name: /^Audits$/ }).click();
     await page.getByRole("heading", { name: /^All scan history$/ }).waitFor();
+    await page.getByRole("button", { name: /Delete scan/i }).first().waitFor();
     await page.getByRole("button", { name: /^Delete selected-site scans$/ }).click();
     await page.getByRole("heading", { name: /^Delete selected-site scans\?$/ }).waitFor();
     await page.getByRole("button", { name: /^Delete selected-site scans$/ }).click();

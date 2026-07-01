@@ -1629,7 +1629,7 @@ function SiteCommandCenter({
       area: "Organic research",
       status: summary?.savedKeywordCount ? "has keywords" : "ready",
       evidence: `${formatNumber(summary?.savedKeywordCount || 0)} saved keywords · local crawl pages feed this screen`,
-      action: <Button asChild size="sm" variant="secondary"><Link to="/domain"><Globe2 /> Open</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/domain"><Globe2 /> Open organic</Link></Button>,
       secondary: null,
     },
     {
@@ -1639,7 +1639,7 @@ function SiteCommandCenter({
       evidence: latestAudit
         ? `${formatNumber(latestAuditSummary.linkTags || 0)} link tags · ${formatNumber(latestAuditSummary.brokenLinks || 0)} broken`
         : "Run a site scan to build the local link graph.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/backlinks"><Link2 /> Open</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/backlinks"><Link2 /> Open links</Link></Button>,
       secondary: null,
     },
     {
@@ -1647,7 +1647,7 @@ function SiteCommandCenter({
       area: "Rank tracking",
       status: summary?.trackerCount ? "tracking" : "manual",
       evidence: `${formatNumber(summary?.trackerCount || 0)} trackers · ${formatNumber(summary?.serpRunCount || 0)} SERP runs`,
-      action: <Button asChild size="sm" variant="secondary"><Link to="/rank"><Target /> Open</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/rank"><Target /> Open ranks</Link></Button>,
       secondary: null,
     },
     {
@@ -1657,7 +1657,7 @@ function SiteCommandCenter({
       evidence: summary?.gscImportCount
         ? `${formatNumber(summary.gscImportCount)} CSV imports · latest has ${formatNumber(latestGscImport?.rowCount || 0)} rows and ${formatNumber(latestGscImport?.totals?.clicks || 0)} clicks`
         : "Import a Search Console CSV locally, or connect Google for live performance and inspection.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/gsc"><BarChart3 /> Open</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/gsc"><BarChart3 /> Open Search Console</Link></Button>,
       secondary: null,
     },
     {
@@ -1665,7 +1665,7 @@ function SiteCommandCenter({
       area: "AI lab",
       status: summary?.latestAiJobs?.length ? "has jobs" : "ready",
       evidence: `${formatNumber(summary?.latestAiJobs?.length || 0)} saved Codex jobs · runs locally with medium reasoning`,
-      action: <Button asChild size="sm" variant="secondary"><Link to="/ai"><Bot /> Open</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/ai"><Bot /> Open AI lab</Link></Button>,
       secondary: null,
     },
   ];
@@ -1727,7 +1727,7 @@ function ScanCoverageList({ rows, auditStatus }: { rows: any[]; auditStatus?: st
             <p className="text-sm leading-6 text-muted-foreground">{row.message}</p>
             {row.route ? (
               <Button asChild size="sm" variant="outline">
-                <Link to={row.route}>Open</Link>
+                <Link to={row.route}>{row.key === "technical-audit" ? "Open report" : `Open ${String(row.label || "").toLowerCase()}`}</Link>
               </Button>
             ) : null}
           </div>
@@ -4396,7 +4396,7 @@ function AuditTable({
                       aria-label={`Delete scan report for ${row.url}`}
                       onClick={(event) => { event.stopPropagation(); onDelete(row.id, row); }}
                     >
-                      <Trash2 />
+                      <Trash2 /> Delete scan
                     </Button>
                   )}
                 </div>

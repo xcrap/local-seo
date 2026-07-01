@@ -403,6 +403,14 @@ try {
   if (!webAppClient.includes("<Pencil /> Edit") || !webAppClient.includes("<Trash2 /> Delete") || !webAppClient.includes('"Scan site"')) {
     throw new Error("Saved-site table actions should be visible text buttons for scan, edit, and delete.");
   }
+  for (const explicitDashboardAction of ["Open organic", "Open links", "Open ranks", "Open Search Console", "Open AI lab"]) {
+    if (!webAppClient.includes(explicitDashboardAction)) {
+      throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
+    }
+  }
+  if (!webAppClient.includes("<Trash2 /> Delete scan")) {
+    throw new Error("Scan history deletion should be a visible Delete scan button, not an icon-only control.");
+  }
   if (!webAppClient.includes("<TableHead>URL</TableHead>") || !webAppClient.includes("<TableHead>Window</TableHead>")) {
     throw new Error("Audit link tables should label URL columns and HTML target-window attributes clearly.");
   }
