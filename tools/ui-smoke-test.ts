@@ -195,6 +195,11 @@ try {
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Images$/ }).click();
     await page.getByText("Image tag inventory").waitFor();
+    await page.getByRole("tab", { name: /^Speed$/ }).click();
+    await page.getByRole("heading", { name: /^Page speed evidence$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Page response timings$/ }).waitFor();
+    await page.getByRole("row", { name: /about.*ms/i }).waitFor();
+    await page.getByRole("heading", { name: /^Performance issues$/ }).waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Checks$/ }).click();
     await page.getByRole("heading", { name: /^Audit checks$/ }).waitFor();

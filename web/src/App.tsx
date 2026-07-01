@@ -4594,6 +4594,7 @@ function AuditDetail({ audit }: { audit: any }) {
           <TabsTrigger value="links">Links</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="assets">Assets</TabsTrigger>
+          <TabsTrigger value="speed">Speed</TabsTrigger>
           <TabsTrigger value="crawl">Robots/Sitemap</TabsTrigger>
           <TabsTrigger value="raw">Evidence</TabsTrigger>
         </TabsList>
@@ -4726,6 +4727,9 @@ function AuditDetail({ audit }: { audit: any }) {
               <AuditAssetsTable rows={assets} />
             </AuditSection>
           ) : <EmptyState title="No CSS or JavaScript assets checked yet" text="Assets are checked after links and images." />}
+        </TabsContent>
+        <TabsContent value="speed" className="space-y-4">
+          <AuditSpeedReport pages={pages} issues={issues} assets={assets} summary={summary} coverage={coverage} />
         </TabsContent>
         <TabsContent value="crawl" className="space-y-4">
           <AuditCrawlEvidence result={result} coverage={coverage} />
@@ -5214,6 +5218,147 @@ function AuditActionBoard({
         <EmptyState title="No priority blockers" text={audit.status === "completed" ? "High and medium issue groups are clear." : "Priority issues appear while the scan runs."} />
       )}
     </ReportSection>
+  );
+}
+
+const speedIssueTypes = [
+  "slow-page",
+  "page-response-slow",
+  "viewport-missing",
+  "viewport-not-responsive",
+  "heavy-html",
+  "html-compression-missing",
+  "image-lazy-loading-missing",
+  "broken-css",
+  "broken-javascript",
+  "css-invalid-content-type",
+  "javascript-invalid-content-type",
+  "large-css",
+  "large-javascript",
+  "render-blocking-javascript",
+  "too-many-assets",
+];
+
+function speedVariant(loadMs: unknown) {
+  const value = Number(loadMs);
+  if (!Number.isFinite(value)) return "outline";
+  if (value > 4000) return "bad";
+  if (value > 2000) return "warn";
+  return "good";
+}
+
+function AuditSpeedReport({
+  pages,
+  issues,
+  assets,
+  summary,
+  coverage,
+}: {
+  pages: any[];
+  issues: any[];
+  assets: any[];
+  summary: any;
+  coverage: ReturnType<typeof auditCoverageMetrics>;
+}) {
+  const timedPages = [...pages]
+    .filter((page) => Number.isFinite(Number(page.loadMs)))
+    .sort((a, b) => Number(b.loadMs || 0) - Number(a.loadMs || 0));
+  const speedIssues = issues.filter((issue) =>
+    issue.category === "performance" ||
+    issue.category === "assets" ||
+    speedIssueTypes.includes(String(issue.type || "")),
+  );
+  return (
+    <div className="space-y-4">
+      <ReportSection
+        title="Page speed evidence"
+        description="Crawler response timings, HTML weight, compression, and performance issues from this scan."
+      >
+        <StatusEvidenceTable
+          rows={[
+            {
+              title: "Measured pages",
+              status: formatNumber(coverage.measuredPageLoads),
+              tone: coverage.measuredPageLoads ? "good" : "outline",
+              text: `${formatNumber(coverage.pages)} pages crawled. ${formatNumber(coverage.measuredPageLoads)} HTML responses include timing evidence.`,
+            },
+            {
+              title: "Average response",
+              status: coverage.measuredPageLoads ? formatMs(coverage.averagePageLoadMs) : "not measured",
+              tone: speedVariant(coverage.averagePageLoadMs) as any,
+              text: `Median ${formatMs(coverage.medianPageLoadMs)} · p95 ${formatMs(coverage.p95PageLoadMs)} · slowest ${formatMs(coverage.slowestPageLoadMs)}.`,
+            },
+            {
+              title: "Slow pages",
+              status: formatNumber(coverage.slowPages),
+              tone: coverage.verySlowPages ? "bad" : coverage.slowPages ? "warn" : "good",
+              text: `${formatNumber(coverage.verySlowPages)} pages above 4,000 ms. ${formatNumber(coverage.slowPages)} pages above 2,000 ms.`,
+            },
+            {
+              title: "CSS/JS requests",
+              status: formatNumber(coverage.checkedAssets),
+              tone: coverage.brokenAssets ? "bad" : coverage.checkedAssets ? "good" : "outline",
+              text: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(summary.largeAssets || 0)} large · ${formatNumber(summary.renderBlockingScripts || 0)} render-blocking scripts.`,
+            },
+            {
+              title: "Image loading",
+              status: formatNumber(summary.imagesMissingLazyLoading || 0),
+              tone: summary.imagesMissingLazyLoading ? "warn" : "good",
+              text: "Lower-page content images without lazy loading increase page weight before users need them.",
+            },
+          ]}
+        />
+      </ReportSection>
+
+      <ReportSection title="Page response timings" description="Slowest pages first, with response size and compression evidence.">
+        {timedPages.length ? <AuditSpeedPagesTable rows={timedPages} /> : <EmptyState title="No page timings" text="Run a fresh audit to record response timing for each HTML page." />}
+      </ReportSection>
+
+      <ReportSection title="Performance issues" description="Only speed, payload, viewport, lazy-loading, and CSS/JS findings.">
+        {speedIssues.length ? <AuditIssuesTable rows={speedIssues} /> : <EmptyState title="No speed issues" text="The scan did not find slow pages or performance blockers." />}
+      </ReportSection>
+
+      {assets.length ? (
+        <ReportSection title="CSS and JavaScript requests" description="Fetched stylesheet and script URLs with status, type, and size.">
+          <AuditAssetsTable rows={assets} />
+        </ReportSection>
+      ) : null}
+    </div>
+  );
+}
+
+function AuditSpeedPagesTable({ rows }: { rows: any[] }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Page</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Response</TableHead>
+          <TableHead>Size</TableHead>
+          <TableHead>Compression</TableHead>
+          <TableHead>Timing issue</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((page) => {
+          const timingIssues = pageIssueTypesCount(page, ["slow-page", "page-response-slow"]);
+          return (
+            <TableRow key={page.url}>
+              <TableCell className="min-w-96">
+                <div className="break-all font-medium">{page.finalUrl || page.url}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{page.title || "Untitled page"}</div>
+              </TableCell>
+              <TableCell><Badge variant={page.status >= 400 ? "bad" : page.status >= 300 ? "warn" : "good"}>{page.status || "-"}</Badge></TableCell>
+              <TableCell><Badge variant={speedVariant(page.loadMs) as any}>{formatMs(page.loadMs)}</Badge></TableCell>
+              <TableCell className="nums">{formatBytes(page.contentLength)}</TableCell>
+              <TableCell><Badge variant={page.contentEncoding ? "good" : page.contentLength ? "warn" : "outline"}>{page.contentEncoding || "not advertised"}</Badge></TableCell>
+              <TableCell><Badge variant={timingIssues ? "warn" : "good"}>{timingIssues ? `${formatNumber(timingIssues)} issue${timingIssues === 1 ? "" : "s"}` : "clear"}</Badge></TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 
