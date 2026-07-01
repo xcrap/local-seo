@@ -280,6 +280,12 @@ try {
   if (!webAppClient.includes("Organic research site") || !webAppClient.includes("Backlink index site")) {
     throw new Error("Organic and Links pages should label their domain inputs as site-specific controls.");
   }
+  if (!webAppClient.includes("Issue results") || !webAppClient.includes("Show {formatNumber")) {
+    throw new Error("Audit issue actions should show an explicit filtered issue result count instead of generic Review buttons.");
+  }
+  if (webAppClient.includes("Review high") || webAppClient.includes("Use Review to jump") || webAppClient.includes("<ListChecks /> Review")) {
+    throw new Error("Audit report actions should say exactly which issues they open, not generic Review.");
+  }
   if (webAppClient.includes("rows.slice(0, 350)") || webAppClient.includes("Showing {formatNumber(visible.length)}")) {
     throw new Error("Audit evidence tables should not silently cap local link or image inventory rows.");
   }

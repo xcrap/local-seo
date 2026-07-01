@@ -4371,6 +4371,20 @@ function AuditDetail({ audit }: { audit: any }) {
     const checkOk = selectedCheckTypes.length === 0 || selectedCheckTypes.includes(issue.type);
     return severityOk && categoryOk && typeOk && checkOk;
   });
+  const activeIssueFilters = [
+    severityFilter !== "all" ? `${severityFilter} severity` : "",
+    categoryFilter !== "all" ? issueCategoryLabel(categoryFilter) : "",
+    typeFilter !== "all" ? typeFilter.replaceAll("-", " ") : "",
+    selectedCheckLabel,
+  ].filter(Boolean);
+  const resetIssueFilters = () => {
+    setSeverityFilter("all");
+    setCategoryFilter("all");
+    setTypeFilter("all");
+    setSelectedCheckTypes([]);
+    setSelectedCheckLabel("");
+    showIssues();
+  };
   return (
     <div className="space-y-5">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -4412,9 +4426,9 @@ function AuditDetail({ audit }: { audit: any }) {
                 ),
                 evidence: `${formatNumber(audit.issue_count)} total issues from ${formatNumber(coverage.pages)} crawled pages`,
                 action: severityCounts.high ? (
-                  <Button size="sm" variant="outline" onClick={() => selectSeverity("high")}>Review high</Button>
+                  <Button size="sm" variant="outline" onClick={() => selectSeverity("high")}>Show high issues</Button>
                 ) : (
-                  <Button size="sm" variant="outline" onClick={() => selectSeverity("all")}>Open issues</Button>
+                  <Button size="sm" variant="outline" onClick={() => selectSeverity("all")}>Show all issues</Button>
                 ),
               },
               {
@@ -4447,6 +4461,22 @@ function AuditDetail({ audit }: { audit: any }) {
           <AuditActionBoard audit={audit} summary={summary} coverage={coverage} issues={issues} issueGroups={issueGroups} onSelectGroup={selectIssueGroup} />
         </TabsContent>
         <TabsContent value="issues" className="space-y-2">
+          <div className="rounded-md border bg-muted/20 px-4 py-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-sm font-medium">Issue results</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Showing {formatNumber(filteredIssues.length)} of {formatNumber(issues.length)} saved issues
+                  {activeIssueFilters.length ? ` for ${activeIssueFilters.join(" · ")}` : "."}
+                </p>
+              </div>
+              {activeIssueFilters.length ? (
+                <Button size="sm" variant="outline" onClick={resetIssueFilters}>
+                  Clear filters
+                </Button>
+              ) : null}
+            </div>
+          </div>
           {issueGroups.length ? <AuditIssueGroups groups={issueGroups} onSelect={selectIssueGroup} /> : null}
           {categoryEntries.length ? (
             <div className="flex flex-wrap gap-2 pb-2">
@@ -4495,11 +4525,6 @@ function AuditDetail({ audit }: { audit: any }) {
               </SelectContent>
             </Select>
             {selectedCheckLabel ? <Badge variant="outline">Showing {selectedCheckLabel}</Badge> : null}
-            {(severityFilter !== "all" || categoryFilter !== "all" || typeFilter !== "all" || selectedCheckLabel) ? (
-              <Button size="sm" variant="ghost" onClick={() => { setSeverityFilter("all"); setCategoryFilter("all"); setTypeFilter("all"); setSelectedCheckTypes([]); setSelectedCheckLabel(""); showIssues(); }}>
-                Clear filters
-              </Button>
-            ) : null}
           </div>
           {filteredIssues.length ? <AuditIssuesTable rows={filteredIssues} /> : <EmptyState title="No matching issues" text={audit.status === "completed" ? "This filter has no issues." : "Issues will appear while the scan runs."} />}
         </TabsContent>
@@ -4686,7 +4711,7 @@ function AuditCrawlEvidence({
                 <TableRow key={row.metric}>
                   <TableCell className="font-medium">{row.metric}</TableCell>
                   <TableCell className="nums text-lg font-semibold">{formatNumber(row.count)}</TableCell>
-                  <TableCell><Badge variant={tone as any}>{row.problem ? (count ? "review" : "clear") : "measured"}</Badge></TableCell>
+                  <TableCell><Badge variant={tone as any}>{row.problem ? (count ? "inspect" : "clear") : "measured"}</Badge></TableCell>
                   <TableCell className="min-w-96 text-sm text-muted-foreground">{row.detail}</TableCell>
                 </TableRow>
               );
@@ -4935,7 +4960,7 @@ function AuditReportOverview({
       area: "Crawl scope",
       status: `${formatNumber(coverage.pages)} pages`,
       evidence: `${formatNumber(coverage.indexablePages)} indexable · ${formatNumber(coverage.nonIndexablePages)} non-indexable · ${formatNumber(coverage.unknownIndexabilityPages)} unknown · ${formatNumber(coverage.sitemapUrls)} sitemap-listed.`,
-      action: <Badge variant={coverage.unknownIndexabilityPages || coverage.nonIndexablePages ? "warn" : "good"}>{coverage.unknownIndexabilityPages ? "needs review" : "measured"}</Badge>,
+      action: <Badge variant={coverage.unknownIndexabilityPages || coverage.nonIndexablePages ? "warn" : "good"}>{coverage.unknownIndexabilityPages ? "needs checking" : "measured"}</Badge>,
     },
     {
       area: "Resources",
@@ -4953,7 +4978,7 @@ function AuditReportOverview({
       area: "Images",
       status: `${formatNumber(summary.missingAlt || 0)} alt issues · ${formatNumber(summary.imagesMissingDimensions || 0)} size issues`,
       evidence: `${formatNumber(summary.cssImageResources || 0)} CSS image URLs · ${formatNumber(summary.imagesMissingLazyLoading || 0)} lazy-loading issues · ${formatNumber(summary.largeImages || coverage.largeImages || 0)} large images.`,
-      action: <Badge variant={summary.imageIssues || coverage.brokenImages ? "warn" : "good"}>{summary.imageIssues || coverage.brokenImages ? "review" : "clear"}</Badge>,
+      action: <Badge variant={summary.imageIssues || coverage.brokenImages ? "warn" : "good"}>{summary.imageIssues || coverage.brokenImages ? "inspect" : "clear"}</Badge>,
     },
     {
       area: "Scan target",
@@ -5085,7 +5110,7 @@ function AuditActionBoard({
                     <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
-                        <ListChecks /> Review
+                        <ListChecks /> Show {formatNumber(group.count)} issues
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -5273,7 +5298,7 @@ function AuditCheckMatrix({
   const rows = sections.flatMap((section) => section.rows.map((row) => ({ ...row, area: section.title, areaText: section.text })));
 
   return (
-    <ReportSection title="Audit checks" description="Every local check grouped into one readable table. Use Review to jump to matching issues.">
+    <ReportSection title="Audit checks" description="Every local check grouped into one readable table. Use the issue buttons to open the matching rows.">
       <Table>
         <TableHeader>
           <TableRow>
@@ -5324,7 +5349,7 @@ function AuditCheckRow({ row, onSelect }: { row: AuditCheckRowModel & { area?: s
       <TableCell className="text-right">
         {clickable ? (
           <Button size="sm" variant="outline" onClick={() => onSelect(row)}>
-            <ListChecks /> Review
+            <ListChecks /> Show {formatNumber(value)} issues
           </Button>
         ) : row.problem ? (
           <Badge variant="good">No issues</Badge>
@@ -5373,7 +5398,7 @@ function AuditIssueGroups({ groups, onSelect }: { groups: any[]; onSelect: (grou
               <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
               <TableCell className="text-right">
                 <Button size="sm" variant="outline" onClick={() => onSelect(group)}>
-                  <ListChecks /> Review
+                  <ListChecks /> Show {formatNumber(group.count)} issues
                 </Button>
               </TableCell>
             </TableRow>
@@ -5427,7 +5452,7 @@ function AuditIssuesTable({ rows }: { rows: any[] }) {
                 </div>
               </TableCell>
               <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">
-                {issue.recommendation || "Review this item and update the affected page."}
+                {issue.recommendation || "Inspect this item and update the affected page."}
               </TableCell>
               <TableCell className="min-w-80 text-xs leading-5 text-muted-foreground">
                 {evidence.length ? evidence.map(([key, value]) => (

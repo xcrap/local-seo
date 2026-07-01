@@ -176,7 +176,9 @@ try {
     await page.getByRole("tab", { name: /^Issues$/ }).click();
     await page.getByRole("heading", { name: /^Priority work queue$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Recommended fix$/ }).waitFor();
-    await page.getByRole("button", { name: /Review/i }).first().click();
+    await page.getByRole("button", { name: /Show \d+ issues/i }).first().click();
+    await page.getByText(/Issue results/i).waitFor();
+    await page.getByText(/Showing \d+ of \d+ saved issues for/i).waitFor();
     await page.getByRole("button", { name: /Clear filters/i }).waitFor();
     await page.getByRole("columnheader", { name: /^Fix$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
@@ -189,10 +191,10 @@ try {
     await page.getByRole("columnheader", { name: /^Issue types$/ }).waitFor();
     const clearAuditCheckRow = page.getByRole("row").filter({ hasText: "No issues" }).first();
     await clearAuditCheckRow.waitFor();
-    if (await clearAuditCheckRow.getByRole("button", { name: /Review/i }).count()) {
-      throw new Error("Clear audit checks should not expose a Review button.");
+    if (await clearAuditCheckRow.getByRole("button", { name: /Show \d+ issues/i }).count()) {
+      throw new Error("Clear audit checks should not expose an issue-opening button.");
     }
-    await page.getByRole("row", { name: /Broken links/i }).getByRole("button", { name: /Review/i }).click();
+    await page.getByRole("row", { name: /Broken links/i }).getByRole("button", { name: /Show \d+ issues/i }).click();
     await page.getByText("Showing Broken links").waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Robots\/Sitemap$/ }).click();
