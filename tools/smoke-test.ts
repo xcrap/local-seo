@@ -400,8 +400,8 @@ try {
   if (/selected-site/i.test(webAppClient)) {
     throw new Error("The app should use active-site wording instead of selected-site implementation copy.");
   }
-  if (webAppClient.includes("window.location.href")) {
-    throw new Error("The app shell should use React Router navigation instead of full-page window.location.href route changes.");
+  if (webAppClient.includes("window.location.href") || webAppClient.includes("window.location.reload")) {
+    throw new Error("The app shell should use React Router/app state instead of full-page window.location route changes.");
   }
   if (webAppClient.includes("rows[0] || ledger[0]")) {
     throw new Error("Scan report selection should not hide context by auto-opening the newest global scan.");

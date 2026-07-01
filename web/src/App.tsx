@@ -1208,15 +1208,15 @@ function LoginScreen({ setupRequired, onSuccess }: { setupRequired: boolean; onS
   );
 }
 
-function AppRoot() {
+function AppRoot({ onLogout }: { onLogout: () => void }) {
   return (
     <BrowserRouter>
-      <AppShell />
+      <AppShell onLogout={onLogout} />
     </BrowserRouter>
   );
 }
 
-function AppShell() {
+function AppShell({ onLogout }: { onLogout: () => void }) {
   const [sites, setSites] = useState<Site[]>([]);
   const [activeSiteId, setActiveSiteId] = useState(
     localStorage.getItem(activeSiteStorageKey) || "",
@@ -1289,7 +1289,9 @@ function AppShell() {
 
   async function logout() {
     await auth.logout().catch(() => undefined);
-    window.location.reload();
+    setShellScanError("");
+    setShellScanning(false);
+    onLogout();
   }
 
   return (
@@ -7338,5 +7340,5 @@ export default function App() {
     return <LoginScreen setupRequired={setupRequired} onSuccess={() => setAuthenticated(true)} />;
   }
 
-  return <AppRoot />;
+  return <AppRoot onLogout={() => setAuthenticated(false)} />;
 }
