@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { getConfigValue } from "./config";
 import { createAiJob, getAiJob } from "./codex";
 import {
-  createProject,
+  createSite,
   brandLookup,
   backlinksOverview,
   getBacklinksProfile,
@@ -12,13 +12,13 @@ import {
   getSerpAnalysis,
   domainOverview,
   getAudit,
-  getProject,
+  getSite,
   listRankTrackers,
-  listProjects,
+  listSites,
   listSavedKeywords,
   querySavedKeywords,
   promptExplorer,
-  projectSummary,
+  siteSummary,
   researchKeywords,
   saveKeywords,
   startAudit,
@@ -431,18 +431,18 @@ async function callTool(name: string, args: any) {
   if ("target" in (args || {})) throw new Error("Use domain.");
   args = args?.siteId ? { ...args, projectId: args.siteId } : args;
   const withDomainInput = (input: any) => {
-    const domain = input?.domain || input?.domainOrUrl || input?.url;
+    const domain = input?.domain;
     return domain ? { ...input, domain } : input;
   };
   switch (name) {
     case "whoami":
       return { server: "local-seo", mode: "local-sqlite", cloudflare: false };
     case "list_sites":
-      return listProjects();
+      return listSites();
     case "create_site":
-      return createProject(args);
+      return createSite(args);
     case "get_site_summary":
-      return projectSummary(args.siteId);
+      return siteSummary(args.siteId);
     case "research_keywords":
       return researchKeywords(args);
     case "analyze_serp":
@@ -475,7 +475,7 @@ async function callTool(name: string, args: any) {
       return startAudit(args.projectId, args.url);
     case "scan_site": {
       const siteId = args.siteId;
-      const site = getProject(siteId);
+      const site = getSite(siteId);
       if (!site) throw new Error("Site not found.");
       const candidateUrls = args.url ? [String(args.url)] : site.domain ? siteScanCandidates(site) : [];
       const url = args.url || (site.domain ? await resolveSavedSiteScanUrl(site) : "");

@@ -14,7 +14,7 @@ try {
   const { resolveSavedSiteScanUrl } = await import("../src/site-target");
   expect(seo.sameSiteUrl("https://www.waka.pt/about/", "https://waka.pt"), "Root and www Waka URLs must share crawl scope.");
 
-  const project = seo.createProject({
+  const site = seo.createSite({
     name: "Waka live audit",
     domain: "waka.pt",
     locationCode: 2620,
@@ -22,12 +22,12 @@ try {
     crawlProtocol: "https",
     crawlHost: "both",
   });
-  const resolvedScanUrl = await resolveSavedSiteScanUrl(project);
+  const resolvedScanUrl = await resolveSavedSiteScanUrl(site);
   expect(
     resolvedScanUrl.startsWith("https://www.waka.pt"),
-    `Expected saved-site scan resolver to prefer Waka's live www HTTPS target, got ${resolvedScanUrl}.`,
+    `Expected saved-site scan resolver to prefer Waka's live www HTTPS URL, got ${resolvedScanUrl}.`,
   );
-  const started = seo.startAudit(project.id, resolvedScanUrl);
+  const started = seo.startAudit(site.id, resolvedScanUrl);
   expect(started?.id, "Could not start Waka audit.");
 
   const startedAt = Date.now();

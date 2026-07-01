@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import Papa from "papaparse";
 import { getConfigValue } from "./config";
 import { all, get, jsonParse, run } from "./db";
-import { getProject } from "./seo";
+import { getSite } from "./seo";
 
 const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 
@@ -420,7 +420,7 @@ export function importGscPerformance(input: {
 }) {
   const siteId = String(input.siteId || "");
   if (!siteId) throw new Error("Site id is required.");
-  const project = getProject(siteId);
+  const project = getSite(siteId);
   if (!project) throw new Error("Site not found.");
   const rawRows = input.csv ? parseGscCsv(input.csv) : input.rows || [];
   if (!rawRows.length) {

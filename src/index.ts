@@ -35,11 +35,11 @@ import {
   backlinksOverview,
   brandLookup,
   clearAudits,
-  createProject,
+  createSite,
   createRankTracker,
   dashboardSummary,
   deleteAudit,
-  deleteProject,
+  deleteSite,
   deleteSavedKeywordTag,
   domainOverview,
   exportSavedKeywordsCsv,
@@ -51,20 +51,20 @@ import {
   getRankKeywordHistory,
   getRankTrackerTrend,
   getSerpAnalysis,
-  getProject,
+  getSite,
   listBacklinkSnapshots,
   listAllAudits,
   listAudits,
   listBrandLookupRuns,
   listDomainSnapshots,
   listPromptExplorerRuns,
-  listProjects,
+  listSites,
   listRankTrackers,
   listSavedKeywordTags,
   listSavedKeywords,
   listSerpRuns,
   promptExplorer,
-  projectSummary,
+  siteSummary,
   querySavedKeywords,
   researchKeywords,
   refreshRankKeywordMetrics,
@@ -75,7 +75,7 @@ import {
   startAudit,
   updateSavedKeywordTag,
   updateSavedKeywordTags,
-  updateProject,
+  updateSite,
 } from "./seo";
 dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local", override: true });
@@ -111,28 +111,12 @@ async function readSiteScopedJson(c: any) {
 function domainScopedBody(body: Record<string, any>) {
   if ("target" in body) throw new Error("Use domain.");
   const scoped = siteScopedBody(body);
-  const domain = body.domain || body.domainOrUrl || body.url;
+  const domain = body.domain;
   return domain ? { ...scoped, domain } : scoped;
 }
 
 async function readDomainScopedJson(c: any) {
   return domainScopedBody(await readJson(c));
-}
-
-function publicSerpResult(row: any) {
-  if (!row || typeof row !== "object") return row;
-  const { target, targetPosition, rows, ...rest } = row;
-  return {
-    ...rest,
-    rows: Array.isArray(rows)
-      ? rows.map((resultRow: any) => {
-        const { isTarget, ...resultRest } = resultRow || {};
-        return { ...resultRest, isDomain: Boolean(isTarget) };
-      })
-      : rows,
-    domain: rest.domain || target || "",
-    domainPosition: targetPosition ?? null,
-  };
 }
 
 function siteQueryId(c: any) {
@@ -270,7 +254,7 @@ app.put(
 );
 
 async function startSavedSiteScan(c: any) {
-  const site = getProject(c.req.param("id"));
+  const site = getSite(c.req.param("id"));
   if (!site) return c.json({ error: "Site not found." }, 404);
   if (!site.domain) return c.json({ error: "Set a site domain first." }, 400);
   const candidateUrls = siteScanCandidates(site);
@@ -323,17 +307,17 @@ async function startSavedSiteScan(c: any) {
   });
 }
 
-app.get("/api/sites", safe((c) => c.json(listProjects())));
+app.get("/api/sites", safe((c) => c.json(listSites())));
 app.post(
   "/api/sites",
-  safe(async (c) => c.json(createProject((await readJson(c)) as any))),
+  safe(async (c) => c.json(createSite((await readJson(c)) as any))),
 );
-app.get("/api/sites/:id", safe((c) => c.json(projectSummary(c.req.param("id")))));
+app.get("/api/sites/:id", safe((c) => c.json(siteSummary(c.req.param("id")))));
 app.put(
   "/api/sites/:id",
-  safe(async (c) => c.json(updateProject(c.req.param("id"), await readJson(c)))),
+  safe(async (c) => c.json(updateSite(c.req.param("id"), await readJson(c)))),
 );
-app.delete("/api/sites/:id", safe((c) => c.json(deleteProject(c.req.param("id")))));
+app.delete("/api/sites/:id", safe((c) => c.json(deleteSite(c.req.param("id")))));
 app.post("/api/sites/:id/scan", safe(startSavedSiteScan));
 
 app.post(
@@ -397,7 +381,7 @@ app.get(
 );
 app.post(
   "/api/serp/analyze",
-  safe(async (c) => c.json(publicSerpResult(await getSerpAnalysis((await readDomainScopedJson(c)) as any)))),
+  safe(async (c) => c.json(await getSerpAnalysis((await readDomainScopedJson(c)) as any))),
 );
 
 app.get(

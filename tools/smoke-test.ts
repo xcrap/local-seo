@@ -281,7 +281,15 @@ try {
   if (apiServerSource.includes('"/api/projects')) {
     throw new Error("Public API routes should expose /api/sites only, not legacy /api/projects aliases.");
   }
+  if (/domainOrUrl|body\.domain\s*\|\|\s*body\.url/.test(apiServerSource)) {
+    throw new Error("Domain APIs should require domain explicitly instead of keeping old domainOrUrl/url aliases.");
+  }
   const seoSource = await readFile(path.join(rootDir, "src/seo.ts"), "utf8");
+  for (const legacySeoName of ["type Project", "createProject", "getProject", "listProjects", "updateProject", "deleteProject", "projectSummary"]) {
+    if (seoSource.includes(legacySeoName)) {
+      throw new Error(`SEO service should use site-named exports, not ${legacySeoName}.`);
+    }
+  }
   if (seoSource.includes("activeProject:") || /^\s*projects:/m.test(seoSource)) {
     throw new Error("Dashboard API should return activeSite/sites terminology.");
   }
@@ -884,10 +892,18 @@ try {
   await request(`/api/rank-trackers/${tracker.id}/refresh-metrics`, { method: "POST" });
   await request(`/api/rank-trackers/${tracker.id}/check`, { method: "POST" });
   await request(`/api/rank-trackers/${tracker.id}/trend`);
-  await request("/api/brand-lookup", {
+  const brandLookupResult = await request("/api/brand-lookup", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, query: "Example", competitors: "competitor.com" }),
   });
+  if (
+    "resolvedTarget" in brandLookupResult ||
+    brandLookupResult.shareOfVoice?.some((row: any) => "target" in row) ||
+    !brandLookupResult.resolvedEntity ||
+    !brandLookupResult.shareOfVoice?.some((row: any) => row.isPrimary === true)
+  ) {
+    throw new Error(`AI visibility should expose entity fields, not target fields: ${JSON.stringify(brandLookupResult)}`);
+  }
   await request("/api/prompt-explorer", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, prompt: "best seo software", highlightBrand: "Example" }),
@@ -990,6 +1006,20 @@ try {
     const siteSummaryWithFullHistory = await request(`/api/sites/${project.id}`);
     if (!siteSummaryWithFullHistory.site || "project" in siteSummaryWithFullHistory) {
       throw new Error(`Site summary response should expose site, not project: ${JSON.stringify(siteSummaryWithFullHistory)}`);
+    }
+    for (const row of [
+      ...(siteSummaryWithFullHistory.serpRuns || []),
+      ...(siteSummaryWithFullHistory.brandLookupRuns || []),
+    ]) {
+      if ("target" in (row.result || {}) || "targetPosition" in (row.result || {}) || "resolvedTarget" in (row.result || {})) {
+        throw new Error(`Site summary SERP/AI rows should expose domain/entity fields: ${JSON.stringify(row)}`);
+      }
+      if ((row.result?.rows || []).some((resultRow: any) => "isTarget" in resultRow)) {
+        throw new Error(`SERP history rows should expose isDomain, not isTarget: ${JSON.stringify(row)}`);
+      }
+      if ((row.result?.shareOfVoice || []).some((resultRow: any) => "target" in resultRow)) {
+        throw new Error(`AI visibility history rows should expose isPrimary, not target: ${JSON.stringify(row)}`);
+      }
     }
     for (const row of [
       ...(siteSummaryWithFullHistory.domainSnapshots || []),

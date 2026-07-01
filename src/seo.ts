@@ -6,7 +6,7 @@ import { createAiJob } from "./codex";
 import { all, get, jsonParse, nowIso, run } from "./db";
 import { getConfigValue } from "./config";
 
-export type Project = {
+export type Site = {
   id: string;
   name: string;
   domain: string;
@@ -240,15 +240,15 @@ async function searchWeb(query: string, limit: number) {
   return searchDuckDuckGo(query, limit);
 }
 
-export function listProjects() {
-  return all<Project>("SELECT * FROM projects ORDER BY created_at DESC");
+export function listSites() {
+  return all<Site>("SELECT * FROM projects ORDER BY created_at DESC");
 }
 
-export function getProject(projectId: string) {
-  return get<Project>("SELECT * FROM projects WHERE id = ?", [projectId]);
+export function getSite(projectId: string) {
+  return get<Site>("SELECT * FROM projects WHERE id = ?", [projectId]);
 }
 
-export function createProject(input: {
+export function createSite(input: {
   name: string;
   domain?: string;
   notes?: string;
@@ -284,13 +284,13 @@ export function createProject(input: {
       crawlHost,
     ],
   );
-  return getProject(id)!;
+  return getSite(id)!;
 }
 
-export function updateProject(projectId: string, input: Partial<Project>) {
-  const existing = getProject(projectId);
+export function updateSite(projectId: string, input: Partial<Site>) {
+  const existing = getSite(projectId);
   if (!existing) throw new Error("Site not found.");
-  const body = input as Partial<Project> & {
+  const body = input as Partial<Site> & {
     crawlProtocol?: CrawlProtocol | string;
     crawlHost?: CrawlHost | string;
   };
@@ -311,10 +311,10 @@ export function updateProject(projectId: string, input: Partial<Project>) {
       projectId,
     ],
   );
-  return getProject(projectId)!;
+  return getSite(projectId)!;
 }
 
-export function deleteProject(projectId: string) {
+export function deleteSite(projectId: string) {
   const info = run("DELETE FROM projects WHERE id = ?", [projectId]);
   return { id: projectId, deleted: Number(info.changes || 0) > 0 };
 }
@@ -378,6 +378,37 @@ function publicDomainSnapshotRow(row: any) {
   };
 }
 
+function publicSerpResult(result: any) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+  const { target, targetPosition, rows, ...rest } = result;
+  return {
+    ...rest,
+    rows: Array.isArray(rows)
+      ? rows.map((row: any) => {
+          const { isTarget, ...rowRest } = row || {};
+          return { ...rowRest, isDomain: Boolean(rowRest.isDomain ?? isTarget) };
+        })
+      : rows,
+    domain: rest.domain || target || "",
+    domainPosition: rest.domainPosition ?? targetPosition ?? null,
+  };
+}
+
+function publicBrandLookupResult(result: any) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+  const { resolvedTarget, shareOfVoice, ...rest } = result;
+  return {
+    ...rest,
+    resolvedEntity: rest.resolvedEntity || resolvedTarget || "",
+    shareOfVoice: Array.isArray(shareOfVoice)
+      ? shareOfVoice.map((row: any) => {
+          const { target, ...rowRest } = row || {};
+          return { ...rowRest, isPrimary: Boolean(rowRest.isPrimary ?? target) };
+        })
+      : shareOfVoice,
+  };
+}
+
 async function duckDuckGoSuggestions(query: string, limit: number): Promise<KeywordRow[]> {
   const response = await fetchJson(`https://duckduckgo.com/ac/?q=${encodeURIComponent(query)}&type=list`);
   if (!response.ok) throw new Error(`DuckDuckGo suggestions ${response.status}`);
@@ -423,7 +454,7 @@ export async function researchKeywords(input: {
   languageCode?: string;
   limit?: number;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const query = input.query.trim();
   if (!query) throw new Error("Keyword query is required.");
@@ -478,7 +509,7 @@ export function saveKeywords(input: {
   tagMode?: "append" | "replace";
   source?: string;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const tagNames = parseList(input.tags).map(normalizeTagName).filter(Boolean);
   for (const tag of tagNames) ensureSavedKeywordTag(project.id, tag);
@@ -592,7 +623,7 @@ export function querySavedKeywords(input: {
   sort?: string;
   order?: string;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const search = String(input.search || "").trim().toLowerCase();
   const includeTerms = parseList(input.includeTerms).map((item) => item.toLowerCase());
@@ -660,7 +691,7 @@ export function updateSavedKeywordTags(input: {
   removeTagNames?: string[] | string;
   removeTagIds?: string[];
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const addTags = parseList(input.addTags).map(normalizeTagName).filter(Boolean);
   const removeTagNames = new Set(parseList(input.removeTagNames).map(normalizeTagName));
@@ -688,7 +719,7 @@ export function updateSavedKeywordTag(input: {
   name?: string;
   color?: string | null;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const tag = get<any>("SELECT * FROM saved_keyword_tags WHERE id = ? AND project_id = ?", [
     input.tagId,
@@ -712,7 +743,7 @@ export function updateSavedKeywordTag(input: {
 }
 
 export function deleteSavedKeywordTag(input: { projectId: string; tagId: string }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const tag = get<any>("SELECT * FROM saved_keyword_tags WHERE id = ? AND project_id = ?", [
     input.tagId,
@@ -729,7 +760,7 @@ export function deleteSavedKeywordTag(input: { projectId: string; tagId: string 
 }
 
 export function removeSavedKeywords(projectId: string, savedKeywordIds: string[]) {
-  const project = getProject(projectId);
+  const project = getSite(projectId);
   if (!project) throw new Error("Site not found.");
   let removed = 0;
   for (const id of savedKeywordIds || []) {
@@ -780,7 +811,7 @@ export function createRankTracker(input: {
   device?: string;
   depth?: number;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const id = randomUUID();
   run(
@@ -1036,14 +1067,14 @@ export async function runRankCheck(trackerId: string) {
   return { runId, tracker: listRankTrackers(tracker.project_id).find((item) => item.id === trackerId) };
 }
 
-export async function domainOverview(input: { projectId: string; domain?: string; target?: string }) {
-  const project = getProject(input.projectId);
+export async function domainOverview(input: { projectId: string; domain?: string }) {
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.domain || input.target || project.domain);
-  if (!target) throw new Error("Domain is required.");
+  const domain = normalizeDomain(input.domain || project.domain);
+  if (!domain) throw new Error("Domain is required.");
   if (!dataForSeoReady()) {
     return emptyProviderResult("Organic research", {
-      domain: target,
+      domain,
       organicKeywords: null,
       organicTraffic: null,
       estimatedValue: null,
@@ -1055,12 +1086,12 @@ export async function domainOverview(input: { projectId: string; domain?: string
   let result: any;
   try {
     const data = await dataForSeo("/v3/dataforseo_labs/google/domain_rank_overview/live", [
-      { target, location_code: project.location_code, language_code: project.language_code },
+      { target: domain, location_code: project.location_code, language_code: project.language_code },
     ]);
     const raw = data.tasks?.[0]?.result?.[0] || {};
     const metrics = raw.metrics?.organic || raw.metrics || {};
     result = {
-      domain: target,
+      domain,
       organicKeywords: numberOrNull(metrics.count ?? raw.organic_keywords),
       organicTraffic: numberOrNull(metrics.etv ?? raw.organic_traffic),
       estimatedValue: numberOrNull(metrics.estimated_paid_traffic_cost ?? raw.estimated_value),
@@ -1071,7 +1102,7 @@ export async function domainOverview(input: { projectId: string; domain?: string
   } catch (error) {
     return emptyProviderResult("Organic research", {
       source: "dataforseo-error",
-      domain: target,
+      domain,
       organicKeywords: null,
       organicTraffic: null,
       estimatedValue: null,
@@ -1082,7 +1113,7 @@ export async function domainOverview(input: { projectId: string; domain?: string
   }
   run(
     "INSERT INTO domain_snapshots (id, project_id, target, source, result_json) VALUES (?, ?, ?, ?, ?)",
-    [randomUUID(), project.id, target, "dataforseo", JSON.stringify(result)],
+    [randomUUID(), project.id, domain, "dataforseo", JSON.stringify(result)],
   );
   return { source: "dataforseo", ...result };
 }
@@ -1119,7 +1150,7 @@ export async function getDomainKeywordSuggestions(input: {
   domain?: string;
   limit?: number;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const target = normalizeDomain(input.domain || project.domain);
   const limit = Math.max(5, Math.min(100, input.limit || 25));
@@ -1144,7 +1175,7 @@ export async function getDomainKeywordsPage(input: {
   sortOrder?: string;
   search?: string;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const target = normalizeDomain(input.domain || project.domain);
   if (!target) throw new Error("Domain is required.");
@@ -1222,7 +1253,7 @@ export async function getDomainPagesPage(input: {
   sortOrder?: string;
   search?: string;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const target = normalizeDomain(input.domain || project.domain);
   if (!target) throw new Error("Domain is required.");
@@ -1298,14 +1329,14 @@ export function listDomainSnapshots(projectId: string) {
   ).map(publicDomainSnapshotRow);
 }
 
-export async function backlinksOverview(input: { projectId: string; domain?: string; target?: string }) {
-  const project = getProject(input.projectId);
+export async function backlinksOverview(input: { projectId: string; domain?: string }) {
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.domain || input.target || project.domain);
-  if (!target) throw new Error("Domain is required.");
+  const domain = normalizeDomain(input.domain || project.domain);
+  if (!domain) throw new Error("Domain is required.");
   if (!dataForSeoReady()) {
     return emptyProviderResult("Backlink index data", {
-      domain: target,
+      domain,
       backlinks: null,
       referringDomains: null,
       dofollowRatio: null,
@@ -1315,10 +1346,10 @@ export async function backlinksOverview(input: { projectId: string; domain?: str
   }
   let result: any;
   try {
-    const data = await dataForSeo("/v3/backlinks/summary/live", [{ target }]);
+    const data = await dataForSeo("/v3/backlinks/summary/live", [{ target: domain }]);
     const raw = data.tasks?.[0]?.result?.[0] || {};
     result = {
-      domain: target,
+      domain,
       backlinks: numberOrNull(raw.backlinks),
       referringDomains: numberOrNull(raw.referring_domains),
       dofollowRatio: numberOrNull(raw.dofollow_ratio),
@@ -1329,7 +1360,7 @@ export async function backlinksOverview(input: { projectId: string; domain?: str
   } catch (error) {
     return emptyProviderResult("Backlink index data", {
       source: "dataforseo-error",
-      domain: target,
+      domain,
       backlinks: null,
       referringDomains: null,
       dofollowRatio: null,
@@ -1340,7 +1371,7 @@ export async function backlinksOverview(input: { projectId: string; domain?: str
   }
   run(
     "INSERT INTO backlink_snapshots (id, project_id, target, source, result_json) VALUES (?, ?, ?, ?, ?)",
-    [randomUUID(), project.id, target, "dataforseo", JSON.stringify(result)],
+    [randomUUID(), project.id, domain, "dataforseo", JSON.stringify(result)],
   );
   return { source: "dataforseo", ...result };
 }
@@ -1348,7 +1379,6 @@ export async function backlinksOverview(input: { projectId: string; domain?: str
 export async function getBacklinksProfile(input: {
   projectId: string;
   domain?: string;
-  target?: string;
   scope?: "domain" | "page";
   tab?: "backlinks" | "domains" | "pages";
   page?: number;
@@ -1357,10 +1387,10 @@ export async function getBacklinksProfile(input: {
   sortOrder?: string;
   mode?: string;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.domain || input.target || project.domain);
-  if (!target) throw new Error("Domain is required.");
+  const domain = normalizeDomain(input.domain || project.domain);
+  if (!domain) throw new Error("Domain is required.");
   const tab = input.tab || "backlinks";
   const page = Math.max(1, Number(input.page || 1));
   const pageSize = Math.max(10, Math.min(200, Number(input.pageSize || 50)));
@@ -1385,7 +1415,7 @@ export async function getBacklinksProfile(input: {
             : "/v3/backlinks/backlinks/live";
       const data = await dataForSeo(path, [
         {
-          target,
+          target: domain,
           limit: pageSize,
           offset: (page - 1) * pageSize,
           order_by: [
@@ -1453,7 +1483,7 @@ export async function getBacklinksProfile(input: {
     }
   }
 
-  return { source, domain: target, tab, ...result };
+  return { source, domain, tab, ...result };
 }
 
 export function listBacklinkSnapshots(projectId: string) {
@@ -1499,21 +1529,21 @@ export function getAudit(auditId: string) {
 }
 
 export function deleteAudit(projectId: string, auditId: string) {
-  const project = getProject(projectId);
+  const project = getSite(projectId);
   if (!project) throw new Error("Site not found.");
   const info = run("DELETE FROM audits WHERE id = ? AND project_id = ?", [auditId, project.id]);
   return { deleted: Number(info.changes || 0) > 0 };
 }
 
 export function clearAudits(projectId: string) {
-  const project = getProject(projectId);
+  const project = getSite(projectId);
   if (!project) throw new Error("Site not found.");
   const info = run("DELETE FROM audits WHERE project_id = ?", [project.id]);
   return { deleted: Number(info.changes || 0) };
 }
 
 export function startAudit(projectId: string, url: string) {
-  const project = getProject(projectId);
+  const project = getSite(projectId);
   if (!project) throw new Error("Site not found.");
   const auditId = randomUUID();
   run(
@@ -1531,20 +1561,20 @@ export function startAudit(projectId: string, url: string) {
   return getAudit(auditId);
 }
 
-function emptySerpResult(keyword: string, target: string) {
-  const normalizedTarget = normalizeDomain(target);
+function emptySerpResult(keyword: string, domain: string) {
+  const normalizedDomain = normalizeDomain(domain);
   return {
     keyword,
-    target: normalizedTarget,
-    targetPosition: null,
+    domain: normalizedDomain,
+    domainPosition: null,
     rows: [],
     intentMix: null,
     opportunities: [
       "Compare headings from the top three pages before drafting content.",
       "Look for recurring entities and questions in SERP titles.",
-      normalizedTarget
-        ? "Improve internal links to the ranking URL if the target is outside the top 5."
-        : "Set a site domain to track target ownership.",
+      normalizedDomain
+        ? "Improve internal links to the ranking URL when this domain is outside the top 5."
+        : "Set a site domain to track ownership in ranking rows.",
     ],
   };
 }
@@ -1553,17 +1583,16 @@ export async function getSerpAnalysis(input: {
   projectId: string;
   keyword: string;
   domain?: string;
-  target?: string;
   depth?: number;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const keyword = input.keyword.trim();
   if (!keyword) throw new Error("Keyword is required.");
-  const target = normalizeDomain(input.domain || input.target || project.domain);
+  const domain = normalizeDomain(input.domain || project.domain);
   const depth = Math.max(10, Math.min(100, input.depth || 20));
   let source = "duckduckgo";
-  let result: any = emptySerpResult(keyword, target);
+  let result: any = emptySerpResult(keyword, domain);
 
   if (dataForSeoReady()) {
     try {
@@ -1584,16 +1613,16 @@ export async function getSerpAnalysis(input: {
           url: String(item.url || ""),
           title: String(item.title || ""),
           description: String(item.description || ""),
-          isTarget: target ? normalizeDomain(item.domain || item.url || "").includes(target) : false,
+          isDomain: domain ? normalizeDomain(item.domain || item.url || "").includes(domain) : false,
         }))
         .filter((row: any) => row.rank > 0);
       if (rows.length > 0) {
         result = {
           keyword,
-          target,
-          targetPosition: rows.find((row: any) => row.isTarget)?.rank ?? null,
+          domain,
+          domainPosition: rows.find((row: any) => row.isDomain)?.rank ?? null,
           rows,
-          opportunities: emptySerpResult(keyword, target).opportunities,
+          opportunities: emptySerpResult(keyword, domain).opportunities,
           rawCost: data.cost,
         };
         source = "dataforseo";
@@ -1609,10 +1638,10 @@ export async function getSerpAnalysis(input: {
         ...result,
         rows: rows.map((row) => ({
           ...row,
-          isTarget: target ? row.domain.includes(target) : false,
+          isDomain: domain ? row.domain.includes(domain) : false,
         })),
       };
-      result.targetPosition = result.rows.find((row: any) => row.isTarget)?.rank ?? null;
+      result.domainPosition = result.rows.find((row: any) => row.isDomain)?.rank ?? null;
       source = rows[0]?.source || "duckduckgo";
     } catch (error) {
       source = "search-error";
@@ -1631,7 +1660,7 @@ export async function getSerpAnalysis(input: {
       id,
       project.id,
       keyword,
-      target,
+      domain,
       project.location_code,
       project.language_code,
       source,
@@ -1645,7 +1674,7 @@ export function listSerpRuns(projectId: string) {
   return all<any>(
     "SELECT * FROM serp_runs WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
-  ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
+  ).map((row) => ({ ...row, result: publicSerpResult(jsonParse(row.result_json, {})) }));
 }
 
 function splitCompetitors(value: string | string[] | undefined) {
@@ -1661,7 +1690,7 @@ export async function brandLookup(input: {
   query: string;
   competitors?: string[] | string;
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const query = (input.query || project.domain || project.name).trim();
   if (!query) throw new Error("Brand or domain is required.");
@@ -1669,7 +1698,7 @@ export async function brandLookup(input: {
   let source = "web-search";
   let result: any = {
     query,
-    resolvedTarget: normalizeDomain(query) || query,
+    resolvedEntity: normalizeDomain(query) || query,
     platforms: [],
     shareOfVoice: [],
     citations: [],
@@ -1700,13 +1729,13 @@ export async function brandLookup(input: {
       const rowsByLabel = await Promise.all(
         labels.map(async (label) => ({
           label,
-          target: label === query,
+          isPrimary: label === query,
           rows: await searchWeb(`"${label}"`, 10),
         })),
       );
       result.citations = rowsByLabel[0]?.rows || [];
       result.shareOfVoice = rowsByLabel
-        .map((item) => ({ label: item.label, value: item.rows.length, target: item.target }))
+        .map((item) => ({ label: item.label, value: item.rows.length, isPrimary: item.isPrimary }))
         .sort((a, b) => b.value - a.value);
       result.platforms = [
         {
@@ -1731,7 +1760,7 @@ export async function brandLookup(input: {
     `,
     [id, project.id, query, JSON.stringify(competitors), source, JSON.stringify(result)],
   );
-  return { id, source, ...result };
+  return { id, source, ...publicBrandLookupResult(result) };
 }
 
 export function listBrandLookupRuns(projectId: string) {
@@ -1741,7 +1770,7 @@ export function listBrandLookupRuns(projectId: string) {
   ).map((row) => ({
     ...row,
     competitors: jsonParse<string[]>(row.competitors, []),
-    result: jsonParse(row.result_json, {}),
+    result: publicBrandLookupResult(jsonParse(row.result_json, {})),
   }));
 }
 
@@ -1751,7 +1780,7 @@ export async function promptExplorer(input: {
   highlightBrand?: string;
   models?: string[];
 }) {
-  const project = getProject(input.projectId);
+  const project = getSite(input.projectId);
   if (!project) throw new Error("Site not found.");
   const prompt = input.prompt.trim();
   if (!prompt) throw new Error("Prompt is required.");
@@ -4062,8 +4091,8 @@ async function runLocalAudit(auditId: string) {
 }
 
 export function dashboardSummary(projectId?: string) {
-  const projects = listProjects();
-  const project = projectId ? getProject(projectId) || projects[0] : projects[0];
+  const projects = listSites();
+  const project = projectId ? getSite(projectId) || projects[0] : projects[0];
   if (!project) {
     return {
       activeSite: null,
@@ -4134,8 +4163,8 @@ export function dashboardSummary(projectId?: string) {
   };
 }
 
-export function projectSummary(projectId: string) {
-  const project = getProject(projectId);
+export function siteSummary(projectId: string) {
+  const project = getSite(projectId);
   if (!project) throw new Error("Site not found.");
   return {
     site: project,

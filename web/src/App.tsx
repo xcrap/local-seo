@@ -3684,7 +3684,7 @@ function BrandLookupResult({ result }: { result: any }) {
       {result.warning ? <ProviderNotice title="Lookup warning" text={result.warning} source={result.source} /> : null}
       <ReportSection
         title="Share of voice"
-        description={<><SourceBadge source={result.source} /> {result.resolvedTarget ? <span className="ml-2">Resolved entity: {result.resolvedTarget}</span> : null}</>}
+        description={<><SourceBadge source={result.source} /> {result.resolvedEntity ? <span className="ml-2">Resolved entity: {result.resolvedEntity}</span> : null}</>}
       >
         <div className="space-y-3">
           {shareRows.length ? shareRows.map((row: any) => {
@@ -3692,7 +3692,7 @@ function BrandLookupResult({ result }: { result: any }) {
             return (
               <div key={row.label} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
-                  <span className={row.target ? "font-semibold" : ""}>{row.label}</span>
+                  <span className={row.isPrimary ? "font-semibold" : ""}>{row.label}</span>
                   <span className="nums">{percent}%</span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
