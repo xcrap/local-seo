@@ -774,5 +774,3 @@ try {
 } finally {
   await cleanup();
 }
-
-export {};

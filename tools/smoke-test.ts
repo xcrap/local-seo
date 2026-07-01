@@ -1218,8 +1218,7 @@ try {
     .get(deleteTarget.id, deleteTarget.id);
   smokeDb.close();
   if (
-    !deletionEvidence ||
-    deletionEvidence.siteRows !== 0 ||
+    deletionEvidence?.siteRows !== 0 ||
     deletionEvidence.keywordRows !== 0
   ) {
     throw new Error(`Deleted sites should not stay hidden in SQLite: ${JSON.stringify(deletionEvidence)}`);
@@ -1312,8 +1311,7 @@ try {
       .query<{ source: string; models: string }, [string]>("SELECT source, models FROM prompt_explorer_runs WHERE site_id = ? ORDER BY created_at DESC LIMIT 1")
       .get(site.id);
     if (
-      !savedPromptRun ||
-      savedPromptRun.source !== "codex" ||
+      savedPromptRun?.source !== "codex" ||
       JSON.stringify(JSON.parse(savedPromptRun.models || "[]")) !== JSON.stringify(["local_codex"])
     ) {
       throw new Error(`Local prompt explorer history should store local_codex only: ${JSON.stringify(savedPromptRun)}`);
@@ -1846,5 +1844,3 @@ try {
   fixtureServer.stop(true);
   await rm(tempDir, { recursive: true, force: true });
 }
-
-export {};

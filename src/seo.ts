@@ -1989,7 +1989,7 @@ export async function brandLookup(input: {
   if (!query) throw new Error("Brand or domain is required.");
   const competitors = splitCompetitors(input.competitors);
   let source = "web-search";
-  let result: any = {
+  const result: any = {
     query,
     resolvedEntity: normalizeDomain(query) || query,
     platforms: [],
@@ -2063,7 +2063,7 @@ export async function promptExplorer(input: {
   if (!prompt) throw new Error("Prompt is required.");
   const highlightBrand = input.highlightBrand?.trim() || site.domain || site.name;
   const models = ["local_codex"];
-  let source = "codex";
+  const source = "codex";
   const result: any = {
     prompt,
     highlightBrand,

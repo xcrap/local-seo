@@ -134,7 +134,7 @@ async function runAiJob(id: string) {
   if (runningJobs.has(id)) return;
   runningJobs.add(id);
   const job = getAiJob(id);
-  if (!job || job.status !== "queued") {
+  if (job?.status !== "queued") {
     runningJobs.delete(id);
     return;
   }

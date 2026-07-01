@@ -1,0 +1,44 @@
+{
+  "files": {
+    "includes": [
+      "src/**/*.ts",
+      "tools/**/*.ts",
+      "web/src/**/*.ts",
+      "web/src/**/*.tsx",
+      "package.json",
+      "web/package.json",
+      "tsconfig.json",
+      "web/tsconfig.json",
+      "biome.json",
+      "!data",
+      "!node_modules",
+      "!web/node_modules",
+      "!web/dist"
+    ]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noAssignInExpressions": "off",
+        "noExplicitAny": "off",
+        "useIterableCallbackReturn": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "useImportType": "off"
+      },
+      "a11y": {
+        "noLabelWithoutControl": "off"
+      }
+    }
+  }
+}
