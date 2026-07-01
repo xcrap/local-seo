@@ -415,13 +415,10 @@ async function callTool(name: string, args: any) {
   switch (name) {
     case "whoami":
       return { server: "local-seo", mode: "local-sqlite", cloudflare: false };
-    case "list_projects":
     case "list_sites":
       return listProjects();
-    case "create_project":
     case "create_site":
       return createProject(args);
-    case "get_project_summary":
     case "get_site_summary":
       return projectSummary(args.siteId || args.projectId);
     case "research_keywords":

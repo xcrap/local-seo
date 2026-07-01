@@ -237,6 +237,12 @@ try {
   if (initialSites.length !== 0) {
     throw new Error(`Fresh setup should keep the site list empty until the user adds a real site: ${JSON.stringify(initialSites)}`);
   }
+  const legacyProjectsResponse = await fetch(`${baseUrl}/api/projects`, {
+    headers: cookieJar.size ? { Cookie: cookieHeader() } : {},
+  });
+  if (legacyProjectsResponse.status !== 404) {
+    throw new Error(`Legacy /api/projects route should be gone, got ${legacyProjectsResponse.status}.`);
+  }
   const dbSource = await readFile(path.join(rootDir, "src/db.ts"), "utf8");
   if (/DELETE\s+FROM\s+(projects|audits|gsc_imports)\b/i.test(dbSource)) {
     throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
@@ -248,6 +254,10 @@ try {
   const readmeSource = await readFile(path.join(rootDir, "README.md"), "utf8");
   if (/target domain/i.test(readmeSource)) {
     throw new Error("README should explain selected-site/comparison-site workflows instead of vague target-domain wording.");
+  }
+  const apiServerSource = await readFile(path.join(rootDir, "src/index.ts"), "utf8");
+  if (apiServerSource.includes('"/api/projects')) {
+    throw new Error("Public API routes should expose /api/sites only, not legacy /api/projects aliases.");
   }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
   if (webApiClient.includes("/api/projects")) {
@@ -955,6 +965,13 @@ try {
     if (toolNames.has(legacyName)) {
       throw new Error(`MCP tools/list should not advertise legacy alias ${legacyName}.`);
     }
+  }
+  const legacyMcp = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({ jsonrpc: "2.0", id: 199, method: "tools/call", params: { name: "list_projects", arguments: {} } }),
+  });
+  if (!legacyMcp.error || !/Unknown tool/i.test(String(legacyMcp.error.message || ""))) {
+    throw new Error(`MCP legacy list_projects alias should be unavailable: ${JSON.stringify(legacyMcp)}`);
   }
   const legacyDescriptionTool = (mcp.result?.tools || []).find((tool: any) =>
     /^Legacy alias:/i.test(tool.description || "") || /workspace|target domain|project/i.test(tool.description || ""),

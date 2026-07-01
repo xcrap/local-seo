@@ -293,19 +293,6 @@ async function startSavedSiteScan(c: any) {
   });
 }
 
-app.get("/api/projects", safe((c) => c.json(listProjects())));
-app.post(
-  "/api/projects",
-  safe(async (c) => c.json(createProject((await readJson(c)) as any))),
-);
-app.get("/api/projects/:id", safe((c) => c.json(projectSummary(c.req.param("id")))));
-app.put(
-  "/api/projects/:id",
-  safe(async (c) => c.json(updateProject(c.req.param("id"), await readJson(c)))),
-);
-app.delete("/api/projects/:id", safe((c) => c.json(deleteProject(c.req.param("id")))));
-app.post("/api/projects/:id/scan", safe(startSavedSiteScan));
-
 app.get("/api/sites", safe((c) => c.json(listProjects())));
 app.post(
   "/api/sites",
@@ -324,34 +311,16 @@ app.post(
   safe(async (c) => c.json(await researchKeywords((await readSiteScopedJson(c)) as any))),
 );
 app.get(
-  "/api/projects/:id/keywords",
-  safe((c) => c.json(listSavedKeywords(c.req.param("id")))),
-);
-app.get(
   "/api/sites/:id/keywords",
   safe((c) => c.json(listSavedKeywords(c.req.param("id")))),
-);
-app.post(
-  "/api/projects/:id/keywords/query",
-  safe(async (c) => c.json(querySavedKeywords({ projectId: c.req.param("id"), ...(await readJson(c)) }))),
 );
 app.post(
   "/api/sites/:id/keywords/query",
   safe(async (c) => c.json(querySavedKeywords({ projectId: c.req.param("id"), ...(await readJson(c)) }))),
 );
 app.get(
-  "/api/projects/:id/keyword-tags",
-  safe((c) => c.json(listSavedKeywordTags(c.req.param("id")))),
-);
-app.get(
   "/api/sites/:id/keyword-tags",
   safe((c) => c.json(listSavedKeywordTags(c.req.param("id")))),
-);
-app.post(
-  "/api/projects/:id/keywords/tags",
-  safe(async (c) =>
-    c.json(updateSavedKeywordTags({ projectId: c.req.param("id"), ...(await readJson(c)) } as any)),
-  ),
 );
 app.post(
   "/api/sites/:id/keywords/tags",
@@ -360,49 +329,20 @@ app.post(
   ),
 );
 app.put(
-  "/api/projects/:id/keyword-tags/:tagId",
-  safe(async (c) =>
-    c.json(updateSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId"), ...(await readJson(c)) })),
-  ),
-);
-app.put(
   "/api/sites/:id/keyword-tags/:tagId",
   safe(async (c) =>
     c.json(updateSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId"), ...(await readJson(c)) })),
   ),
 );
 app.delete(
-  "/api/projects/:id/keyword-tags/:tagId",
-  safe((c) => c.json(deleteSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId") }))),
-);
-app.delete(
   "/api/sites/:id/keyword-tags/:tagId",
   safe((c) => c.json(deleteSavedKeywordTag({ projectId: c.req.param("id"), tagId: c.req.param("tagId") }))),
-);
-app.post(
-  "/api/projects/:id/keywords/remove",
-  safe(async (c) => {
-    const body = await readJson(c);
-    return c.json(removeSavedKeywords(c.req.param("id"), body.savedKeywordIds || body.ids || []));
-  }),
 );
 app.post(
   "/api/sites/:id/keywords/remove",
   safe(async (c) => {
     const body = await readJson(c);
     return c.json(removeSavedKeywords(c.req.param("id"), body.savedKeywordIds || body.ids || []));
-  }),
-);
-app.get(
-  "/api/projects/:id/keywords.csv",
-  safe((c) => {
-    const csv = exportSavedKeywordsCsv(c.req.param("id"));
-    return new Response(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="local-seo-keywords-${c.req.param("id")}.csv"`,
-      },
-    });
   }),
 );
 app.get(
@@ -422,10 +362,6 @@ app.post(
   safe(async (c) => c.json(saveKeywords((await readSiteScopedJson(c)) as any))),
 );
 app.get(
-  "/api/projects/:id/serp",
-  safe((c) => c.json(listSerpRuns(c.req.param("id")))),
-);
-app.get(
   "/api/sites/:id/serp",
   safe((c) => c.json(listSerpRuns(c.req.param("id")))),
 );
@@ -434,10 +370,6 @@ app.post(
   safe(async (c) => c.json(await getSerpAnalysis((await readSiteScopedJson(c)) as any))),
 );
 
-app.get(
-  "/api/projects/:id/rank-trackers",
-  safe((c) => c.json(listRankTrackers(c.req.param("id")))),
-);
 app.get(
   "/api/sites/:id/rank-trackers",
   safe((c) => c.json(listRankTrackers(c.req.param("id")))),
@@ -488,10 +420,6 @@ app.post(
 
 app.post("/api/domain/overview", safe(async (c) => c.json(await domainOverview((await readSiteScopedJson(c)) as any))));
 app.get(
-  "/api/projects/:id/domain-snapshots",
-  safe((c) => c.json(listDomainSnapshots(c.req.param("id")))),
-);
-app.get(
   "/api/sites/:id/domain-snapshots",
   safe((c) => c.json(listDomainSnapshots(c.req.param("id")))),
 );
@@ -512,20 +440,12 @@ app.post(
   safe(async (c) => c.json(await backlinksOverview((await readSiteScopedJson(c)) as any))),
 );
 app.get(
-  "/api/projects/:id/backlink-snapshots",
-  safe((c) => c.json(listBacklinkSnapshots(c.req.param("id")))),
-);
-app.get(
   "/api/sites/:id/backlink-snapshots",
   safe((c) => c.json(listBacklinkSnapshots(c.req.param("id")))),
 );
 app.post(
   "/api/backlinks/profile",
   safe(async (c) => c.json(await getBacklinksProfile((await readSiteScopedJson(c)) as any))),
-);
-app.get(
-  "/api/projects/:id/brand-lookup",
-  safe((c) => c.json(listBrandLookupRuns(c.req.param("id")))),
 );
 app.get(
   "/api/sites/:id/brand-lookup",
@@ -536,10 +456,6 @@ app.post(
   safe(async (c) => c.json(await brandLookup((await readSiteScopedJson(c)) as any))),
 );
 app.get(
-  "/api/projects/:id/prompt-explorer",
-  safe((c) => c.json(listPromptExplorerRuns(c.req.param("id")))),
-);
-app.get(
   "/api/sites/:id/prompt-explorer",
   safe((c) => c.json(listPromptExplorerRuns(c.req.param("id")))),
 );
@@ -548,19 +464,13 @@ app.post(
   safe(async (c) => c.json(await promptExplorer((await readSiteScopedJson(c)) as any))),
 );
 
-app.get("/api/projects/:id/audits", safe((c) => c.json(listAudits(c.req.param("id")))));
 app.get("/api/sites/:id/audits", safe((c) => c.json(listAudits(c.req.param("id")))));
 app.get("/api/audits", safe((c) => c.json(listAllAudits())));
 app.get("/api/audits/:id", safe((c) => c.json(getAudit(c.req.param("id")))));
-app.delete("/api/projects/:id/audits", safe((c) => c.json(clearAudits(c.req.param("id")))));
 app.delete("/api/sites/:id/audits", safe((c) => c.json(clearAudits(c.req.param("id")))));
 app.delete(
-  "/api/projects/:projectId/audits/:id",
-  safe((c) => c.json(deleteAudit(c.req.param("projectId"), c.req.param("id")))),
-);
-app.delete(
-  "/api/sites/:projectId/audits/:id",
-  safe((c) => c.json(deleteAudit(c.req.param("projectId"), c.req.param("id")))),
+  "/api/sites/:siteId/audits/:id",
+  safe((c) => c.json(deleteAudit(c.req.param("siteId"), c.req.param("id")))),
 );
 app.post(
   "/api/audits",
