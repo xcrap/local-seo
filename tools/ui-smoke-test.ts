@@ -193,7 +193,13 @@ try {
       throw new Error("A running first scan should open on progress before the health overview.");
     }
     await page.getByRole("tab", { name: /^Overview$/ }).click();
-    await page.getByRole("heading", { name: /^Scan health$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Live scan progress$|^Scan health$/ }).waitFor();
+    if (await page.getByRole("heading", { name: /^Live scan progress$/ }).count()) {
+      await page.getByText("The final health score appears after the crawl, resource checks, and report build finish.").waitFor();
+      if (await page.getByText(/\bscore\b/i).filter({ hasText: /% live|running/ }).count()) {
+        throw new Error("Running scan overview should show live progress instead of final-score wording.");
+      }
+    }
     await capture(page, "scan-report-overview");
     if (await page.getByRole("heading", { name: /^Audit snapshot$/ }).count()) {
       throw new Error("Overview should not duplicate the old audit snapshot table.");

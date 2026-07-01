@@ -395,6 +395,9 @@ try {
   if (!webAppClient.includes("function EvidenceValue") || !webAppClient.includes("more in saved evidence")) {
     throw new Error("Scan issue evidence should summarize long sample lists without crushing table columns.");
   }
+  if (!webAppClient.includes("Live scan progress") || !webAppClient.includes("The final health score appears after the crawl, resource checks, and report build finish.")) {
+    throw new Error("Running scan reports should show live-progress wording instead of a final-looking health score.");
+  }
   if (webAppClient.includes("absolute bottom-5") || !webAppClient.includes("min-h-0 flex-1 space-y-1 overflow-y-auto")) {
     throw new Error("Desktop sidebar navigation should scroll above a real footer instead of overlapping the sign-out button.");
   }

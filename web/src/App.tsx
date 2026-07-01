@@ -5490,8 +5490,11 @@ function ScanReportOverview({
   activeSeverity: string;
   onSeveritySelect: (severity: string) => void;
 }) {
-  const score = scan.status === "completed" ? Number(scan.score || 0) : scanProgress(scan);
-  const scoreVariant = scan.status === "failed" ? "bad" : score >= 85 ? "good" : score >= 60 ? "warn" : "bad";
+  const isActive = scanIsActive(scan);
+  const isCompleted = scan.status === "completed";
+  const finalScore = Number(scan.score || 0);
+  const progress = scanProgress(scan);
+  const scoreVariant = scan.status === "failed" ? "bad" : isActive ? "warn" : finalScore >= 85 ? "good" : finalScore >= 60 ? "warn" : "bad";
   const sourceUrl = result.startUrl || scan.url;
   const canonicalTarget = result.pages?.find((page: any) => page.finalUrl)?.finalUrl || sourceUrl;
   const rows = [
@@ -5560,27 +5563,31 @@ function ScanReportOverview({
           Started at {sourceUrl}. Final home evidence: {canonicalTarget}.
         </span>
       ),
-      action: <Badge variant={scoreVariant as any}>{formatNumber(score)} score</Badge>,
+      action: isCompleted
+        ? <Badge variant={scoreVariant as any}>{formatNumber(finalScore)} score</Badge>
+        : <Badge variant={scoreVariant as any}>{isActive ? `${formatNumber(progress)}% live` : scanStatusLabel(scan.status)}</Badge>,
     },
   ];
   return (
     <ReportSection
-      title="Scan health"
+      title={isActive ? "Live scan progress" : "Scan health"}
       description={`${scanPhaseLabel(scan)} · ${formatDate(scan.created_at)} · stored in local SQLite`}
     >
       <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
         <div className="space-y-4 border-b pb-5 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-6">
           <div>
-            <div className="text-sm font-medium text-muted-foreground">Score</div>
+            <div className="text-sm font-medium text-muted-foreground">{isCompleted ? "Score" : "Progress"}</div>
             <div className="mt-2 flex items-end gap-3">
-              <div className="nums text-7xl font-semibold leading-none">{formatNumber(score)}</div>
+              <div className="nums text-7xl font-semibold leading-none">
+                {isCompleted ? formatNumber(finalScore) : `${formatNumber(progress)}%`}
+              </div>
               <Badge variant={scoreVariant as any}>{scanStatusLabel(scan.status)}</Badge>
             </div>
           </div>
-          <ProgressBar value={scanProgress(scan)} />
+          <ProgressBar value={progress} />
           <div className="text-sm leading-6 text-muted-foreground">
-            {scan.status === "running" || scan.status === "queued"
-              ? "This scan is still running and the evidence updates automatically."
+            {isActive
+              ? "The final health score appears after the crawl, resource checks, and report build finish."
               : `${formatNumber(scan.issue_count || 0)} issues saved for this run.`}
           </div>
           {scan.error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{scan.error}</p> : null}
