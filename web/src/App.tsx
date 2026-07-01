@@ -6531,11 +6531,13 @@ function GscPage({ site }: { site: Site }) {
   const [importSiteUrl, setImportSiteUrl] = useState(defaultGscProperty);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState("");
+  const [gscTab, setGscTab] = useState("performance");
   const today = new Date();
   const defaultEndDate = today.toISOString().slice(0, 10);
   const defaultStartDate = new Date(today.getTime() - 28 * 86400000).toISOString().slice(0, 10);
   const [dateRange, setDateRange] = useState({ startDate: defaultStartDate, endDate: defaultEndDate });
   const latestImport = imports[0];
+  const selectedGscProperty = status?.connection?.siteUrl || "";
 
   async function load() {
     const [nextStatus, nextImports] = await Promise.all([
@@ -6668,7 +6670,7 @@ function GscPage({ site }: { site: Site }) {
         action={<Badge variant={status?.connected || imports.length ? "good" : status?.configured ? "warn" : "outline"}>{status?.connected ? "Connected" : imports.length ? "Local imports" : status?.configured ? "Ready to connect" : "OAuth missing"}</Badge>}
       />
       {error ? <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
-      <Tabs defaultValue="performance" className="space-y-5">
+      <Tabs value={gscTab} onValueChange={setGscTab} className="space-y-5">
         <TabsList>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="import">Local import</TabsTrigger>
@@ -6748,12 +6750,40 @@ function GscPage({ site }: { site: Site }) {
           </ReportSection>
         </TabsContent>
         <TabsContent value="inspection" className="space-y-5">
-          <ReportSection title="URL inspection" description="Inspect up to 20 URLs against the selected Google property.">
+          <ReportSection
+            title="URL inspection"
+            description="Inspect up to 20 URLs against a connected Google Search Console property."
+          >
             <div className="space-y-4">
+              <StatusEvidenceTable
+                rows={[
+                  {
+                    title: "Inspection source",
+                    status: selectedGscProperty ? "Google API ready" : "Google property required",
+                    tone: selectedGscProperty ? "good" : "warn",
+                    text: selectedGscProperty
+                      ? `Live inspection will use ${selectedGscProperty}.`
+                      : "Local CSV imports cover performance rows only; Google URL Inspection is a live Search Console API.",
+                  },
+                  {
+                    title: "Default URL",
+                    status: defaultInspectionUrl || "No site",
+                    tone: defaultInspectionUrl ? "good" : "warn",
+                    text: defaultInspectionUrl
+                      ? "Generated from the active site's saved scan protocol and host variant."
+                      : "Add a website address before inspecting URLs.",
+                  },
+                ]}
+              />
               <Field label="URLs to inspect">
                 <Textarea value={inspectUrls} onChange={(event) => setInspectUrls(event.target.value)} placeholder="https://example.com/page" />
               </Field>
-              <Button onClick={inspect} disabled={!status?.connection?.siteUrl || loading === "inspection"}><ExternalLink /> {loading === "inspection" ? "Inspecting" : "Inspect URLs"}</Button>
+              <Button
+                onClick={selectedGscProperty ? inspect : () => setGscTab("connection")}
+                disabled={loading === "inspection"}
+              >
+                <ExternalLink /> {loading === "inspection" ? "Inspecting" : selectedGscProperty ? "Inspect URLs" : "Open connection"}
+              </Button>
               {inspection?.rows?.length ? <GscInspectionResults rows={inspection.rows} /> : null}
             </div>
           </ReportSection>

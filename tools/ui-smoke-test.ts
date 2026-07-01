@@ -441,6 +441,12 @@ try {
     await page.getByRole("heading", { name: /^Search Console$/ }).waitFor();
     await page.getByRole("tab", { name: /^URL inspection$/ }).click();
     await page.getByLabel("URLs to inspect").waitFor();
+    await page.getByRole("row", { name: /Inspection source.*Google property required.*performance rows only/i }).waitFor();
+    await page.getByRole("button", { name: /^Open connection$/ }).waitFor();
+    await capture(page, "search-console-inspection");
+    await page.getByRole("button", { name: /^Open connection$/ }).click();
+    await page.getByRole("heading", { name: /^Google connection$/ }).waitFor();
+    await page.getByRole("tab", { name: /^URL inspection$/ }).click();
     if (await page.getByPlaceholder("https://example.com/page").inputValue() !== `${fixtureUrl}/`) {
       throw new Error("Search Console inspection URL did not use the active site's saved crawl URL.");
     }

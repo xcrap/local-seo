@@ -635,6 +635,9 @@ try {
   ) {
     throw new Error("Search Console inspection, AI metadata, and recommendation rows should render as readable evidence tables, not mini fact cards.");
   }
+  if (!webAppClient.includes("Google property required") || !webAppClient.includes("Open connection")) {
+    throw new Error("Search Console URL inspection should explain the Google-only requirement and link to connection setup.");
+  }
   if (webAppClient.includes("Clear selected site")) {
     throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
   }
