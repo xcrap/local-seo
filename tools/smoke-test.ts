@@ -428,6 +428,9 @@ try {
   if (!webAppClient.includes("total scans visible below")) {
     throw new Error("Scan history should show the active-site scan count and total visible scan count.");
   }
+  if (!webAppClient.includes("Other saved site") || !webAppClient.includes("activeSiteId")) {
+    throw new Error("Global scan history rows should label whether each scan belongs to the active site or another saved site.");
+  }
   if (!webAppClient.includes("Could not load local sites") || !webAppClient.includes("Your SQLite data was not cleared")) {
     throw new Error("Site loading failures should be visible instead of rendering an empty site list that looks like data loss.");
   }

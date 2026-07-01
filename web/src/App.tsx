@@ -1660,7 +1660,7 @@ function Overview({
           </div>
           <div className="p-5">
             {scanLedgerRows.length ? (
-              <ScanTable rows={scanLedgerRows} showSite onInspect={openScanReport} />
+              <ScanTable rows={scanLedgerRows} showSite activeSiteId={site.id} onInspect={openScanReport} />
             ) : (
               <EmptyState
                 title="No scans yet"
@@ -4526,7 +4526,7 @@ function ScansPage({ site }: { site: Site }) {
           </div>
           <div className="p-5">
             {allScans.length ? (
-              <ScanTable rows={allScans} showSite selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingScan(allScans.find((scan) => scan.id === id) || { id })} />
+              <ScanTable rows={allScans} showSite activeSiteId={site.id} selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingScan(allScans.find((scan) => scan.id === id) || { id })} />
             ) : (
               <EmptyState
                 title="No scans yet"
@@ -4688,12 +4688,14 @@ function ScanSpeedHistoryPanel({ scans }: { scans: any[] }) {
 function ScanTable({
   rows,
   showSite,
+  activeSiteId,
   selectedId,
   onInspect,
   onDelete,
 }: {
   rows: any[];
   showSite?: boolean;
+  activeSiteId?: string;
   selectedId?: string;
   onInspect?: (id: string, row: any) => void;
   onDelete?: (id: string, row: any) => void;
@@ -4703,6 +4705,9 @@ function ScanTable({
       <div className="divide-y rounded-md border md:hidden">
         {rows.map((row) => {
           const counts = scanSeverityCounts(row);
+          const siteScope = activeSiteId && row.site_id
+            ? row.site_id === activeSiteId ? "Active site" : "Other saved site"
+            : "";
           return (
             <div key={row.id} className={cn("p-4", selectedId === row.id ? "bg-accent/45" : "")}>
               <div className="break-all font-medium">{row.url}</div>
@@ -4711,7 +4716,10 @@ function ScanTable({
               </div>
               {showSite ? (
                 <div className="mt-3">
-                  <div className="text-sm font-medium">{scanSiteName(row)}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-sm font-medium">{scanSiteName(row)}</div>
+                    {siteScope ? <Badge variant={siteScope === "Active site" ? "good" : "outline"}>{siteScope}</Badge> : null}
+                  </div>
                   <div className="mt-1 break-all text-xs text-muted-foreground">{scanSiteDetail(row)}</div>
                 </div>
               ) : null}
@@ -4773,6 +4781,9 @@ function ScanTable({
           <TableBody>
             {rows.map((row) => {
               const counts = scanSeverityCounts(row);
+              const siteScope = activeSiteId && row.site_id
+                ? row.site_id === activeSiteId ? "Active site" : "Other saved site"
+                : "";
               return (
                 <TableRow
                   key={row.id}
@@ -4787,7 +4798,10 @@ function ScanTable({
                   </TableCell>
                   {showSite ? (
                     <TableCell className="min-w-40">
-                      <div className="font-medium">{scanSiteName(row)}</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="font-medium">{scanSiteName(row)}</div>
+                        {siteScope ? <Badge variant={siteScope === "Active site" ? "good" : "outline"}>{siteScope}</Badge> : null}
+                      </div>
                       <div className="mt-1 break-all text-xs text-muted-foreground">{scanSiteDetail(row)}</div>
                     </TableCell>
                   ) : null}

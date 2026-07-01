@@ -477,6 +477,7 @@ try {
     await page.getByRole("columnheader", { name: /^P95$/ }).waitFor();
     await page.getByRole("heading", { name: /^All scan history$/ }).waitFor();
     await page.getByText(/Active site: \d+ saved scans\. Local database: \d+ total scans visible below\./).waitFor();
+    await page.locator("section", { hasText: "All scan history" }).getByText("Active site").first().waitFor();
     await page.getByRole("button", { name: /Delete scan/i }).first().waitFor();
     const scanHistoryTable = page.locator("section", { hasText: "All scan history" }).locator("table").first();
     const scanHistoryBox = await scanHistoryTable.boundingBox();
