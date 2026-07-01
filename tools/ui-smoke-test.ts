@@ -178,6 +178,9 @@ try {
 
     await page.getByRole("heading", { name: /Scan report/i }).waitFor({ timeout: 20_000 });
     auditReportPath = new URL(page.url()).pathname;
+    if (!auditReportPath.startsWith("/scans/")) {
+      throw new Error(`First scan should open on the /scans route, got ${auditReportPath}.`);
+    }
     await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
     if (await page.getByRole("heading", { name: /^Scan health$/ }).count()) {
       throw new Error("A running first scan should open on progress before the health overview.");
@@ -447,6 +450,9 @@ try {
     await page.keyboard.press("Escape");
 
     await page.getByRole("navigation").getByRole("link", { name: /^Site scans$/ }).click();
+    if (new URL(page.url()).pathname !== "/scans") {
+      throw new Error(`Site scans navigation should use /scans, got ${page.url()}.`);
+    }
     await page.getByRole("heading", { name: /^Page speed tracking$/ }).waitFor();
     await page.getByText(/Latest avg .*ms/i).waitFor();
     await page.getByRole("columnheader", { name: /^P95$/ }).waitFor();
@@ -470,8 +476,12 @@ try {
       await page.getByRole("heading", { name: /^Scan health$|^Scan progress$/ }).waitFor();
       await assertNoHorizontalOverflow(page, "Mobile audit report");
       await page.setViewportSize({ width: 1600, height: 1000 });
-      await page.goto(`${webUrl}/audits`, { waitUntil: "networkidle" });
+      await page.goto(`${webUrl}/scans`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: /^Page speed tracking$/ }).waitFor();
+    }
+    await page.goto(`${webUrl}/audits`, { waitUntil: "networkidle" });
+    if (new URL(page.url()).pathname !== "/scans") {
+      throw new Error(`Legacy /audits should redirect to /scans, got ${page.url()}.`);
     }
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
     await page.getByRole("heading", { name: /^Delete scans for this site\?$/ }).waitFor();
@@ -627,7 +637,7 @@ try {
     const mobileRoutes: [string, string][] = [
       ["overview", "/"],
       ["sites", "/sites"],
-      ["audits", "/audits"],
+      ["scans", "/scans"],
       ["organic research", "/domain"],
       ["links", "/links"],
       ["settings", "/settings"],

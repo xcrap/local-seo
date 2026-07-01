@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type ComponentProps, type FormEvent, type ReactElement, type ReactNode } from "react";
-import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
@@ -97,7 +97,7 @@ const nav = [
   { to: "/links", label: "Links", icon: Link2 },
   { to: "/brand", label: "Brand lookup", icon: Sparkles },
   { to: "/prompts", label: "Prompt explorer", icon: Bot },
-  { to: "/audits", label: "Site scans", icon: FileSearch },
+  { to: "/scans", label: "Site scans", icon: FileSearch },
   { to: "/gsc", label: "Search Console", icon: BarChart3 },
   { to: "/ai", label: "AI lab", icon: Bot },
   { to: "/mcp-tools", label: "MCP", icon: Cable },
@@ -1276,9 +1276,9 @@ function AppShell() {
       const result = await api.scanSite(activeSite.id);
       if (result.audit?.id) {
         setSelectedAuditId(activeSite.id, result.audit.id);
-        navigate(`/audits/${result.audit.id}`);
+        navigate(`/scans/${result.audit.id}`);
       } else {
-        navigate("/audits");
+        navigate("/scans");
       }
     } catch (err) {
       setShellScanError(err instanceof Error ? err.message : "Could not start site scan");
@@ -1414,8 +1414,10 @@ function AppShell() {
                 <Route path="/links" element={<LinksPage site={activeSite} />} />
                 <Route path="/brand" element={<BrandLookupPage site={activeSite} />} />
                 <Route path="/prompts" element={<PromptExplorerPage site={activeSite} />} />
-                <Route path="/audits" element={<AuditsPage site={activeSite} />} />
-                <Route path="/audits/:auditId" element={<AuditReportRoute />} />
+                <Route path="/scans" element={<AuditsPage site={activeSite} />} />
+                <Route path="/scans/:auditId" element={<AuditReportRoute />} />
+                <Route path="/audits" element={<Navigate to="/scans" replace />} />
+                <Route path="/audits/:auditId" element={<LegacyAuditReportRedirect />} />
                 <Route path="/gsc" element={<GscPage site={activeSite} />} />
                 <Route path="/ai" element={<AiPage site={activeSite} />} />
                 <Route path="/mcp-tools" element={<McpPage site={activeSite} />} />
@@ -1429,6 +1431,13 @@ function AppShell() {
         </main>
     </div>
   );
+}
+
+function LegacyAuditReportRedirect() {
+  const { auditId } = useParams();
+  const [searchParams] = useSearchParams();
+  const query = searchParams.toString();
+  return <Navigate to={`/scans/${auditId || ""}${query ? `?${query}` : ""}`} replace />;
 }
 
 function NotFoundPage() {
@@ -1510,7 +1519,7 @@ function Overview({
       setScanAudit(result.audit);
       if (result.audit?.id) {
         setSelectedAuditId(site.id, result.audit.id);
-        navigate(`/audits/${result.audit.id}`);
+        navigate(`/scans/${result.audit.id}`);
       }
       setSummary(await api.dashboard(site.id));
     } catch (err) {
@@ -1522,7 +1531,7 @@ function Overview({
 
   function openAuditReport(auditId: string, row?: any) {
     setSelectedAuditId(row?.site_id || site.id, auditId);
-    navigate(`/audits/${auditId}`);
+    navigate(`/scans/${auditId}`);
   }
 
   async function createSiteAndScan(event: FormEvent) {
@@ -1544,8 +1553,8 @@ function Overview({
         setSelectedAuditId(created.id, result.audit.id);
       }
       await reloadSites();
-      if (result.audit?.id) navigate(`/audits/${result.audit.id}`);
-      else navigate("/audits");
+      if (result.audit?.id) navigate(`/scans/${result.audit.id}`);
+      else navigate("/scans");
     } catch (err) {
       setFirstScanError(err instanceof Error ? err.message : "Could not start the first scan");
     } finally {
@@ -1636,7 +1645,7 @@ function Overview({
             {scan.related?.length ? <ScanCoverageList rows={scan.related} auditStatus={scanAudit?.status} /> : null}
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="secondary">
-                <Link to={scanAudit?.id ? `/audits/${scanAudit.id}` : "/audits"}>Open scan report</Link>
+                <Link to={scanAudit?.id ? `/scans/${scanAudit.id}` : "/scans"}>Open scan report</Link>
               </Button>
               <Button asChild variant="secondary"><Link to="/domain">View organic research</Link></Button>
               <Button asChild variant="secondary"><Link to="/links">View links</Link></Button>
@@ -1736,10 +1745,10 @@ function SiteCommandCenter({
       evidence: latestAudit
         ? `${formatNumber(latestAudit.pages_crawled)} pages · ${formatNumber(latestAudit.issue_count)} issues · ${formatNumber(latestAuditSummary.checkedLinks || 0)} links checked`
         : "No crawl evidence saved yet.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/audits"><FileSearch /> Open site scans</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/scans"><FileSearch /> Open site scans</Link></Button>,
       secondary: latestAudit ? (
         <Button asChild size="sm" variant="outline">
-          <Link to={`/audits/${latestAudit.id}`}><FileSearch /> Open scan report</Link>
+          <Link to={`/scans/${latestAudit.id}`}><FileSearch /> Open scan report</Link>
         </Button>
       ) : null,
     },
@@ -1752,7 +1761,7 @@ function SiteCommandCenter({
         : "Run a site scan to record response timings for every crawled HTML page.",
       action: latestAuditSpeed?.measuredPageLoads ? (
         <Button asChild size="sm" variant="secondary">
-          <Link to={`/audits/${latestAudit.id}?tab=speed`}><Zap /> Open speed report</Link>
+          <Link to={`/scans/${latestAudit.id}?tab=speed`}><Zap /> Open speed report</Link>
         </Button>
       ) : site.domain ? (
         <Button size="sm" variant="secondary" onClick={onScan} disabled={scanning}>
@@ -1762,7 +1771,7 @@ function SiteCommandCenter({
         <Button asChild size="sm" variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
       ),
       secondary: latestAudit ? (
-        <Button asChild size="sm" variant="outline"><Link to="/audits"><FileSearch /> Open scan history</Link></Button>
+        <Button asChild size="sm" variant="outline"><Link to="/scans"><FileSearch /> Open scan history</Link></Button>
       ) : null,
     },
     {
@@ -2021,8 +2030,8 @@ function SitesPage({
           setSelectedAuditId(created.id, result.audit.id);
         }
         await reloadSites();
-        if (result.audit?.id) navigate(`/audits/${result.audit.id}`);
-        else navigate("/audits");
+        if (result.audit?.id) navigate(`/scans/${result.audit.id}`);
+        else navigate("/scans");
         return;
       }
       await reloadSites();
@@ -2103,8 +2112,8 @@ function SitesPage({
       }
       setScanningSiteId("");
       selectSite(site.id);
-      if (result.audit?.id) navigate(`/audits/${result.audit.id}`);
-      else navigate("/audits");
+      if (result.audit?.id) navigate(`/scans/${result.audit.id}`);
+      else navigate("/scans");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start site scan");
       setScanningSiteId("");
@@ -3087,9 +3096,9 @@ function DomainPage({ site }: { site: Site }) {
       const result = await api.scanSite(site.id);
       if (result.audit?.id) {
         setSelectedAuditId(site.id, result.audit.id);
-        navigate(`/audits/${result.audit.id}`);
+        navigate(`/scans/${result.audit.id}`);
       } else {
-        navigate("/audits");
+        navigate("/scans");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start site scan");
@@ -3196,7 +3205,7 @@ function AuditRunPicker({
           </SelectContent>
         </Select>
         <Button asChild variant="outline">
-          <Link to={`/audits/${selected.id}`}><FileSearch /> Open scan report</Link>
+          <Link to={`/scans/${selected.id}`}><FileSearch /> Open scan report</Link>
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -3261,7 +3270,7 @@ function LocalOrganicEvidence({
           <EmptyState
             title={auditIsActive(audit) ? "Selected scan is still running" : "Selected scan has no crawl evidence"}
             text={auditIsActive(audit) ? "Open the scan report to watch progress. Evidence appears here after crawl data is saved." : audit.error || "This saved scan did not include crawl rows."}
-            action={<Button asChild variant="secondary"><Link to={`/audits/${audit.id}`}><FileSearch /> Open scan report</Link></Button>}
+            action={<Button asChild variant="secondary"><Link to={`/scans/${audit.id}`}><FileSearch /> Open scan report</Link></Button>}
           />
         ) : (
           <>
@@ -3503,9 +3512,9 @@ function LinksPage({ site }: { site: Site }) {
       const result = await api.scanSite(site.id);
       if (result.audit?.id) {
         setSelectedAuditId(site.id, result.audit.id);
-        navigate(`/audits/${result.audit.id}`);
+        navigate(`/scans/${result.audit.id}`);
       } else {
-        navigate("/audits");
+        navigate("/scans");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start site scan");
@@ -3659,7 +3668,7 @@ function LocalLinkEvidence({
           <EmptyState
             title={auditIsActive(audit) ? "Selected scan is still running" : "Selected scan has no link evidence"}
             text={auditIsActive(audit) ? "Open the scan report to watch progress. Link evidence appears here after crawl data is saved." : audit.error || "This saved scan did not include link rows."}
-            action={<Button asChild variant="secondary"><Link to={`/audits/${audit.id}`}><FileSearch /> Open scan report</Link></Button>}
+            action={<Button asChild variant="secondary"><Link to={`/scans/${audit.id}`}><FileSearch /> Open scan report</Link></Button>}
           />
         ) : (
           <>
@@ -4260,7 +4269,7 @@ function AuditReportRoute() {
         eyebrow="Technical"
         title="Scan report"
         description="Technical evidence, broken assets, metadata, indexability, and fixes from this saved local scan."
-        action={<Button asChild variant="outline"><Link to="/audits"><FileSearch /> Back to scans</Link></Button>}
+        action={<Button asChild variant="outline"><Link to="/scans"><FileSearch /> Back to scans</Link></Button>}
       />
       {error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       {loading ? (
@@ -4268,7 +4277,7 @@ function AuditReportRoute() {
       ) : audit ? (
         <AuditDetail audit={audit} />
       ) : (
-        <EmptyState title="Scan not found" text="This saved scan no longer exists in local SQLite." action={<Button asChild><Link to="/audits"><FileSearch /> Open scans</Link></Button>} />
+        <EmptyState title="Scan not found" text="This saved scan no longer exists in local SQLite." action={<Button asChild><Link to="/scans"><FileSearch /> Open scans</Link></Button>} />
       )}
     </>
   );
@@ -4596,7 +4605,7 @@ function ActiveScanBanner({ audit }: { audit: any }) {
           </div>
         </div>
         <Button asChild variant="secondary">
-          <Link to={`/audits/${audit.id}`}><FileSearch /> Open live report</Link>
+          <Link to={`/scans/${audit.id}`}><FileSearch /> Open live report</Link>
         </Button>
       </div>
     </section>
@@ -4729,7 +4738,7 @@ function AuditTable({
                   {onInspect && (
                     <Button size="sm" variant="outline" asChild>
                       <Link
-                        to={`/audits/${row.id}`}
+                        to={`/scans/${row.id}`}
                         onClick={() => {
                           if (row.site_id) setSelectedAuditId(row.site_id, row.id);
                         }}
@@ -4812,7 +4821,7 @@ function AuditTable({
                         {onInspect && (
                           <Button size="sm" variant="outline" asChild>
                             <Link
-                              to={`/audits/${row.id}`}
+                              to={`/scans/${row.id}`}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 if (row.site_id) setSelectedAuditId(row.site_id, row.id);
