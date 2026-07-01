@@ -3681,7 +3681,7 @@ function LinksPage({ site }: { site: Site }) {
             <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
               {backlinkIndexAvailable
                 ? `${formatNumber(matchingImport.rowCount || matchingImport.row_count || 0)} real rows from ${matchingImport.sourceName || matchingImport.source_name || "backlink CSV"} are available for ${domainKey(domain)}.`
-                : "Import a backlink CSV with source URL, target URL, referring domain, anchor, follow/nofollow, and status columns. No web-wide backlinks are generated locally."}
+                : "Import a backlink CSV with source URL, linked URL, referring domain, anchor, follow/nofollow, and status columns. No web-wide backlinks are generated locally."}
             </div>
             <div className="px-4 py-3">
               <Field label="Import backlink CSV">

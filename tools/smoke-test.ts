@@ -346,6 +346,17 @@ try {
   if (/dataforseo|DataForSEO|SEO_METRICS|seo_metrics/i.test(seoSource)) {
     throw new Error("Backend SEO services should not keep paid metrics provider hooks in the fresh local app.");
   }
+  for (const staleIssueWording of [
+    "understand the target",
+    "Update the link target",
+    "redirect the target URL",
+    "target returns crawlable HTML",
+    "evidence: { target: candidate.url",
+  ]) {
+    if (seoSource.includes(staleIssueWording)) {
+      throw new Error(`Scan issue copy should name the URL or link destination instead of target: ${staleIssueWording}`);
+    }
+  }
   if (!seoSource.includes("activeSite:") || !/^\s*sites:/m.test(seoSource)) {
     throw new Error("Dashboard API should return activeSite/sites terminology.");
   }
@@ -477,6 +488,7 @@ try {
     "competitor target analyzed",
     "Top pages returned for this target",
     "Check a target to load real backlink rows",
+    "target URL, referring domain",
     "failing targets from the selected saved audit",
     "failing link targets",
     "HTTP link target",

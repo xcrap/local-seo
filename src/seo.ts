@@ -3817,7 +3817,7 @@ async function runLocalScan(scanId: string) {
           category: "links",
           type: "empty-anchor-text",
           message: `${emptyAnchorLinks.length} links have no readable anchor text`,
-          recommendation: "Add visible anchor text or accessible labels so users and crawlers understand the target.",
+          recommendation: "Add visible anchor text or accessible labels so users and crawlers understand the linked URL.",
           evidence: { count: emptyAnchorLinks.length, samples: emptyAnchorLinks.map((link) => link.href) },
         });
       }
@@ -4143,8 +4143,8 @@ async function runLocalScan(scanId: string) {
         category: "links",
         type: candidate.type === "internal" ? "broken-internal-link" : "broken-external-link",
         message: `${candidate.type === "internal" ? "Internal" : "External"} link is failing`,
-        recommendation: "Update the link target, remove it, or redirect the target URL to a live page.",
-        evidence: { target: candidate.url, status: row.status, error: row.error },
+        recommendation: "Update the linked URL, remove the link, or redirect that URL to a live page.",
+        evidence: { linkedUrl: candidate.url, status: row.status, error: row.error },
       });
     } else if (row.redirected || (row.finalUrl && row.finalUrl !== candidate.url)) {
       pushScanIssue(issues, pageBucket(candidate.from), {
@@ -4154,7 +4154,7 @@ async function runLocalScan(scanId: string) {
         type: candidate.type === "internal" ? "internal-link-redirects" : "external-link-redirects",
         message: `${candidate.type === "internal" ? "Internal" : "External"} link redirects`,
         recommendation: "Link directly to the final destination when the redirect is permanent and intentional.",
-        evidence: { target: candidate.url, finalUrl: row.finalUrl, status: row.status },
+        evidence: { linkedUrl: candidate.url, finalUrl: row.finalUrl, status: row.status },
       });
     }
     if (checkedLinks.length % 25 === 0) persistProgress();
@@ -4395,7 +4395,7 @@ async function runLocalScan(scanId: string) {
       category: "crawl",
       type: "no-pages-crawled",
       message: "No HTML pages were crawled",
-      recommendation: "Check the scan URL, redirects, DNS, TLS, firewall rules, and whether the target returns crawlable HTML.",
+      recommendation: "Check the scan URL, redirects, DNS, TLS, firewall rules, and whether the URL returns crawlable HTML.",
       evidence: {
         visitedUrls: visited.size,
         sitemapUrls: (sitemap.urls || []).length,
