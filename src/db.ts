@@ -79,6 +79,12 @@ function addColumnIfMissing(table: string, column: string, definition: string) {
   }
 }
 
+function dropColumnIfPresent(table: string, column: string) {
+  if (columnExists(table, column)) {
+    db.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+  }
+}
+
 migrate(
   "001_local_seo_init",
   `
@@ -106,11 +112,10 @@ migrate(
     location_code INTEGER NOT NULL DEFAULT 2840,
     language_code TEXT NOT NULL DEFAULT 'en',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    archived_at TEXT
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE INDEX IF NOT EXISTS idx_sites_active ON sites(archived_at, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_sites_created ON sites(created_at DESC);
 
   CREATE TABLE IF NOT EXISTS keyword_research_runs (
     id TEXT PRIMARY KEY,
@@ -357,6 +362,12 @@ migrate(
   DELETE FROM backlink_snapshots WHERE source = 'local-fallback';
   `,
 );
+
+migrateStep("007_remove_unused_site_archive_state", () => {
+  db.exec("DROP INDEX IF EXISTS idx_sites_active");
+  dropColumnIfPresent("sites", "archived_at");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_sites_created ON sites(created_at DESC)");
+});
 
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];

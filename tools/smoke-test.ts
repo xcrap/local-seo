@@ -246,6 +246,14 @@ try {
     if (!tables.has("sites") || tables.has("projects")) {
       throw new Error(`Fresh SQLite schema should create sites, not projects: ${JSON.stringify([...tables].sort())}`);
     }
+    const siteColumns = schemaDb.query<{ name: string }, []>("PRAGMA table_info(sites)").all().map((row) => row.name);
+    if (siteColumns.includes("archived_at")) {
+      throw new Error("Fresh sites schema should not keep unused archive state.");
+    }
+    const siteIndexes = schemaDb.query<{ name: string }, []>("PRAGMA index_list(sites)").all().map((row) => row.name);
+    if (siteIndexes.includes("idx_sites_active")) {
+      throw new Error("Fresh sites schema should not keep the old archive index.");
+    }
     for (const table of ["saved_keywords", "audits", "gsc_imports", "domain_snapshots", "backlink_snapshots", "serp_runs"]) {
       const columns = schemaDb.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((row) => row.name);
       if (columns.includes("project_id")) {
@@ -876,13 +884,12 @@ try {
   const smokeDb = new Database(path.join(tempDir, "smoke.sqlite"), { readonly: true });
   const deletionEvidence = smokeDb
     .query<
-      { siteRows: number; keywordRows: number; archivedRows: number; generatedFallbackRows: number },
+      { siteRows: number; keywordRows: number; generatedFallbackRows: number },
       [string, string]
     >(`
       SELECT
         (SELECT count(*) FROM sites WHERE id = ?) AS siteRows,
         (SELECT count(*) FROM saved_keywords WHERE site_id = ?) AS keywordRows,
-        (SELECT count(*) FROM sites WHERE archived_at IS NOT NULL) AS archivedRows,
         (SELECT count(*) FROM domain_snapshots WHERE source = 'local-fallback') +
         (SELECT count(*) FROM backlink_snapshots WHERE source = 'local-fallback') AS generatedFallbackRows
     `)
@@ -891,8 +898,7 @@ try {
   if (
     !deletionEvidence ||
     deletionEvidence.siteRows !== 0 ||
-    deletionEvidence.keywordRows !== 0 ||
-    deletionEvidence.archivedRows !== 0
+    deletionEvidence.keywordRows !== 0
   ) {
     throw new Error(`Deleted sites should not stay hidden in SQLite: ${JSON.stringify(deletionEvidence)}`);
   }
