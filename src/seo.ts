@@ -4061,7 +4061,7 @@ export function projectSummary(projectId: string) {
   const project = getProject(projectId);
   if (!project) throw new Error("Site not found.");
   return {
-    project,
+    site: project,
     savedKeywords: listSavedKeywords(projectId),
     rankTrackers: listRankTrackers(projectId),
     audits: listAudits(projectId),

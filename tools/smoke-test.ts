@@ -786,6 +786,9 @@ try {
       }
     }
     const siteSummaryWithFullHistory = await request(`/api/sites/${project.id}`);
+    if (!siteSummaryWithFullHistory.site || "project" in siteSummaryWithFullHistory) {
+      throw new Error(`Site summary response should expose site, not project: ${JSON.stringify(siteSummaryWithFullHistory)}`);
+    }
     const summaryChecks = [
       { ids: insertedHistoryIds.keyword, rows: siteSummaryWithFullHistory.savedKeywords, label: "saved keyword summary" },
       { ids: insertedHistoryIds.domain, rows: siteSummaryWithFullHistory.domainSnapshots, label: "organic summary" },
