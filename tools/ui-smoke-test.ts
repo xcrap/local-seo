@@ -261,7 +261,7 @@ try {
 
     await page.goto(webUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByText("Technical audit").waitFor();
+    await page.getByRole("row", { name: /Technical audit/i }).waitFor();
     await page.getByRole("row", { name: /Active site.*Scan website/i }).waitFor();
     if (await page.getByText("Workspace totals").count()) {
       throw new Error("Overview still renders the old metric-card totals section.");
@@ -272,11 +272,11 @@ try {
     if (await page.getByText(/\b2840\b/).count()) {
       throw new Error("Main site flow exposes a raw location code.");
     }
-    await page.getByText(/Keyword tools:/i).waitFor();
+    const siteControl = page.locator("section", { hasText: "Site control" });
+    await siteControl.getByRole("row", { name: /Active site.*Keyword tools:/i }).waitFor();
     if (await page.getByText(/Search defaults|Search locale/i).count()) {
       throw new Error("Overview still presents keyword tool defaults as site search defaults or a site locale.");
     }
-    const siteControl = page.locator("section", { hasText: "Site control" });
     await siteControl.getByRole("link", { name: /^Open organic$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open links$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open ranks$/ }).waitFor();
@@ -364,6 +364,19 @@ try {
     if (await page.getByText("local OAuth").count()) {
       throw new Error("Overview still labels Search Console as local OAuth.");
     }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(webUrl, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: /Site control/i }).waitFor();
+    await page.getByRole("button", { name: /^Scan website$/ }).waitFor();
+    await page.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
+    await page
+      .locator("section", { hasText: "Scan history" })
+      .getByRole("link", { name: /^Open report$/ })
+      .first()
+      .waitFor();
+    await assertNoHorizontalOverflow(page, "Mobile populated overview");
+    await page.setViewportSize({ width: 1600, height: 1000 });
 
     await page.getByRole("link", { name: /Sites/i }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();

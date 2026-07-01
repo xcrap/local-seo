@@ -1774,31 +1774,48 @@ function SiteCommandCenter({
           {site.domain ? <Badge variant="outline">{scanTargetShortDetail(site)}</Badge> : null}
         </div>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Area</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Local evidence</TableHead>
-            <TableHead className="text-right">Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.key}>
-              <TableCell className="font-medium">{row.area}</TableCell>
-              <TableCell className="min-w-36"><Badge variant={row.status === "needs scan" || row.status === "not run" || row.status === "missing" ? "warn" : "outline"}>{row.status}</Badge></TableCell>
-              <TableCell className="min-w-96 break-words text-sm text-muted-foreground">{row.evidence}</TableCell>
-              <TableCell>
-                <div className="flex justify-end gap-2">
-                  {row.secondary}
-                  {row.action}
-                </div>
-              </TableCell>
+      <div className="divide-y md:hidden">
+        {rows.map((row) => (
+          <div key={row.key} className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-medium">{row.area}</h3>
+              <Badge variant={row.status === "needs scan" || row.status === "not run" || row.status === "missing" ? "warn" : "outline"}>{row.status}</Badge>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{row.evidence}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {row.secondary}
+              {row.action}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Area</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Local evidence</TableHead>
+              <TableHead className="text-right">Action</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.key}>
+                <TableCell className="font-medium">{row.area}</TableCell>
+                <TableCell className="min-w-36"><Badge variant={row.status === "needs scan" || row.status === "not run" || row.status === "missing" ? "warn" : "outline"}>{row.status}</Badge></TableCell>
+                <TableCell className="min-w-96 break-words text-sm text-muted-foreground">{row.evidence}</TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-2">
+                    {row.secondary}
+                    {row.action}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </section>
   );
 }
@@ -4542,91 +4559,154 @@ function AuditTable({
   onDelete?: (id: string, row: any) => void;
 }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Scan</TableHead>
-          {showSite ? <TableHead>Site</TableHead> : null}
-          <TableHead>Result</TableHead>
-          <TableHead>Evidence</TableHead>
-          {(onInspect || onDelete) && <TableHead className="text-right">Actions</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <>
+      <div className="divide-y rounded-md border md:hidden">
         {rows.map((row) => {
           const counts = auditSeverityCounts(row);
           return (
-            <TableRow
-              key={row.id}
-              className={cn(onInspect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
-              onClick={() => onInspect?.(row.id, row)}
-            >
-              <TableCell className="min-w-56 max-w-sm">
-                <div className="truncate font-medium">{row.url}</div>
-                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
-                </div>
-              </TableCell>
+            <div key={row.id} className={cn("p-4", selectedId === row.id ? "bg-accent/45" : "")}>
+              <div className="break-all font-medium">{row.url}</div>
+              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
+              </div>
               {showSite ? (
-                <TableCell className="min-w-40">
-                  <div className="font-medium">{auditSiteName(row)}</div>
+                <div className="mt-3">
+                  <div className="text-sm font-medium">{auditSiteName(row)}</div>
                   <div className="mt-1 break-all text-xs text-muted-foreground">{auditSiteDetail(row)}</div>
-                </TableCell>
+                </div>
               ) : null}
-              <TableCell className="min-w-44">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge>
-                  <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
-                </div>
-                <div className="mt-2 max-w-52">
-                  <ProgressBar value={auditProgress(row)} />
-                  <div className="mt-1 text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
-                </div>
-              </TableCell>
-              <TableCell className="min-w-52">
-                <div className="text-sm text-muted-foreground">
-                  {formatNumber(row.pages_crawled)} pages crawled
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge variant={counts.high ? "bad" : "outline"}>{counts.high} high</Badge>
-                  <Badge variant={counts.medium ? "warn" : "outline"}>{counts.medium} med</Badge>
-                  <Badge variant="outline">{counts.low} low</Badge>
-                </div>
-              </TableCell>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge>
+                <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
+              </div>
+              <div className="mt-2">
+                <ProgressBar value={auditProgress(row)} />
+                <div className="mt-1 text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
+              </div>
+              <div className="mt-3 text-sm text-muted-foreground">{formatNumber(row.pages_crawled)} pages crawled</div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                <Badge variant={counts.high ? "bad" : "outline"}>{counts.high} high</Badge>
+                <Badge variant={counts.medium ? "warn" : "outline"}>{counts.medium} med</Badge>
+                <Badge variant="outline">{counts.low} low</Badge>
+              </div>
               {(onInspect || onDelete) && (
-                <TableCell className={cn("text-right", onDelete ? "min-w-56" : "min-w-40")}>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {onInspect && (
-                      <Button size="sm" variant="outline" asChild>
-                        <Link
-                          to={`/audits/${row.id}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (row.site_id) setSelectedAuditId(row.site_id, row.id);
-                          }}
-                        >
-                          <FileSearch /> Open report
-                        </Link>
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        aria-label={`Delete scan report for ${row.url}`}
-                        onClick={(event) => { event.stopPropagation(); onDelete(row.id, row); }}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {onInspect && (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link
+                        to={`/audits/${row.id}`}
+                        onClick={() => {
+                          if (row.site_id) setSelectedAuditId(row.site_id, row.id);
+                        }}
                       >
-                        <Trash2 /> Delete scan
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
+                        <FileSearch /> Open report
+                      </Link>
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      aria-label={`Delete scan report for ${row.url}`}
+                      onClick={() => onDelete(row.id, row)}
+                    >
+                      <Trash2 /> Delete scan
+                    </Button>
+                  )}
+                </div>
               )}
-            </TableRow>
+            </div>
           );
         })}
-      </TableBody>
-    </Table>
+      </div>
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Scan</TableHead>
+              {showSite ? <TableHead>Site</TableHead> : null}
+              <TableHead>Result</TableHead>
+              <TableHead>Evidence</TableHead>
+              {(onInspect || onDelete) && <TableHead className="text-right">Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => {
+              const counts = auditSeverityCounts(row);
+              return (
+                <TableRow
+                  key={row.id}
+                  className={cn(onInspect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
+                  onClick={() => onInspect?.(row.id, row)}
+                >
+                  <TableCell className="min-w-56 max-w-sm">
+                    <div className="truncate font-medium">{row.url}</div>
+                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
+                    </div>
+                  </TableCell>
+                  {showSite ? (
+                    <TableCell className="min-w-40">
+                      <div className="font-medium">{auditSiteName(row)}</div>
+                      <div className="mt-1 break-all text-xs text-muted-foreground">{auditSiteDetail(row)}</div>
+                    </TableCell>
+                  ) : null}
+                  <TableCell className="min-w-44">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge>
+                      <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
+                    </div>
+                    <div className="mt-2 max-w-52">
+                      <ProgressBar value={auditProgress(row)} />
+                      <div className="mt-1 text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="min-w-52">
+                    <div className="text-sm text-muted-foreground">
+                      {formatNumber(row.pages_crawled)} pages crawled
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <Badge variant={counts.high ? "bad" : "outline"}>{counts.high} high</Badge>
+                      <Badge variant={counts.medium ? "warn" : "outline"}>{counts.medium} med</Badge>
+                      <Badge variant="outline">{counts.low} low</Badge>
+                    </div>
+                  </TableCell>
+                  {(onInspect || onDelete) && (
+                    <TableCell className={cn("text-right", onDelete ? "min-w-56" : "min-w-40")}>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {onInspect && (
+                          <Button size="sm" variant="outline" asChild>
+                            <Link
+                              to={`/audits/${row.id}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (row.site_id) setSelectedAuditId(row.site_id, row.id);
+                              }}
+                            >
+                              <FileSearch /> Open report
+                            </Link>
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            aria-label={`Delete scan report for ${row.url}`}
+                            onClick={(event) => { event.stopPropagation(); onDelete(row.id, row); }}
+                          >
+                            <Trash2 /> Delete scan
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 

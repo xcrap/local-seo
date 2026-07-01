@@ -524,6 +524,9 @@ try {
   if (!webAppClient.includes("<Trash2 /> Delete scan")) {
     throw new Error("Scan history deletion should be a visible Delete scan button, not an icon-only control.");
   }
+  if (!webAppClient.includes('className="divide-y md:hidden"') || !webAppClient.includes('className="divide-y rounded-md border md:hidden"')) {
+    throw new Error("Overview control and scan-history rows should reflow on mobile instead of forcing horizontal table scrolling.");
+  }
   if (
     webAppClient.includes("row.metrics.averagePageLoadMs > 0") ||
     webAppClient.includes("page.loadMs ?") ||
