@@ -94,7 +94,7 @@ const nav = [
   { to: "/saved", label: "Saved keywords", icon: TableProperties },
   { to: "/rank", label: "Rank tracking", icon: Target },
   { to: "/domain", label: "Organic research", icon: Globe2 },
-  { to: "/backlinks", label: "Links", icon: Link2 },
+  { to: "/links", label: "Links", icon: Link2 },
   { to: "/brand", label: "Brand lookup", icon: Sparkles },
   { to: "/prompts", label: "Prompt explorer", icon: Bot },
   { to: "/audits", label: "Audits", icon: FileSearch },
@@ -1181,7 +1181,7 @@ function LoginScreen({ setupRequired, onSuccess }: { setupRequired: boolean; onS
   );
 }
 
-function AppWorkspace() {
+function AppRoot() {
   return (
     <BrowserRouter>
       <AppShell />
@@ -1384,7 +1384,7 @@ function AppShell() {
                 <Route path="/saved" element={<SavedPage site={activeSite} />} />
                 <Route path="/rank" element={<RankPage site={activeSite} />} />
                 <Route path="/domain" element={<DomainPage site={activeSite} />} />
-                <Route path="/backlinks" element={<BacklinksPage site={activeSite} />} />
+                <Route path="/links" element={<LinksPage site={activeSite} />} />
                 <Route path="/brand" element={<BrandLookupPage site={activeSite} />} />
                 <Route path="/prompts" element={<PromptExplorerPage site={activeSite} />} />
                 <Route path="/audits" element={<AuditsPage site={activeSite} />} />
@@ -1581,7 +1581,7 @@ function Overview({
                 <Link to={scanAudit?.id ? `/audits/${scanAudit.id}` : "/audits"}>Open scan report</Link>
               </Button>
               <Button asChild variant="secondary"><Link to="/domain">View organic research</Link></Button>
-              <Button asChild variant="secondary"><Link to="/backlinks">View links</Link></Button>
+              <Button asChild variant="secondary"><Link to="/links">View links</Link></Button>
             </div>
           </div>
         </section>
@@ -1699,7 +1699,7 @@ function SiteCommandCenter({
       evidence: latestAudit
         ? `${formatNumber(latestAuditSummary.linkTags || 0)} link tags · ${formatNumber(latestAuditSummary.brokenLinks || 0)} broken`
         : "Run a site scan to build the local link graph.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/backlinks"><Link2 /> Open links</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/links"><Link2 /> Open links</Link></Button>,
       secondary: null,
     },
     {
@@ -3233,7 +3233,7 @@ function DomainPagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function BacklinksPage({ site }: { site: Site }) {
+function LinksPage({ site }: { site: Site }) {
   const navigate = useNavigate();
   const [domain, setDomain] = useState(site.domain);
   const [overview, setOverview] = useState<any>(null);
@@ -6922,5 +6922,5 @@ export default function App() {
     return <LoginScreen setupRequired={setupRequired} onSuccess={() => setAuthenticated(true)} />;
   }
 
-  return <AppWorkspace />;
+  return <AppRoot />;
 }

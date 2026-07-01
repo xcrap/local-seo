@@ -282,6 +282,9 @@ try {
 
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
     await page.getByRole("heading", { name: /^Links$/ }).waitFor();
+    if (!page.url().includes("/links") || page.url().includes("/backlinks")) {
+      throw new Error(`Links navigation should use /links only, got ${page.url()}.`);
+    }
     await page.getByRole("heading", { name: /^Local link graph$/ }).waitFor();
     await page.getByLabel("Saved scan for link evidence").waitFor();
     await page.getByText(/saved scans? available for this site/i).first().waitFor();

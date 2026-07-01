@@ -423,8 +423,6 @@ export async function handleMcp(c: Context) {
 }
 
 async function callTool(name: string, args: any) {
-  if ("projectId" in (args || {})) throw new Error("Use siteId.");
-  if ("target" in (args || {})) throw new Error("Use domain.");
   const withDomainInput = (input: any) => {
     const domain = input?.domain;
     return domain ? { ...input, domain } : input;

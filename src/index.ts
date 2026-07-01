@@ -99,7 +99,6 @@ async function readJson(c: any) {
 }
 
 function siteScopedBody(body: Record<string, any>) {
-  if ("projectId" in body) throw new Error("Use siteId.");
   return body;
 }
 
@@ -108,7 +107,6 @@ async function readSiteScopedJson(c: any) {
 }
 
 function domainScopedBody(body: Record<string, any>) {
-  if ("target" in body) throw new Error("Use domain.");
   const scoped = siteScopedBody(body);
   const domain = body.domain;
   return domain ? { ...scoped, domain } : scoped;
@@ -119,12 +117,10 @@ async function readDomainScopedJson(c: any) {
 }
 
 function siteQueryId(c: any) {
-  if (c.req.query("projectId")) throw new Error("Use siteId.");
   return c.req.query("siteId");
 }
 
 function siteBodyId(body: Record<string, any>) {
-  if ("projectId" in body) throw new Error("Use siteId.");
   return String(body.siteId || "");
 }
 
@@ -299,7 +295,7 @@ async function startSavedSiteScan(c: any) {
         key: "links",
         label: "Links",
         status: config.seo_metrics_source_connected ? "queued" : "local",
-        route: "/backlinks",
+        route: "/links",
         message: config.seo_metrics_source_connected
           ? "Backlink overview snapshot is queued."
           : "Local internal, external, and broken-link evidence will be available from this scan. Connect or import a backlink index only for web-wide backlinks.",

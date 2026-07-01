@@ -265,10 +265,6 @@ try {
   if (legacyProjectsResponse.status !== 404) {
     throw new Error(`Legacy /api/projects route should be gone, got ${legacyProjectsResponse.status}.`);
   }
-  const legacyDashboardQuery = await requestFailure("/api/dashboard?projectId=old-id");
-  if (!/Use siteId/i.test(String(legacyDashboardQuery.data?.error || ""))) {
-    throw new Error(`Dashboard should reject projectId query input: ${JSON.stringify(legacyDashboardQuery)}`);
-  }
   const dbSource = await readFile(path.join(rootDir, "src/db.ts"), "utf8");
   if (/DELETE\s+FROM\s+(sites|audits|gsc_imports)\b/i.test(dbSource)) {
     throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
@@ -353,6 +349,12 @@ try {
   }
   if (webAppClient.includes('path="/projects"') || webAppClient.includes('to="/projects"')) {
     throw new Error("The React app should not expose or redirect a legacy /projects route.");
+  }
+  if (!webAppClient.includes('path="/links"') || !webAppClient.includes('to="/links"')) {
+    throw new Error("The React app should expose Links at /links.");
+  }
+  if (webAppClient.includes('path="/backlinks"') || webAppClient.includes('to="/backlinks"')) {
+    throw new Error("The React app should not keep a /backlinks UI route or redirect.");
   }
   for (const legacyWebCall of ["api.projects", "api.project", "api.createProject", "api.updateProject", "api.deleteProject", "api.scanProject"]) {
     if (webAppClient.includes(legacyWebCall)) {
@@ -611,12 +613,8 @@ try {
   if (!siteScan.related?.some((row: any) => row.key === "technical-audit") || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
     throw new Error("Site scan did not return related report statuses.");
   }
-  const legacyAuditStart = await requestFailure("/api/audits", {
-    method: "POST",
-    body: JSON.stringify({ projectId: project.id, url: "https://example.com" }),
-  });
-  if (!/Use siteId/i.test(String(legacyAuditStart.data?.error || ""))) {
-    throw new Error(`Audit start should reject projectId body input: ${JSON.stringify(legacyAuditStart)}`);
+  if (!siteScan.related?.some((row: any) => row.key === "links" && row.route === "/links")) {
+    throw new Error(`Site scan should send users to the Links route, not a legacy route: ${JSON.stringify(siteScan.related)}`);
   }
   const localProject = await request("/api/sites", {
     method: "POST",
@@ -814,26 +812,12 @@ try {
   ) {
     throw new Error(`SERP analysis should expose domain fields, not target fields: ${JSON.stringify(serpAnalysis)}`);
   }
-  const legacySerpTarget = await requestFailure("/api/serp/analyze", {
-    method: "POST",
-    body: JSON.stringify({ siteId: project.id, keyword: "seo software", target: "example.com" }),
-  });
-  if (!/Use domain/i.test(String(legacySerpTarget.data?.error || ""))) {
-    throw new Error(`SERP analysis should reject target body input: ${JSON.stringify(legacySerpTarget)}`);
-  }
   const organicOverview = await request("/api/domain/overview", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, domain: "example.com" }),
   });
   if (organicOverview.domain !== "example.com" || "target" in organicOverview) {
     throw new Error(`Organic research should expose domain, not target: ${JSON.stringify(organicOverview)}`);
-  }
-  const legacyOrganicTarget = await requestFailure("/api/domain/overview", {
-    method: "POST",
-    body: JSON.stringify({ siteId: project.id, target: "example.com" }),
-  });
-  if (!/Use domain/i.test(String(legacyOrganicTarget.data?.error || ""))) {
-    throw new Error(`Organic research should reject target body input: ${JSON.stringify(legacyOrganicTarget)}`);
   }
   if (
     organicOverview.source === "provider-not-configured" &&
@@ -1299,20 +1283,6 @@ try {
   if (!legacyMcp.error || !/Unknown tool/i.test(String(legacyMcp.error.message || ""))) {
     throw new Error(`MCP legacy list_projects alias should be unavailable: ${JSON.stringify(legacyMcp)}`);
   }
-  const legacyMcpProjectId = await request("/mcp", {
-    method: "POST",
-    body: JSON.stringify({ jsonrpc: "2.0", id: 198, method: "tools/call", params: { name: "get_site_summary", arguments: { projectId: project.id } } }),
-  });
-  if (!legacyMcpProjectId.error || !/Use siteId/i.test(String(legacyMcpProjectId.error.message || ""))) {
-    throw new Error(`MCP should reject projectId input: ${JSON.stringify(legacyMcpProjectId)}`);
-  }
-  const legacyMcpTarget = await request("/mcp", {
-    method: "POST",
-    body: JSON.stringify({ jsonrpc: "2.0", id: 197, method: "tools/call", params: { name: "get_domain_overview", arguments: { siteId: project.id, target: "example.com" } } }),
-  });
-  if (!legacyMcpTarget.error || !/Use domain/i.test(String(legacyMcpTarget.error.message || ""))) {
-    throw new Error(`MCP should reject target input: ${JSON.stringify(legacyMcpTarget)}`);
-  }
   const legacyDescriptionTool = (mcp.result?.tools || []).find((tool: any) =>
     /^Legacy alias:/i.test(tool.description || "") || /workspace|target domain|project|selected-site/i.test(tool.description || ""),
   );
@@ -1362,7 +1332,7 @@ try {
     mcpDomainOverview.result?.structuredContent?.domain !== "example.com" ||
     "target" in (mcpDomainOverview.result?.structuredContent || {})
   ) {
-    throw new Error(`MCP get_domain_overview should accept and return domain while mapping legacy internals: ${JSON.stringify(mcpDomainOverview)}`);
+    throw new Error(`MCP get_domain_overview should accept and return domain fields: ${JSON.stringify(mcpDomainOverview)}`);
   }
   const mcpSerpAnalysis = await request("/mcp", {
     method: "POST",
