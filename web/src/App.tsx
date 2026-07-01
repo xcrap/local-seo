@@ -449,7 +449,7 @@ function ActiveSiteSelect({
   return (
     <Select value={activeSiteId} onValueChange={onSelect}>
       <SelectTrigger className="min-w-0 [&_[data-slot=select-value]]:truncate">
-        <SelectValue placeholder="Select site" />
+        <SelectValue placeholder="Choose active site" />
       </SelectTrigger>
       <SelectContent className="max-w-[min(34rem,calc(100vw-2rem))]">
         {sites.map((site) => (
@@ -2140,7 +2140,7 @@ function SitesPage({
       <div className={cn("flex flex-wrap gap-2", mobile ? "" : "justify-end")}>
         {activeSiteId !== site.id ? (
           <Button size={mobile ? "default" : "sm"} variant="secondary" className={buttonClass} onClick={() => selectSite(site.id)}>
-            Select site
+            Make active
           </Button>
         ) : null}
         {site.domain ? (
@@ -3345,7 +3345,7 @@ function LocalOrganicEvidence({
           <div>
             <h2 className="text-lg font-semibold">Local crawl pages</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Real page evidence from the selected saved scan. No external keyword or traffic estimates are generated here.
+              Real page evidence from the saved scan shown below. No external keyword or traffic estimates are generated here.
             </p>
           </div>
           <ScanRunPicker label="Saved scan for page evidence" scans={scans} selectedScanId={selectedScanId} onScanChange={onScanChange} />
@@ -3366,7 +3366,7 @@ function LocalOrganicEvidence({
           />
         ) : !scan.result ? (
           <EmptyState
-            title={scanIsActive(scan) ? "Selected scan is still running" : "Selected scan has no crawl evidence"}
+            title={scanIsActive(scan) ? "This saved scan is still running" : "This saved scan has no crawl evidence"}
             text={scanIsActive(scan) ? "Open the scan report to watch progress. Evidence appears here after crawl data is saved." : scan.error || "This saved scan did not include crawl rows."}
             action={<Button asChild variant="secondary"><Link to={`/scans/${scan.id}`}><FileSearch /> Open scan report</Link></Button>}
           />
@@ -3388,7 +3388,7 @@ function LocalOrganicEvidence({
                 </div>
               ))}
             </div>
-            {rows.length ? <LocalOrganicPagesTable rows={rows} /> : <EmptyState title="No page rows" text="The selected scan did not save page rows." />}
+            {rows.length ? <LocalOrganicPagesTable rows={rows} /> : <EmptyState title="No page rows" text="This saved scan did not save page rows." />}
           </>
         )}
       </div>
@@ -3771,7 +3771,7 @@ function LocalLinkEvidence({
           <div>
             <h2 className="text-lg font-semibold">Local link graph</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Real internal links, external links, and failing URLs from the selected saved scan.
+              Real internal links, external links, and failing URLs from the saved scan shown below.
             </p>
           </div>
           <ScanRunPicker label="Saved scan for link evidence" scans={scans} selectedScanId={selectedScanId} onScanChange={onScanChange} />
@@ -3792,7 +3792,7 @@ function LocalLinkEvidence({
           />
         ) : !scan.result ? (
           <EmptyState
-            title={scanIsActive(scan) ? "Selected scan is still running" : "Selected scan has no link evidence"}
+            title={scanIsActive(scan) ? "This saved scan is still running" : "This saved scan has no link evidence"}
             text={scanIsActive(scan) ? "Open the scan report to watch progress. Link evidence appears here after crawl data is saved." : scan.error || "This saved scan did not include link rows."}
             action={<Button asChild variant="secondary"><Link to={`/scans/${scan.id}`}><FileSearch /> Open scan report</Link></Button>}
           />
@@ -3820,13 +3820,13 @@ function LocalLinkEvidence({
                 <TabsTrigger value="internal">Internal graph</TabsTrigger>
               </TabsList>
               <TabsContent value="external">
-                {externalLinks.length ? <LocalExternalLinksTable rows={externalLinks} checkedByUrl={checkedByUrl} /> : <EmptyState title="No external links" text="The selected scan did not find external links." />}
+                {externalLinks.length ? <LocalExternalLinksTable rows={externalLinks} checkedByUrl={checkedByUrl} /> : <EmptyState title="No external links" text="This saved scan did not find external links." />}
               </TabsContent>
               <TabsContent value="broken">
-                {brokenLinks.length ? <ScanLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="The selected scan did not find failing link URLs." />}
+                {brokenLinks.length ? <ScanLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="This saved scan did not find failing link URLs." />}
               </TabsContent>
               <TabsContent value="internal">
-                {pageRows.length ? <LocalInternalGraphTable rows={pageRows} /> : <EmptyState title="No internal graph" text="The selected scan did not save page link rows." />}
+                {pageRows.length ? <LocalInternalGraphTable rows={pageRows} /> : <EmptyState title="No internal graph" text="This saved scan did not save page link rows." />}
               </TabsContent>
             </Tabs>
           </>
@@ -4586,14 +4586,14 @@ function ScansPage({ site }: { site: Site }) {
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-2xl font-semibold tracking-normal">Scan report</h2>
-              <p className="text-sm text-muted-foreground">Technical evidence, broken assets, metadata, indexability, and fixes from the selected scan.</p>
+              <p className="text-sm text-muted-foreground">Technical evidence, broken assets, metadata, indexability, and fixes from the open scan report.</p>
             </div>
             {detail ? <Badge variant={detail.status === "completed" ? "good" : detail.status === "failed" ? "bad" : "warn"}>{detail.status}</Badge> : null}
           </div>
           {detail ? <ScanDetail scan={detail} /> : (
             <EmptyState
-              title={allScans.length ? "No scan selected for this site" : "No scan report yet"}
-              text={allScans.length ? "Every saved scan is still listed below. Open a row to inspect it, or run a new scan for this site." : "Start a local site scan to fill this report with crawl evidence."}
+              title={allScans.length ? "No scan report open for this site" : "No scan report yet"}
+              text={allScans.length ? "Every saved scan is still listed below. Open a row to view it, or run a new scan for this site." : "Start a local site scan to fill this report with crawl evidence."}
               action={
                 !allScans.length
                   ? site.domain

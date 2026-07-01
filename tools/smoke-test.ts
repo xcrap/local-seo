@@ -426,6 +426,21 @@ try {
   if (/selected-site/i.test(webAppClient)) {
     throw new Error("The app should use active-site wording instead of selected-site implementation copy.");
   }
+  if (webAppClient.includes('placeholder="Select site"') || webAppClient.includes(">Select site")) {
+    throw new Error("Active-site controls should say Choose active site or Make active, not Select site.");
+  }
+  for (const staleSelectedScanCopy of [
+    "selected saved scan",
+    "Selected scan is still running",
+    "Selected scan has no",
+    "The selected scan",
+    "from the selected scan",
+    "No scan selected for this site",
+  ]) {
+    if (webAppClient.includes(staleSelectedScanCopy)) {
+      throw new Error(`User-facing scan copy should say saved/open scan instead of selected scan: ${staleSelectedScanCopy}`);
+    }
+  }
   if (webAppClient.includes("window.location.href") || webAppClient.includes("window.location.reload")) {
     throw new Error("The app shell should use React Router/app state instead of full-page window.location route changes.");
   }
