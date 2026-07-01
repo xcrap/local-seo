@@ -248,14 +248,64 @@ function crawlPreferenceLabel(project?: Project | null) {
 function scanTargetDetail(project?: Project | null) {
   const candidates = scanTargetCandidates(project);
   if (!candidates.length) return "Set a website address to scan.";
-  if (candidates.length === 1) return crawlPreferenceLabel(project);
-  return `${crawlPreferenceLabel(project)} · tries ${formatNumber(candidates.length)} targets: ${candidates.join(" -> ")}`;
+  if (candidates.length === 1) return `${crawlPreferenceLabel(project)} · ${candidates[0]}`;
+  return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} target candidates`;
 }
 
 function scanTargetShortDetail(project?: Project | null) {
   const candidates = scanTargetCandidates(project);
-  if (candidates.length <= 1) return crawlPreferenceLabel(project);
-  return `${crawlPreferenceLabel(project)} · tries ${formatNumber(candidates.length)} targets`;
+  if (!candidates.length) return "No scan target";
+  return `${crawlPreferenceLabel(project)} · ${formatNumber(candidates.length)} target${candidates.length === 1 ? "" : "s"}`;
+}
+
+function scanTargetCountLabel(project?: Project | null) {
+  const count = scanTargetCandidates(project).length;
+  return `${formatNumber(count)} target${count === 1 ? "" : "s"}`;
+}
+
+function ScanTargetPills({
+  project,
+  compact = false,
+}: {
+  project?: Project | null;
+  compact?: boolean;
+}) {
+  const candidates = scanTargetCandidates(project);
+  if (!candidates.length) return <span className="text-sm text-muted-foreground">Set a website address</span>;
+  return (
+    <div className={cn("flex flex-wrap gap-2", compact ? "gap-1.5" : "")}>
+      {candidates.map((candidate, index) => (
+        <span
+          key={candidate}
+          className={cn(
+            "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-medium",
+            compact ? "px-2 py-0.5" : "",
+          )}
+        >
+          <span className="text-muted-foreground">{index + 1}</span>
+          <span className="min-w-0 truncate">{candidate}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ScanPlanSummary({
+  project,
+  compact = false,
+}: {
+  project?: Project | null;
+  compact?: boolean;
+}) {
+  return (
+    <div className={cn("space-y-2", compact ? "space-y-1.5" : "")}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline">{scanTargetCountLabel(project)}</Badge>
+        <Badge variant="outline">{crawlPreferenceLabel(project)}</Badge>
+      </div>
+      <ScanTargetPills project={project} compact={compact} />
+    </div>
+  );
 }
 
 function siteDisplayName(project?: Project | null) {
@@ -1026,9 +1076,10 @@ function WorkspaceShell() {
 
           {activeProject?.domain ? (
             <div className="mt-3 rounded-md border bg-card p-3">
-              <div className="text-xs font-medium text-muted-foreground">First scan target</div>
-              <div className="mt-1 break-all text-sm font-medium">{preferredAuditUrl(activeProject)}</div>
-              <div className="mt-1 text-xs text-muted-foreground">{scanTargetShortDetail(activeProject)}</div>
+              <div className="text-xs font-medium text-muted-foreground">Scan plan</div>
+              <div className="mt-2">
+                <ScanPlanSummary project={activeProject} compact />
+              </div>
               <Button className="mt-3 w-full justify-start" size="sm" onClick={scanActiveSite} disabled={shellScanning}>
                 <FileSearch /> {shellScanning ? "Starting scan" : "Scan website"}
               </Button>
@@ -1379,7 +1430,7 @@ function SiteCommandCenter({
       area: "Selected site",
       status: project.domain || "missing",
       evidence: project.domain
-        ? `First scan target: ${preferredAuditUrl(project)} · ${scanTargetDetail(project)} · Search defaults: ${searchDefaultsLabel(project)}`
+        ? `Scan plan: ${scanTargetShortDetail(project)} · starts at ${preferredAuditUrl(project)} · Search defaults: ${searchDefaultsLabel(project)}`
         : "Add a site before running audits, rankings, Search Console imports, or AI work.",
       action: project.domain ? (
         <Button size="sm" onClick={onScan} disabled={scanning}>
@@ -1810,7 +1861,7 @@ function ProjectsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Site</TableHead>
-                <TableHead>First scan target</TableHead>
+                <TableHead>Scan plan</TableHead>
                 <TableHead>Search defaults</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Status</TableHead>
@@ -1825,8 +1876,7 @@ function ProjectsPage({
                     <div className="text-xs text-muted-foreground">{project.domain || "Add a website address"}</div>
                   </TableCell>
                   <TableCell className="min-w-56">
-                    <div className="font-medium">{preferredAuditUrl(project) || "Set website address"}</div>
-                    <div className="line-clamp-2 max-w-md break-all text-xs text-muted-foreground">{scanTargetDetail(project)}</div>
+                    <ScanPlanSummary project={project} compact />
                   </TableCell>
                   <TableCell className="min-w-44">
                     <div className="font-medium">{marketLabel(project.location_code)}</div>
@@ -3774,13 +3824,13 @@ function AuditsPage({ project }: { project: Project }) {
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">Scan target</span>
+              <span className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">Scan plan</span>
               {project.domain ? <Badge variant="outline">{scanTargetShortDetail(project)}</Badge> : null}
             </div>
-            <div className="mt-2 break-all text-xl font-semibold">
-              {project.domain ? preferredAuditUrl(project) : "Add a website address"}
+            <div className="mt-3">
+              {project.domain ? <ScanTargetPills project={project} /> : <p className="text-xl font-semibold">Add a website address</p>}
             </div>
-            {project.domain ? <p className="mt-1 text-sm text-muted-foreground">{scanTargetDetail(project)}</p> : null}
+            {project.domain ? <p className="mt-2 text-sm text-muted-foreground">{scanTargetDetail(project)}</p> : null}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row xl:justify-end">
             {project.domain ? (

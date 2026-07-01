@@ -207,8 +207,9 @@ try {
 
     await page.goto(webUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByText("First scan target").first().waitFor();
-    await page.getByText(/tries 2 targets/i).first().waitFor();
+    await page.getByText("Scan plan").first().waitFor();
+    await page.getByText(/2 targets/i).first().waitFor();
+    await page.getByText(fixtureUrl).first().waitFor();
     await page.getByRole("row", { name: /Selected site.*Scan website/i }).getByRole("button", { name: /Scan website/i }).click();
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
@@ -281,9 +282,15 @@ try {
     await page.getByRole("link", { name: /Sites/i }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
     await page.getByText("A site is one saved website address").waitFor();
-    await page.getByRole("columnheader", { name: /First scan target/i }).waitFor();
+    await page.getByRole("columnheader", { name: /Scan plan/i }).waitFor();
     await page.getByRole("columnheader", { name: /^Search defaults$/ }).waitFor();
-    await page.getByText(/tries 2 targets/i).first().waitFor();
+    await page.getByText(/2 targets/i).first().waitFor();
+    if (await page.getByText(/First scan target/i).count()) {
+      throw new Error("Sites flow still exposes the old first-target wording.");
+    }
+    if (await page.getByText(/tries \d+ targets/i).count()) {
+      throw new Error("Sites flow still hides the scan plan behind tries-targets wording.");
+    }
     await page.getByRole("button", { name: /Edit Fixture Site/i }).click();
     await page.getByRole("heading", { name: /Edit site/i }).waitFor();
     await page.getByText("Scan protocol").waitFor();

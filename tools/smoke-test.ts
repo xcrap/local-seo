@@ -254,6 +254,12 @@ try {
   if (webAppClient.includes("rows[0] || ledger[0]")) {
     throw new Error("Audit report selection should not hide context by auto-opening the newest global scan.");
   }
+  if (/First scan target|tries \$\{formatNumber\(candidates\.length\)\} targets|tries \d+ targets/i.test(webAppClient)) {
+    throw new Error("The app should present saved-site crawl settings as an explicit scan plan, not a hidden first-target rule.");
+  }
+  if (!webAppClient.includes("Scan plan")) {
+    throw new Error("The main site flow should expose the saved site's scan plan.");
+  }
   if (!webAppClient.includes("Every saved scan is still listed below")) {
     throw new Error("Audit page should explain that all saved scans remain visible in the local ledger.");
   }
@@ -326,6 +332,9 @@ try {
   }
   const siteScan = await request(`/api/sites/${project.id}/scan`, { method: "POST" });
   if (!siteScan.audit?.id) throw new Error("Site scan did not return an audit.");
+  if (!Array.isArray(siteScan.candidateUrls) || !siteScan.candidateUrls.includes("https://example.com")) {
+    throw new Error(`Site scan should return its scan-plan candidate URLs: ${JSON.stringify(siteScan)}`);
+  }
   if (!siteScan.related?.some((row: any) => row.key === "technical-audit") || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
     throw new Error("Site scan did not return related report statuses.");
   }
@@ -337,6 +346,9 @@ try {
   if (!localSiteScan.audit?.id) throw new Error("Local saved-site scan did not return an audit.");
   if (!String(localSiteScan.scanUrl || "").startsWith(fixtureUrl)) {
     throw new Error(`Local saved-site scan did not resolve to the reachable HTTP fixture: ${localSiteScan.scanUrl}`);
+  }
+  if (!Array.isArray(localSiteScan.candidateUrls) || localSiteScan.candidateUrls[0] !== fixtureUrl) {
+    throw new Error(`Local saved-site scan did not return the expected scan plan: ${JSON.stringify(localSiteScan.candidateUrls)}`);
   }
   const localMcpScan = await request("/mcp", {
     method: "POST",

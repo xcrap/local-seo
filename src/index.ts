@@ -29,7 +29,7 @@ import {
   setGscSite,
 } from "./gsc";
 import { handleMcp, mcpToolList } from "./mcp";
-import { resolveSavedSiteScanUrl } from "./site-target";
+import { resolveSavedSiteScanUrl, siteScanCandidates } from "./site-target";
 import {
   addRankKeywords,
   backlinksOverview,
@@ -243,6 +243,7 @@ async function startSavedSiteScan(c: any) {
   const site = getProject(c.req.param("id"));
   if (!site) return c.json({ error: "Site not found." }, 404);
   if (!site.domain) return c.json({ error: "Set a site domain first." }, 400);
+  const candidateUrls = siteScanCandidates(site);
   const url = await resolveSavedSiteScanUrl(site);
   const audit = startAudit(site.id, url);
   const config = listPublicConfig();
@@ -283,6 +284,7 @@ async function startSavedSiteScan(c: any) {
       },
     ],
     scanUrl: url,
+    candidateUrls,
     scanPreferences: {
       protocol: site.crawl_protocol || "auto",
       host: site.crawl_host || "auto",
