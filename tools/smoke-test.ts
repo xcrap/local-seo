@@ -674,8 +674,11 @@ try {
   if (!Array.isArray(siteScan.candidateUrls) || !siteScan.candidateUrls.includes("https://example.com")) {
     throw new Error(`Site scan should return its scan-plan candidate URLs: ${JSON.stringify(siteScan)}`);
   }
-  if (!siteScan.related?.some((row: any) => row.key === "technical-audit") || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
+  if (!siteScan.related?.some((row: any) => row.key === "technical-audit" && row.route === `/audits/${siteScan.audit.id}`) || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
     throw new Error("Site scan did not return related report statuses.");
+  }
+  if (!siteScan.related?.some((row: any) => row.key === "page-speed" && row.route === `/audits/${siteScan.audit.id}?tab=speed`)) {
+    throw new Error(`Site scan should return a direct speed-report follow-up: ${JSON.stringify(siteScan.related)}`);
   }
   if (!siteScan.related?.some((row: any) => row.key === "links" && row.route === "/links")) {
     throw new Error(`Site scan should send users to the Links route: ${JSON.stringify(siteScan.related)}`);

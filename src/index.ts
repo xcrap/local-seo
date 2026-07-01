@@ -279,8 +279,15 @@ async function startSavedSiteScan(c: any) {
         key: "technical-audit",
         label: "Technical audit",
         status: "running",
-        route: "/audits",
+        route: `/audits/${audit.id}`,
         message: `Local crawler is checking ${url} for pages, metadata, links, images, assets, robots, and sitemap.`,
+      },
+      {
+        key: "page-speed",
+        label: "Page speed",
+        status: "running",
+        route: `/audits/${audit.id}?tab=speed`,
+        message: "Crawler response timings, HTML weight, compression, and CSS/JS evidence are saved in this scan.",
       },
       {
         key: "domain-intelligence",

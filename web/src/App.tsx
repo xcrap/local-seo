@@ -1880,6 +1880,11 @@ function ScanCoverageList({ rows, auditStatus }: { rows: any[]; auditStatus?: st
       {rows.map((row) => {
         const status = row.key === "technical-audit" && auditStatus ? auditStatus : row.status;
         const variant = status === "completed" || status === "queued" || status === "running" || status === "local" ? "good" : status === "needs-provider" ? "warn" : "outline";
+        const actionLabel = row.key === "technical-audit"
+          ? "Open live report"
+          : row.key === "page-speed"
+            ? "Open speed report"
+            : `Open ${String(row.label || "").toLowerCase()}`;
         return (
           <div key={row.key} className="grid gap-3 p-4 lg:grid-cols-[220px_1fr_auto] lg:items-center">
             <div className="flex items-center gap-3">
@@ -1889,7 +1894,7 @@ function ScanCoverageList({ rows, auditStatus }: { rows: any[]; auditStatus?: st
             <p className="text-sm leading-6 text-muted-foreground">{row.message}</p>
             {row.route ? (
               <Button asChild size="sm" variant="outline">
-                <Link to={row.route}>{row.key === "technical-audit" ? "Open report" : `Open ${String(row.label || "").toLowerCase()}`}</Link>
+                <Link to={row.route}>{actionLabel}</Link>
               </Button>
             ) : null}
           </div>
