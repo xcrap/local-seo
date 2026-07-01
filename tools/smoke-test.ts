@@ -299,6 +299,9 @@ try {
   if (/save these in Settings|save .* in Settings/i.test(envExampleSource + readmeSource)) {
     throw new Error("Docs should not imply app Settings are used for secret environment credentials.");
   }
+  if (!/^CODEX_MODEL=$/m.test(envExampleSource) || /gpt-5\.5/i.test(envExampleSource)) {
+    throw new Error("The env example should leave CODEX_MODEL blank so the local Codex CLI default is used.");
+  }
   if (!/OpenSERP/i.test(envExampleSource + readmeSource) || !/SearXNG/i.test(envExampleSource + readmeSource)) {
     throw new Error("Docs should expose free/self-hosted SERP providers before optional paid metrics.");
   }
