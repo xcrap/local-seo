@@ -619,6 +619,11 @@ try {
   if (!webAppClient.includes("show as unavailable unless a real metrics source is connected")) {
     throw new Error("Keyword research copy should explain unavailable metric values clearly.");
   }
+  for (const keywordFormLabel of ['Field label="Seed keyword"', 'Field label="Suggestion limit"', 'Field label="Search keywords"', 'Field label="Tag filter"', 'Field label="Tag names"']) {
+    if (!webAppClient.includes(keywordFormLabel)) {
+      throw new Error(`Keyword workflows should use explicit form labels, missing ${keywordFormLabel}.`);
+    }
+  }
   const site = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),

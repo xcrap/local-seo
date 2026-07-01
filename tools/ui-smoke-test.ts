@@ -307,6 +307,15 @@ try {
     await desktopNavigation.evaluate((element) => { element.scrollTop = 0; });
 
     await page.setViewportSize({ width: 1600, height: 1000 });
+    await page.getByRole("navigation").getByRole("link", { name: /^Keywords$/ }).click();
+    await page.getByRole("heading", { name: /^Keyword research$/ }).waitFor();
+    await page.getByLabel("Seed keyword").waitFor();
+    await page.getByLabel("Suggestion limit").waitFor();
+    await page.getByRole("navigation").getByRole("link", { name: /^Saved keywords$/ }).click();
+    await page.getByRole("heading", { name: /^Saved keywords$/ }).waitFor();
+    await page.getByLabel("Search keywords").waitFor();
+    await page.getByText("Tag filter").waitFor();
+
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
     await page.getByLabel("Saved scan for page evidence").waitFor();

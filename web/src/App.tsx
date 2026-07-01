@@ -2335,10 +2335,14 @@ function KeywordsPage({ site }: { site: Site }) {
     <>
       <PageHeader eyebrow="Research" title="Keyword research" description="Find real keyword suggestions. Volume, CPC, and difficulty show as unavailable unless a real metrics source is connected." />
       <section className="rounded-md border bg-background p-5">
-        <form className="grid gap-3 lg:grid-cols-[1fr_120px_auto]" onSubmit={submit}>
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="seed keyword" />
-          <Input value={limit} type="number" onChange={(e) => setLimit(Number(e.target.value))} />
-          <Button disabled={loading}><Search /> {loading ? "Researching" : "Research"}</Button>
+        <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_140px_auto] lg:items-end" onSubmit={submit}>
+          <Field label="Seed keyword">
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={site.domain || "seed keyword"} />
+          </Field>
+          <Field label="Suggestion limit">
+            <Input value={limit} type="number" min={1} max={100} onChange={(e) => setLimit(Number(e.target.value))} />
+          </Field>
+          <Button disabled={loading || !query.trim()}><Search /> {loading ? "Researching" : "Research"}</Button>
         </form>
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
         {message ? <p className="mt-3 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
@@ -2486,15 +2490,19 @@ function SavedPage({ site }: { site: Site }) {
         }
       />
       <section className="mb-6 rounded-md border bg-background p-5">
-        <div className="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search saved keywords" />
-          <Select value={tagFilter || "__all"} onValueChange={(value) => setTagFilter(value === "__all" ? "" : value)}>
-            <SelectTrigger><SelectValue placeholder="Tag" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all">All tags</SelectItem>
-              {tags.map((tag) => <SelectItem key={tag.id} value={tag.name}>{tag.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-end">
+          <Field label="Search keywords">
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search saved keywords" />
+          </Field>
+          <Field label="Tag filter">
+            <Select value={tagFilter || "__all"} onValueChange={(value) => setTagFilter(value === "__all" ? "" : value)}>
+              <SelectTrigger><SelectValue placeholder="Tag" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all">All tags</SelectItem>
+                {tags.map((tag) => <SelectItem key={tag.id} value={tag.name}>{tag.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
           <Button onClick={load} disabled={loading}><Search /> {loading ? "Loading" : "Apply"}</Button>
         </div>
       </section>
@@ -2502,8 +2510,10 @@ function SavedPage({ site }: { site: Site }) {
       {message ? <p className="mb-4 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
       {selectedIds.length > 0 && (
         <section className="mb-6 rounded-md border border-primary/40 bg-background p-5">
-          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
-            <Input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder="tag names, comma separated" />
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
+            <Field label="Tag names">
+              <Input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder="tag names, comma separated" />
+            </Field>
             <Button variant="secondary" onClick={() => applyTags("add")}><Tags /> Add tags</Button>
             <Button variant="outline" onClick={() => applyTags("remove")}>Remove tags</Button>
             <Button variant="destructive" onClick={removeSelected}><Trash2 /> Delete {selectedIds.length}</Button>
