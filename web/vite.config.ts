@@ -6,6 +6,15 @@ const apiTarget = process.env.VITE_API_PROXY_TARGET || "http://localhost:3031";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          return id.includes("node_modules") ? "vendor" : undefined;
+        },
+      },
+    },
+  },
   server: {
     port: Number(process.env.WEB_PORT || 5173),
     proxy: {
