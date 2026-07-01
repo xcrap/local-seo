@@ -624,6 +624,11 @@ try {
       throw new Error(`Keyword workflows should use explicit form labels, missing ${keywordFormLabel}.`);
     }
   }
+  for (const trackingFormLabel of ['Field label="Add tracked keywords"', '"Add keywords"', '"Refresh metrics"', "Remove selected", 'Field label="URLs to inspect"']) {
+    if (!webAppClient.includes(trackingFormLabel)) {
+      throw new Error(`Rank tracking and Search Console forms should use explicit labels/actions, missing ${trackingFormLabel}.`);
+    }
+  }
   const site = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),

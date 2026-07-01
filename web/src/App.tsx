@@ -2824,11 +2824,13 @@ function RankPage({ site }: { site: Site }) {
                   {tracker.latest?.length ? <RankTable rows={tracker.latest} /> : <EmptyState title="No snapshots" text="Run a check to create the first local rank snapshot." />}
                 </TabsContent>
                 <TabsContent value="keywords">
-                  <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
-                    <Textarea value={keywordDrafts[tracker.id] || ""} onChange={(event) => setKeywordDrafts({ ...keywordDrafts, [tracker.id]: event.target.value })} placeholder="add keywords, one per line" />
-                    <Button variant="secondary" onClick={() => addKeywords(tracker.id)} disabled={loading === `add-${tracker.id}`}><Plus /> {loading === `add-${tracker.id}` ? "Adding" : "Add"}</Button>
-                    <Button variant="outline" onClick={() => refreshMetrics(tracker.id)} disabled={loading === `metrics-${tracker.id}`}><RefreshCw /> {loading === `metrics-${tracker.id}` ? "Refreshing" : "Metrics"}</Button>
-                    <Button variant="destructive" onClick={() => removeKeywords(tracker.id)} disabled={loading === `remove-${tracker.id}`}><Trash2 /> Remove</Button>
+                  <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
+                    <Field label="Add tracked keywords">
+                      <Textarea value={keywordDrafts[tracker.id] || ""} onChange={(event) => setKeywordDrafts({ ...keywordDrafts, [tracker.id]: event.target.value })} placeholder="add keywords, one per line" />
+                    </Field>
+                    <Button variant="secondary" onClick={() => addKeywords(tracker.id)} disabled={loading === `add-${tracker.id}`}><Plus /> {loading === `add-${tracker.id}` ? "Adding keywords" : "Add keywords"}</Button>
+                    <Button variant="outline" onClick={() => refreshMetrics(tracker.id)} disabled={loading === `metrics-${tracker.id}`}><RefreshCw /> {loading === `metrics-${tracker.id}` ? "Refreshing metrics" : "Refresh metrics"}</Button>
+                    <Button variant="destructive" onClick={() => removeKeywords(tracker.id)} disabled={loading === `remove-${tracker.id}`}><Trash2 /> Remove selected</Button>
                   </div>
                   <RankKeywordTable
                     rows={tracker.keywords || []}
@@ -6516,7 +6518,9 @@ function GscPage({ site }: { site: Site }) {
         <TabsContent value="inspection" className="space-y-5">
           <ReportSection title="URL inspection" description="Inspect up to 20 URLs against the selected Google property.">
             <div className="space-y-4">
-              <Textarea value={inspectUrls} onChange={(event) => setInspectUrls(event.target.value)} placeholder="https://example.com/page" />
+              <Field label="URLs to inspect">
+                <Textarea value={inspectUrls} onChange={(event) => setInspectUrls(event.target.value)} placeholder="https://example.com/page" />
+              </Field>
               <Button onClick={inspect} disabled={!status?.connection?.siteUrl || loading === "inspection"}><ExternalLink /> {loading === "inspection" ? "Inspecting" : "Inspect URLs"}</Button>
               {inspection?.rows?.length ? <GscInspectionResults rows={inspection.rows} /> : null}
             </div>

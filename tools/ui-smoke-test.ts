@@ -368,6 +368,7 @@ try {
     await page.getByRole("navigation").getByRole("link", { name: /^Search Console$/ }).click();
     await page.getByRole("heading", { name: /^Search Console$/ }).waitFor();
     await page.getByRole("tab", { name: /^URL inspection$/ }).click();
+    await page.getByLabel("URLs to inspect").waitFor();
     if (await page.getByPlaceholder("https://example.com/page").inputValue() !== `${fixtureUrl}/`) {
       throw new Error("Search Console inspection URL did not use the active site's saved crawl URL.");
     }
