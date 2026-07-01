@@ -547,6 +547,7 @@ try {
       page.waitForResponse((response) => response.url().includes("/api/config") && response.request().method() === "PUT"),
       page.getByRole("button", { name: /^Save app settings$/ }).click(),
     ]);
+    await page.getByText("App settings saved locally.").waitFor();
 
     await page.getByRole("navigation").getByRole("link", { name: /^Sites$/ }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();

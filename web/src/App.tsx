@@ -6991,6 +6991,9 @@ function McpExample({ title, value }: { title: string; value: unknown }) {
 function SettingsPage() {
   const [config, setConfig] = useState<any>({});
   const [form, setForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   async function load() {
     const data = await api.config();
@@ -7010,15 +7013,25 @@ function SettingsPage() {
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    await api.saveConfig({
-      codex_model: String(form.codex_model || "").trim(),
-      codex_reasoning_effort: String(form.codex_reasoning_effort || "medium").trim(),
-      default_location_code: String(form.default_location_code || 2840),
-      default_language_code: String(form.default_language_code || "en"),
-      default_crawl_protocol: String(form.default_crawl_protocol || "auto"),
-      default_crawl_host: String(form.default_crawl_host || "auto"),
-    });
-    await load();
+    setSaving(true);
+    setSaveMessage("");
+    setSaveError("");
+    try {
+      await api.saveConfig({
+        codex_model: String(form.codex_model || "").trim(),
+        codex_reasoning_effort: String(form.codex_reasoning_effort || "medium").trim(),
+        default_location_code: String(form.default_location_code || 2840),
+        default_language_code: String(form.default_language_code || "en"),
+        default_crawl_protocol: String(form.default_crawl_protocol || "auto"),
+        default_crawl_host: String(form.default_crawl_host || "auto"),
+      });
+      await load();
+      setSaveMessage("App settings saved locally.");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save app settings");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -7086,7 +7099,9 @@ function SettingsPage() {
                 </Field>
               </div>
             </div>
-            <Button><Settings /> Save app settings</Button>
+            {saveMessage ? <p className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-primary">{saveMessage}</p> : null}
+            {saveError ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{saveError}</p> : null}
+            <Button disabled={saving}><Settings /> {saving ? "Saving settings" : "Save app settings"}</Button>
           </form>
         </ReportSection>
         <ReportSection title="Data sources" description="What the app can run locally now and what needs a real connected source.">

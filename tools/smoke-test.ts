@@ -513,6 +513,9 @@ try {
   if (!webAppClient.includes("Keyword tool defaults") || !webAppClient.includes("Audits crawl every page language they find") || !webAppClient.includes('Field label="Result language"')) {
     throw new Error("Keyword market/language controls should be optional keyword-tool defaults, not primary site fields.");
   }
+  if (!webAppClient.includes("App settings saved locally.") || !webAppClient.includes("Could not save app settings")) {
+    throw new Error("Settings should show explicit saved and error feedback after saving local app preferences.");
+  }
   if (webAppClient.includes("firstLocationCode") || webAppClient.includes("firstLanguageCode")) {
     throw new Error("First-run site scan should not carry hidden keyword market/language fields.");
   }
