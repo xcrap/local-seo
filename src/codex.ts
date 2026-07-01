@@ -40,9 +40,9 @@ export const promptTemplates = [
   },
   {
     key: "audit.prioritize",
-    label: "Audit prioritization",
+    label: "Scan prioritization",
     template:
-      "Prioritize these technical SEO audit issues by likely impact, effort, and dependency order. Return concise markdown.\n\n{{context}}",
+      "Prioritize these technical SEO scan issues by likely impact, effort, and dependency order. Return concise markdown.\n\n{{context}}",
   },
   {
     key: "competitor.gaps",

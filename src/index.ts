@@ -277,7 +277,7 @@ async function startSavedSiteScan(c: any) {
     related: [
       {
         key: "technical-audit",
-        label: "Technical audit",
+        label: "Technical scan",
         status: "running",
         route: `/audits/${audit.id}`,
         message: `Local crawler is checking ${url} for pages, metadata, links, images, assets, robots, and sitemap.`,

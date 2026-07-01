@@ -176,14 +176,14 @@ try {
     await page.getByText(fixtureUrl).first().waitFor();
     await page.getByRole("button", { name: /Add site and scan/i }).click();
 
-    await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
+    await page.getByRole("heading", { name: /Scan report/i }).waitFor({ timeout: 20_000 });
     auditReportPath = new URL(page.url()).pathname;
     await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
-    if (await page.getByRole("heading", { name: /^Audit health$/ }).count()) {
+    if (await page.getByRole("heading", { name: /^Scan health$/ }).count()) {
       throw new Error("A running first scan should open on progress before the health overview.");
     }
     await page.getByRole("tab", { name: /^Overview$/ }).click();
-    await page.getByRole("heading", { name: /^Audit health$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Scan health$/ }).waitFor();
     if (await page.getByRole("heading", { name: /^Audit snapshot$/ }).count()) {
       throw new Error("Overview should not duplicate the audit snapshot table.");
     }
@@ -229,7 +229,7 @@ try {
     await page.getByRole("heading", { name: /^Performance issues$/ }).waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Checks$/ }).click();
-    await page.getByRole("heading", { name: /^Audit checks$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Scan checks$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Issue types$/ }).waitFor();
     const clearAuditCheckRow = page.getByRole("row").filter({ hasText: "No issues" }).first();
     await clearAuditCheckRow.waitFor();
@@ -245,11 +245,11 @@ try {
     await page.getByRole("heading", { name: /^Crawl coverage$/ }).waitFor();
     await page.getByRole("cell", { name: /sitemap\.xml/i }).last().waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
-    await page.getByRole("heading", { name: /^Audit health$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Scan health$/ }).waitFor();
     await page.getByRole("row", { name: /Resources.*image URLs checked/i }).waitFor();
     await page.getByRole("row", { name: /Page speed.*average response/i }).waitFor();
     if (await page.getByText("0 chars").count()) {
-      throw new Error("Audit report still shows standalone 0 chars badges.");
+      throw new Error("Scan report still shows standalone 0 chars badges.");
     }
 
     await page.goto(webUrl, { waitUntil: "networkidle" });
@@ -270,12 +270,12 @@ try {
     await page.getByRole("option", { name: new RegExp(`Fixture Site.*localhost:${fixtureServer.port}.*2 crawl URLs`, "i") }).waitFor();
     await page.keyboard.press("Escape");
     await page.getByRole("row", { name: /Active site.*Scan website/i }).getByRole("button", { name: /Scan website/i }).click();
-    await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
+    await page.getByRole("heading", { name: /Scan report/i }).waitFor({ timeout: 20_000 });
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
 
     await page.goto(webUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByRole("row", { name: /Technical audit/i }).waitFor();
+    await page.getByRole("row", { name: /Technical scan/i }).waitFor();
     await page.getByRole("row", { name: /Active site.*Scan website/i }).waitFor();
     if (await page.getByText("Workspace totals").count()) {
       throw new Error("Overview still renders the old metric-card totals section.");
@@ -466,8 +466,8 @@ try {
     if (auditReportPath) {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto(`${webUrl}${auditReportPath}`, { waitUntil: "networkidle" });
-      await page.getByRole("heading", { name: /Audit report/i }).waitFor();
-      await page.getByRole("heading", { name: /^Audit health$|^Scan progress$/ }).waitFor();
+      await page.getByRole("heading", { name: /Scan report/i }).waitFor();
+      await page.getByRole("heading", { name: /^Scan health$|^Scan progress$/ }).waitFor();
       await assertNoHorizontalOverflow(page, "Mobile audit report");
       await page.setViewportSize({ width: 1600, height: 1000 });
       await page.goto(`${webUrl}/audits`, { waitUntil: "networkidle" });

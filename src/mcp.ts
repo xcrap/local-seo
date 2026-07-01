@@ -77,7 +77,7 @@ const tools = [
   },
   {
     name: "get_site_summary",
-    description: "Get saved keywords, trackers, audits, and snapshots for a site.",
+    description: "Get saved keywords, trackers, scans, and snapshots for a site.",
     inputSchema: {
       type: "object",
       properties: siteIdInput,
@@ -257,7 +257,7 @@ const tools = [
   },
   {
     name: "start_audit",
-    description: "Start a local crawl audit for a site URL.",
+    description: "Start a local crawl scan for a site URL.",
     inputSchema: {
       type: "object",
       properties: {
@@ -269,7 +269,7 @@ const tools = [
   },
   {
     name: "scan_site",
-    description: "Start a local crawl audit for a saved site using its saved scan plan unless a URL is supplied.",
+    description: "Start a local crawl scan for a saved site using its saved scan plan unless a URL is supplied.",
     inputSchema: {
       type: "object",
       properties: {
@@ -281,7 +281,7 @@ const tools = [
   },
   {
     name: "get_audit",
-    description: "Read an audit by id.",
+    description: "Read a saved scan by id.",
     inputSchema: {
       type: "object",
       properties: { auditId: { type: "string" } },

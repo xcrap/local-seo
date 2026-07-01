@@ -491,7 +491,7 @@ try {
       throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
     }
   }
-  for (const oldScanLabel of ["Open site audits", "No audits yet", "Site audits", "Back to audits", "Open audits"]) {
+  for (const oldScanLabel of ["Open site audits", "No audits yet", "Site audits", "Back to audits", "Open audits", "Audit report", "Audit health", "Audit checks", "Technical audit", "Technical audits"]) {
     if (webAppClient.includes(oldScanLabel)) {
       throw new Error(`Scan-run UI should use site scan wording instead of ${oldScanLabel}.`);
     }
@@ -682,7 +682,7 @@ try {
   if (!Array.isArray(siteScan.candidateUrls) || !siteScan.candidateUrls.includes("https://example.com")) {
     throw new Error(`Site scan should return its scan-plan candidate URLs: ${JSON.stringify(siteScan)}`);
   }
-  if (!siteScan.related?.some((row: any) => row.key === "technical-audit" && row.route === `/audits/${siteScan.audit.id}`) || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
+  if (!siteScan.related?.some((row: any) => row.key === "technical-audit" && row.label === "Technical scan" && row.route === `/audits/${siteScan.audit.id}`) || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
     throw new Error("Site scan did not return related report statuses.");
   }
   if (!siteScan.related?.some((row: any) => row.key === "page-speed" && row.route === `/audits/${siteScan.audit.id}?tab=speed`)) {

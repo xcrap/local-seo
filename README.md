@@ -7,8 +7,8 @@ auth service.
 ## Features
 
 - Single local admin login
-- Local SQLite sites, keywords, rank tracking, audits, AI jobs, config, and cache
-- Real local crawler data for technical SEO audits
+- Local SQLite sites, keywords, rank tracking, scans, AI jobs, config, and cache
+- Real local crawler data for technical SEO scans
 - Real DuckDuckGo suggestions/search results for free keyword ideas and web SERP checks
 - Optional self-hosted OpenSERP or SearXNG for free/local SERP and rank checks
 - Optional external SEO metrics/index datasets only when a real source is configured
@@ -24,14 +24,14 @@ auth service.
 - **SERP analysis:** live web result snapshots, active-site ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
-- **Organic research:** local audit pages for the active site, plus ranked keywords and traffic estimates only when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
-- **Links and backlinks:** local crawl link graph from audits, plus backlink overview, backlink rows, referring domains, and top linked pages only from a real backlink index.
-- **Site audits:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, page response timing, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
+- **Organic research:** local scan pages for the active site, plus ranked keywords and traffic estimates only when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
+- **Links and backlinks:** local crawl link graph from scans, plus backlink overview, backlink rows, referring domains, and top linked pages only from a real backlink index.
+- **Site scans:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, page response timing, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
 - **Brand lookup:** real web-search evidence and optional AI visibility datasets when connected.
 - **Prompt explorer:** local Codex jobs or optional real AI visibility data-source responses.
 - **Google Search Console:** OAuth connection, property picker, disconnect, search analytics query endpoint, and URL inspection helper.
-- **Local AI lab:** Codex-backed SEO coach, clustering, audit prioritization, competitor gaps, and AI visibility jobs.
-- **MCP:** local tools for sites, keyword research, saved keywords, organic research, backlinks, SERP, rank trackers, audits, GSC performance, GSC URL inspection, brand lookup, prompt explorer, and Codex jobs.
+- **Local AI lab:** Codex-backed SEO coach, clustering, scan prioritization, competitor gaps, and AI visibility jobs.
+- **MCP:** local tools for sites, keyword research, saved keywords, organic research, backlinks, SERP, rank trackers, scans, GSC performance, GSC URL inspection, brand lookup, prompt explorer, and Codex jobs.
 
 ## Quickstart
 
@@ -61,14 +61,14 @@ bun run admin:password
 
 A site is the website/domain being analyzed. The active site feeds scans,
 rank trackers, Search Console, keyword saves, AI jobs, and local history. Each
-audit run is stored separately in SQLite, even when multiple scans use the same
+scan run is stored separately in SQLite, even when multiple scans use the same
 domain.
 
 SERP and rank checks can use self-hosted OpenSERP, self-hosted SearXNG, or the
 built-in DuckDuckGo fallback. External SEO metrics are never generated locally.
 Backlink indexes, Google keyword volumes, CPC, keyword difficulty, and
 third-party traffic estimates require a real data source or imported data. Local
-audits still feed technical pages, internal/external links, images, assets,
+scans still feed technical pages, internal/external links, images, assets,
 sitemap, robots, and response timing into reports. The app shows not-connected
 states instead of invented rows.
 

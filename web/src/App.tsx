@@ -1731,7 +1731,7 @@ function SiteCommandCenter({
     },
     {
       key: "audit",
-      area: "Technical audit",
+      area: "Technical scan",
       status: latestAudit ? scanStatusLabel(latestAudit.status) : "Needs scan",
       evidence: latestAudit
         ? `${formatNumber(latestAudit.pages_crawled)} pages · ${formatNumber(latestAudit.issue_count)} issues · ${formatNumber(latestAuditSummary.checkedLinks || 0)} links checked`
@@ -4237,7 +4237,7 @@ function AuditReportRoute() {
           }
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load audit report");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load scan report");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -4258,7 +4258,7 @@ function AuditReportRoute() {
     <>
       <PageHeader
         eyebrow="Technical"
-        title="Audit report"
+        title="Scan report"
         description="Technical evidence, broken assets, metadata, indexability, and fixes from this saved local scan."
         action={<Button asChild variant="outline"><Link to="/audits"><FileSearch /> Back to scans</Link></Button>}
       />
@@ -5532,7 +5532,7 @@ function AuditReportOverview({
       status: coverage.measuredPageLoads ? `${formatMs(coverage.averagePageLoadMs)} average response` : "not measured",
       evidence: coverage.measuredPageLoads
         ? `${formatNumber(coverage.measuredPageLoads)} pages timed · median ${formatMs(coverage.medianPageLoadMs)} · p95 ${formatMs(coverage.p95PageLoadMs)} · slowest ${formatMs(coverage.slowestPageLoadMs)}.`
-        : "Run a fresh audit to record crawler response timing for each HTML page.",
+        : "Run a fresh scan to record crawler response timing for each HTML page.",
       action: <Badge variant={coverage.verySlowPages ? "bad" : coverage.slowPages ? "warn" : coverage.measuredPageLoads ? "good" : "outline"}>{coverage.slowPages ? `${formatNumber(coverage.slowPages)} slow` : coverage.measuredPageLoads ? "measured" : "no timing"}</Badge>,
     },
     {
@@ -5560,7 +5560,7 @@ function AuditReportOverview({
   ];
   return (
     <ReportSection
-      title="Audit health"
+      title="Scan health"
       description={`${auditPhaseLabel(audit)} · ${formatDate(audit.created_at)} · stored in local SQLite`}
     >
       <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
@@ -5756,7 +5756,7 @@ function AuditSpeedReport({
       </ReportSection>
 
       <ReportSection title="Page response timings" description="Slowest pages first, with response size and compression evidence.">
-        {timedPages.length ? <AuditSpeedPagesTable rows={timedPages} /> : <EmptyState title="No page timings" text="Run a fresh audit to record response timing for each HTML page." />}
+        {timedPages.length ? <AuditSpeedPagesTable rows={timedPages} /> : <EmptyState title="No page timings" text="Run a fresh scan to record response timing for each HTML page." />}
       </ReportSection>
 
       <ReportSection title="Performance issues" description="Only speed, payload, viewport, lazy-loading, and CSS/JS findings.">
@@ -5950,7 +5950,7 @@ function AuditCheckMatrix({
   const rows = sections.flatMap((section) => section.rows.map((row) => ({ ...row, area: section.title, areaText: section.text })));
 
   return (
-    <ReportSection title="Audit checks" description="Every local check grouped into one readable table. Use the issue buttons to open the matching rows.">
+    <ReportSection title="Scan checks" description="Every local check grouped into one readable table. Use the issue buttons to open the matching rows.">
       <Table>
         <TableHeader>
           <TableRow>
@@ -6863,7 +6863,7 @@ function AiPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Local Codex" title="AI lab" description="SEO coach, keyword clustering, audit prioritization, competitor gaps, and AI visibility through local Codex medium jobs." />
+      <PageHeader eyebrow="Local Codex" title="AI lab" description="SEO coach, keyword clustering, scan prioritization, competitor gaps, and AI visibility through local Codex medium jobs." />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
         <ReportSection title="Run Codex" description="Jobs are queued in SQLite and run through your local Codex CLI.">
           <form className="space-y-4" onSubmit={submit}>
@@ -7240,7 +7240,7 @@ function SettingsPage() {
                   </span>
                 ),
               },
-              { title: "Technical audits", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
+              { title: "Technical scans", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
               { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless a metrics source is connected." },
               { title: "SERP and rank checks", status: serpProviderStatus(config), tone: "good", text: "Uses local/self-hosted OpenSERP or SearXNG when configured, otherwise live DuckDuckGo results. The source is shown on each report." },
               { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally. Google connection is optional for live performance and URL inspection." },
