@@ -186,12 +186,23 @@ try {
     await page.getByRole("tab", { name: /^Issues$/ }).click();
     await page.getByRole("heading", { name: /^Priority work queue$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Recommended fix$/ }).waitFor();
-    await page.getByRole("button", { name: /Show \d+ issues/i }).first().click();
-    await page.getByText(/Issue results/i).waitFor();
-    await page.getByText(/Showing \d+ of \d+ saved issues for/i).waitFor();
-    await page.getByRole("button", { name: /Clear filters/i }).waitFor();
-    await page.getByRole("columnheader", { name: /^Fix$/ }).waitFor();
-    await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
+	    await page.getByRole("button", { name: /Show \d+ issues/i }).first().click();
+	    await page.getByText(/Issue results/i).waitFor();
+	    await page.getByText(/Showing \d+ of \d+ saved issues for/i).waitFor();
+	    const issueResultsTable = page.locator("table").last();
+	    const issueResultsTableBox = await issueResultsTable.boundingBox();
+	    const issueResultsViewport = page.viewportSize();
+	    if (
+	      !issueResultsTableBox ||
+	      !issueResultsViewport ||
+	      issueResultsTableBox.x + issueResultsTableBox.width > issueResultsViewport.width
+	    ) {
+	      throw new Error(`Issue results table should fit the viewport, got ${JSON.stringify(issueResultsTableBox)} in ${JSON.stringify(issueResultsViewport)}.`);
+	    }
+	    await page.getByRole("button", { name: /Clear filters/i }).waitFor();
+	    await page.getByRole("button", { name: /Clear filters/i }).click();
+	    await page.getByRole("columnheader", { name: /^Fix$/ }).waitFor();
+	    await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Images$/ }).click();
     await page.getByText("Image tag inventory").waitFor();

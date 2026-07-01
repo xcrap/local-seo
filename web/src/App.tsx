@@ -5818,7 +5818,6 @@ function AuditIssuesTable({ rows }: { rows: any[] }) {
       <TableHeader>
         <TableRow>
           <TableHead>Severity</TableHead>
-          <TableHead>Page</TableHead>
           <TableHead>Issue</TableHead>
           <TableHead>Fix</TableHead>
           <TableHead>Evidence</TableHead>
@@ -5830,29 +5829,27 @@ function AuditIssuesTable({ rows }: { rows: any[] }) {
           const evidence = Object.entries(issue.evidence || {});
           return (
             <TableRow key={issue.id || `${issue.url}:${issue.message}:${index}`}>
-              <TableCell><Badge variant={severityVariant(issue.severity) as any}>{issue.severity}</Badge></TableCell>
-              <TableCell className="min-w-72">
-                <div className="break-all font-medium">{issue.url || "-"}</div>
-              </TableCell>
-              <TableCell className="min-w-72">
+              <TableCell className="align-top"><Badge variant={severityVariant(issue.severity) as any}>{issue.severity}</Badge></TableCell>
+              <TableCell className="min-w-72 max-w-lg align-top">
                 <div className="font-medium">{issue.message}</div>
+                <div className="mt-1 break-all text-xs leading-5 text-muted-foreground">{issue.url || "No page URL saved"}</div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   <Badge variant="outline">{issueCategoryLabel(issue.category)}</Badge>
                   <Badge variant="outline">{String(issue.type || "").replaceAll("-", " ")}</Badge>
                 </div>
               </TableCell>
-              <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">
+              <TableCell className="min-w-64 max-w-sm align-top text-sm leading-6 text-muted-foreground">
                 {issue.recommendation || "Inspect this item and update the affected page."}
               </TableCell>
-              <TableCell className="min-w-80 text-xs leading-5 text-muted-foreground">
+              <TableCell className="min-w-72 max-w-md align-top text-xs leading-5 text-muted-foreground">
                 {evidence.length ? evidence.map(([key, value]) => (
-                  <div key={key} className="grid gap-1 py-0.5 sm:grid-cols-[120px_1fr]">
+                  <div key={key} className="grid gap-1 py-1 sm:grid-cols-[90px_1fr]">
                     <span className="font-medium text-foreground">{key}</span>
-                    <span className="break-all">{evidenceText(value)}</span>
+                    <EvidenceValue value={value} />
                   </div>
                 )) : "-"}
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="align-top text-right">
                 {issue.url ? (
                   <Button asChild size="sm" variant="outline">
                     <a href={issue.url} target="_blank" rel="noreferrer">
@@ -5867,6 +5864,26 @@ function AuditIssuesTable({ rows }: { rows: any[] }) {
       </TableBody>
     </Table>
   );
+}
+
+function EvidenceValue({ value }: { value: unknown }) {
+  if (value == null || value === "") return <span>-</span>;
+  if (Array.isArray(value)) {
+    const items = value.map((item) => evidenceText(item)).filter((item) => item !== "-");
+    if (!items.length) return <span>-</span>;
+    const visible = items.slice(0, 3);
+    return (
+      <span className="block space-y-1">
+        {visible.map((item, index) => (
+          <span key={`${item}:${index}`} className="block break-all">{item}</span>
+        ))}
+        {items.length > visible.length ? (
+          <Badge variant="outline">+{formatNumber(items.length - visible.length)} more in saved evidence</Badge>
+        ) : null}
+      </span>
+    );
+  }
+  return <span className="break-all">{evidenceText(value)}</span>;
 }
 
 function evidenceText(value: unknown) {
