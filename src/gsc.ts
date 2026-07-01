@@ -425,8 +425,7 @@ export function importGscPerformance(input: {
   const dimensions = normalizeGscDimensions(input.dimensions, rawRows);
   const rows = rawRows
     .map((row) => normalizeGscImportRow(row, dimensions))
-    .filter(rowHasGscEvidence)
-    .slice(0, 5000);
+    .filter(rowHasGscEvidence);
   if (!rows.length) {
     throw new Error("Import must include Search Console columns such as query/page, clicks, impressions, CTR, and position.");
   }

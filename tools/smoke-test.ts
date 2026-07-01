@@ -241,6 +241,10 @@ try {
   if (/DELETE\s+FROM\s+(projects|audits|gsc_imports)\b/i.test(dbSource)) {
     throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
   }
+  const gscSource = await readFile(path.join(rootDir, "src/gsc.ts"), "utf8");
+  if (gscSource.includes(".slice(0, 5000)")) {
+    throw new Error("Search Console CSV imports must not silently drop rows after 5,000 entries.");
+  }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
   if (webApiClient.includes("/api/projects")) {
     throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");
@@ -829,6 +833,31 @@ try {
     scanHistoryDb.close();
   }
   await request(`/api/gsc/status/${project.id}`);
+  const fullCsvRows = Array.from(
+    { length: 5025 },
+    (_, index) => `seo query ${index + 1},1,2,50%,${(index % 10) + 1}`,
+  ).join("\n");
+  const fullGscImport = await request("/api/gsc/import", {
+    method: "POST",
+    body: JSON.stringify({
+      siteId: project.id,
+      siteUrl: "sc-domain:example.com",
+      sourceName: "full-search-console.csv",
+      csv: `Top queries,Clicks,Impressions,CTR,Position\n${fullCsvRows}\n`,
+    }),
+  });
+  if (
+    fullGscImport.rowCount !== 5025 ||
+    fullGscImport.rows?.length !== 5025 ||
+    fullGscImport.totals?.clicks !== 5025 ||
+    fullGscImport.totals?.impressions !== 10050
+  ) {
+    throw new Error(`GSC CSV import silently dropped rows: ${JSON.stringify({
+      rowCount: fullGscImport.rowCount,
+      returnedRows: fullGscImport.rows?.length,
+      totals: fullGscImport.totals,
+    })}`);
+  }
   const gscImport = await request("/api/gsc/import", {
     method: "POST",
     body: JSON.stringify({
@@ -841,8 +870,16 @@ try {
   if (gscImport.rowCount !== 2 || gscImport.totals?.clicks !== 15 || gscImport.totals?.impressions !== 150) {
     throw new Error(`GSC CSV import totals were not normalized: ${JSON.stringify(gscImport)}`);
   }
+  const gscOrderDb = new Database(serverDbPath);
+  try {
+    gscOrderDb
+      .query("UPDATE gsc_imports SET created_at = '2030-01-01 00:00:00' WHERE id = ?")
+      .run(gscImport.id);
+  } finally {
+    gscOrderDb.close();
+  }
   const gscImports = await request(`/api/gsc/imports/${project.id}`);
-  if (!gscImports.length || gscImports[0].id !== gscImport.id) {
+  if (!gscImports.length || gscImports[0].id !== gscImport.id || !gscImports.some((row: any) => row.id === fullGscImport.id)) {
     throw new Error("GSC import was not persisted in SQLite.");
   }
   const gscHistoryDb = new Database(serverDbPath);
@@ -870,7 +907,7 @@ try {
     gscHistoryDb.close();
   }
   const dashboardWithGsc = await request(`/api/dashboard?siteId=${project.id}`);
-  if (dashboardWithGsc.gscImportCount !== 26 || dashboardWithGsc.latestGscImport?.rowCount !== 2) {
+  if (dashboardWithGsc.gscImportCount !== 27 || dashboardWithGsc.latestGscImport?.rowCount !== 2) {
     throw new Error(`Dashboard did not expose local GSC import evidence: ${JSON.stringify(dashboardWithGsc.latestGscImport)}`);
   }
   const mcp = await request("/mcp", {
