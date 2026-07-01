@@ -69,12 +69,13 @@ function tableExists(name: string) {
 }
 
 function columnExists(table: string, column: string) {
+  if (!tableExists(table)) return false;
   return db.prepare(`PRAGMA table_info(${table})`).all().some((row: any) => row.name === column);
 }
 
-function renameColumnIfExists(table: string, from: string, to: string) {
-  if (tableExists(table) && columnExists(table, from) && !columnExists(table, to)) {
-    db.exec(`ALTER TABLE ${table} RENAME COLUMN ${from} TO ${to}`);
+function addColumnIfMissing(table: string, column: string, definition: string) {
+  if (!columnExists(table, column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
   }
 }
 
@@ -325,13 +326,10 @@ migrate(
   `,
 );
 
-migrate(
-  "004_project_crawl_preferences",
-  `
-  ALTER TABLE sites ADD COLUMN crawl_protocol TEXT NOT NULL DEFAULT 'auto';
-  ALTER TABLE sites ADD COLUMN crawl_host TEXT NOT NULL DEFAULT 'auto';
-  `,
-);
+migrateStep("004_site_crawl_preferences", () => {
+  addColumnIfMissing("sites", "crawl_protocol", "crawl_protocol TEXT NOT NULL DEFAULT 'auto'");
+  addColumnIfMissing("sites", "crawl_host", "crawl_host TEXT NOT NULL DEFAULT 'auto'");
+});
 
 migrate(
   "005_gsc_imports",
@@ -359,49 +357,6 @@ migrate(
   DELETE FROM backlink_snapshots WHERE source = 'local-fallback';
   `,
 );
-
-migrateStep("007_site_schema_names", () => {
-  db.exec("PRAGMA foreign_keys = OFF");
-  if (tableExists("projects") && !tableExists("sites")) {
-    db.exec("ALTER TABLE projects RENAME TO sites");
-  }
-
-  for (const table of [
-    "keyword_research_runs",
-    "saved_keywords",
-    "rank_trackers",
-    "domain_snapshots",
-    "backlink_snapshots",
-    "audits",
-    "gsc_connections",
-    "serp_runs",
-    "brand_lookup_runs",
-    "prompt_explorer_runs",
-    "saved_keyword_tags",
-    "gsc_imports",
-  ]) {
-    renameColumnIfExists(table, "project_id", "site_id");
-  }
-  renameColumnIfExists("domain_snapshots", "target", "domain");
-  renameColumnIfExists("backlink_snapshots", "target", "domain");
-  renameColumnIfExists("serp_runs", "target", "domain");
-
-  db.exec(`
-    DROP INDEX IF EXISTS idx_projects_active;
-    DROP INDEX IF EXISTS idx_serp_runs_project_created;
-    DROP INDEX IF EXISTS idx_brand_lookup_project_created;
-    DROP INDEX IF EXISTS idx_prompt_explorer_project_created;
-    DROP INDEX IF EXISTS idx_saved_keyword_tags_project;
-    DROP INDEX IF EXISTS idx_gsc_imports_project_created;
-    CREATE INDEX IF NOT EXISTS idx_sites_active ON sites(archived_at, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_serp_runs_site_created ON serp_runs(site_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_brand_lookup_site_created ON brand_lookup_runs(site_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_prompt_explorer_site_created ON prompt_explorer_runs(site_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_saved_keyword_tags_site ON saved_keyword_tags(site_id, name);
-    CREATE INDEX IF NOT EXISTS idx_gsc_imports_site_created ON gsc_imports(site_id, created_at DESC);
-    PRAGMA foreign_keys = ON;
-  `);
-});
 
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];

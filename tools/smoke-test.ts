@@ -272,6 +272,17 @@ try {
   if (/DELETE\s+FROM\s+(sites|audits|gsc_imports)\b/i.test(dbSource)) {
     throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
   }
+  for (const removedSchemaBridge of [
+    "004_project_crawl_preferences",
+    "007_site_schema_names",
+    "ALTER TABLE projects RENAME TO sites",
+    "idx_projects_active",
+    "project_id",
+  ]) {
+    if (dbSource.includes(removedSchemaBridge)) {
+      throw new Error(`Fresh app database startup should not keep old project-schema compatibility code: ${removedSchemaBridge}`);
+    }
+  }
   const gscSource = await readFile(path.join(rootDir, "src/gsc.ts"), "utf8");
   if (gscSource.includes(".slice(0, 5000)")) {
     throw new Error("Search Console CSV imports must not silently drop rows after 5,000 entries.");
