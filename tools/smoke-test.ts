@@ -1138,10 +1138,10 @@ try {
     throw new Error(`MCP legacy list_projects alias should be unavailable: ${JSON.stringify(legacyMcp)}`);
   }
   const legacyDescriptionTool = (mcp.result?.tools || []).find((tool: any) =>
-    /^Legacy alias:/i.test(tool.description || "") || /workspace|target domain|project/i.test(tool.description || ""),
+    /^Legacy alias:/i.test(tool.description || "") || /workspace|target domain|project|selected-site/i.test(tool.description || ""),
   );
   if (legacyDescriptionTool) {
-    throw new Error(`MCP tools/list should not advertise legacy project/workspace copy: ${legacyDescriptionTool.name}`);
+    throw new Error(`MCP tools/list should not advertise legacy project/workspace/selected-site copy: ${legacyDescriptionTool.name}`);
   }
   const projectRequiredTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.required?.includes("projectId"));
   if (projectRequiredTool) {

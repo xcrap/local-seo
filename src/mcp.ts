@@ -95,13 +95,13 @@ const tools = [
   },
   {
     name: "analyze_serp",
-    description: "Analyze one Google SERP for a keyword and check ownership for the selected site or a comparison site.",
+    description: "Analyze one Google SERP for a keyword and check ownership for the active site or a comparison site.",
     inputSchema: {
       type: "object",
       properties: {
         ...siteIdInput,
         keyword: { type: "string" },
-        domain: { type: "string", description: "Optional selected-site or competitor domain to highlight in the ranking rows." },
+        domain: { type: "string", description: "Optional active-site or competitor domain to highlight in the ranking rows." },
         depth: { type: "number" },
       },
       required: ["siteId", "keyword"],

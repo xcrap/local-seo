@@ -4180,7 +4180,7 @@ function AuditsPage({ site }: { site: Site }) {
   }
   return (
     <>
-      <PageHeader eyebrow="Technical" title="Site audits" description="Scan the selected website and open the report when it completes." />
+      <PageHeader eyebrow="Technical" title="Site audits" description="Scan the active site's saved crawl URL and open the report when it completes." />
       <section className="border-y bg-background/40 px-4 py-4 sm:px-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
           <div className="min-w-0">
