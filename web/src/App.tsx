@@ -5580,26 +5580,38 @@ function ScanReportOverview({
           </div>
           {scan.error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{scan.error}</p> : null}
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Area</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Evidence</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.area}>
-                <TableCell className="min-w-44 font-medium">{row.area}</TableCell>
-                <TableCell className="min-w-56">{row.status}</TableCell>
-                <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{row.evidence}</TableCell>
-                <TableCell className="text-right">{row.action}</TableCell>
+        <div className="divide-y md:hidden">
+          {rows.map((row) => (
+            <div key={row.area} className="space-y-3 py-4 first:pt-0 last:pb-0">
+              <div className="font-medium">{row.area}</div>
+              <div className="text-sm">{row.status}</div>
+              <div className="text-sm leading-6 text-muted-foreground">{row.evidence}</div>
+              <div className="flex flex-wrap gap-2">{row.action}</div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Area</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Evidence</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.area}>
+                  <TableCell className="min-w-44 font-medium">{row.area}</TableCell>
+                  <TableCell className="min-w-56">{row.status}</TableCell>
+                  <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{row.evidence}</TableCell>
+                  <TableCell className="text-right">{row.action}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </ReportSection>
   );
@@ -5627,38 +5639,64 @@ function ScanActionBoard({
       }
     >
       {priorityGroups.length ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Severity</TableHead>
-              <TableHead>Issue</TableHead>
-              <TableHead>Affected</TableHead>
-              <TableHead>Fix</TableHead>
-              <TableHead className="text-right">Open</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <>
+          <div className="divide-y md:hidden">
             {priorityGroups.map((group) => (
-              <TableRow key={group.key}>
-                <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
-                <TableCell className="min-w-80">
+              <div key={group.key} className="space-y-3 py-4 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge>
+                  <span className="nums text-lg font-semibold">{formatNumber(group.count)}</span>
+                  <span className="text-sm text-muted-foreground">affected</span>
+                </div>
+                <div>
                   <div className="font-medium">{group.message}</div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
                     <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
                   </div>
-                </TableCell>
-                <TableCell className="nums text-lg font-semibold">{formatNumber(group.count)}</TableCell>
-                <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
-                <TableCell className="text-right">
-                  <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
-                    <ListChecks /> Show {formatNumber(group.count)} issues
-                  </Button>
-                </TableCell>
-              </TableRow>
+                </div>
+                <p className="text-sm leading-6 text-muted-foreground">{group.recommendation}</p>
+                <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
+                  <ListChecks /> Show {formatNumber(group.count)} issues
+                </Button>
+              </div>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Issue</TableHead>
+                  <TableHead>Affected</TableHead>
+                  <TableHead>Fix</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {priorityGroups.map((group) => (
+                  <TableRow key={group.key}>
+                    <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
+                    <TableCell className="min-w-80">
+                      <div className="font-medium">{group.message}</div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
+                        <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="nums text-lg font-semibold">{formatNumber(group.count)}</TableCell>
+                    <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
+                        <ListChecks /> Show {formatNumber(group.count)} issues
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       ) : (
         <EmptyState title="No priority blockers" text={scan.status === "completed" ? "High and medium issue groups are clear." : "Priority issues appear while the scan runs."} />
       )}

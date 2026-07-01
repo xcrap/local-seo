@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -8,6 +8,7 @@ const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-ui-"));
 const apiPort = 4510 + Math.floor(Math.random() * 300);
 const webPort = apiPort + 700;
 const webUrl = `http://127.0.0.1:${webPort}`;
+const screenshotDir = process.env.SCREENSHOT_DIR || "";
 let fixtureUrl = "";
 let scanReportPath = "";
 
@@ -144,6 +145,12 @@ async function assertNoHorizontalOverflow(page: any, label: string) {
   }
 }
 
+async function capture(page: any, label: string) {
+  if (!screenshotDir) return;
+  await mkdir(screenshotDir, { recursive: true });
+  await page.screenshot({ path: path.join(screenshotDir, `${label}.png`), fullPage: true });
+}
+
 async function cleanup() {
   web.kill();
   api.kill();
@@ -187,11 +194,13 @@ try {
     }
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("heading", { name: /^Scan health$/ }).waitFor();
+    await capture(page, "scan-report-overview");
     if (await page.getByRole("heading", { name: /^Audit snapshot$/ }).count()) {
       throw new Error("Overview should not duplicate the old audit snapshot table.");
     }
     await page.getByRole("tab", { name: /^Progress$/ }).click();
     await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
+    await capture(page, "scan-report-progress");
     await page.getByText("Resolve start URL").waitFor();
     await page.getByText("Read robots and sitemap").waitFor();
     await page.getByText("Crawl pages").waitFor();
@@ -233,6 +242,7 @@ try {
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Checks$/ }).click();
     await page.getByRole("heading", { name: /^Scan checks$/ }).waitFor();
+    await capture(page, "scan-report-checks");
     await page.getByRole("columnheader", { name: /^Issue types$/ }).waitFor();
     const clearScanCheckRow = page.getByRole("row").filter({ hasText: "No issues" }).first();
     await clearScanCheckRow.waitFor();
@@ -257,6 +267,7 @@ try {
 
     await page.goto(webUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
+    await capture(page, "overview");
     const visibleOverviewScanPlan = await page.getByText("Scan plan", { exact: true }).evaluateAll((nodes) =>
       nodes.some((node) => {
         const element = node as HTMLElement;
@@ -424,6 +435,7 @@ try {
 
     await page.getByRole("link", { name: /Sites/i }).click();
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
+    await capture(page, "sites");
     await page.getByText("A site is one saved website address").waitFor();
     await page.getByRole("columnheader", { name: /Scan plan/i }).waitFor();
     if (await page.getByRole("columnheader", { name: /^Keyword\/rank defaults$/ }).count()) {
@@ -454,6 +466,7 @@ try {
       throw new Error(`Site scans navigation should use /scans, got ${page.url()}.`);
     }
     await page.getByRole("heading", { name: /^Page speed tracking$/ }).waitFor();
+    await capture(page, "scans");
     await page.getByText(/Latest avg .*ms/i).waitFor();
     await page.getByRole("columnheader", { name: /^P95$/ }).waitFor();
     await page.getByRole("heading", { name: /^All scan history$/ }).waitFor();
@@ -474,6 +487,11 @@ try {
       await page.goto(`${webUrl}${scanReportPath}`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: /Scan report/i }).waitFor();
       await page.getByRole("heading", { name: /^Scan health$|^Scan progress$/ }).waitFor();
+      await page.getByText(/link URLs checked/i).first().waitFor();
+      await page.getByText(/pages timed.*median/i).first().waitFor();
+      await page.getByText(/Serve public pages over HTTPS/i).first().waitFor();
+      await page.getByRole("button", { name: /Show \d+ issues/i }).first().waitFor();
+      await capture(page, "scan-report-mobile");
       await assertNoHorizontalOverflow(page, "Mobile scan report");
       await page.setViewportSize({ width: 1600, height: 1000 });
       await page.goto(`${webUrl}/scans`, { waitUntil: "networkidle" });
@@ -499,6 +517,7 @@ try {
 
     await page.getByRole("navigation").getByRole("link", { name: /^MCP$/ }).click();
     await page.getByRole("heading", { name: /^MCP$/ }).waitFor();
+    await capture(page, "mcp");
     await page.getByRole("columnheader", { name: /^Inputs$/i }).first().waitFor();
     await page.getByRole("cell", { name: "start_scan" }).waitFor();
     await page.getByRole("cell", { name: "scan_site" }).waitFor();
@@ -551,6 +570,7 @@ try {
 
     await page.getByRole("navigation").getByRole("link", { name: /^Settings$/ }).click();
     await page.getByRole("heading", { name: /^App settings$/ }).waitFor();
+    await capture(page, "settings");
     await page.getByRole("heading", { name: /^Data sources$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
     await page.getByRole("row", { name: /Local SQLite database.*Source of truth/i }).waitFor();
@@ -664,6 +684,9 @@ try {
     }
   } finally {
     await browser.close();
+  }
+  if (screenshotDir) {
+    console.log(`UI smoke screenshots: ${screenshotDir}`);
   }
   console.log("UI smoke test passed.");
 } finally {
