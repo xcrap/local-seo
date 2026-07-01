@@ -5,6 +5,7 @@ import { parse as parseDomain } from "tldts";
 import { createAiJob } from "./codex";
 import { all, get, jsonParse, nowIso, run } from "./db";
 import { getConfigValue } from "./config";
+import { DEFAULT_KEYWORD_LANGUAGE_CODE, DEFAULT_KEYWORD_LOCATION_CODE } from "./defaults";
 
 export type Site = {
   id: string;
@@ -58,12 +59,12 @@ function normalizeCrawlHost(value: unknown): CrawlHost {
 }
 
 function defaultLocationCode() {
-  const value = Number(getConfigValue("default_location_code") || 2840);
-  return Number.isFinite(value) && value > 0 ? value : 2840;
+  const value = Number(getConfigValue("default_location_code") || DEFAULT_KEYWORD_LOCATION_CODE);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_KEYWORD_LOCATION_CODE;
 }
 
 function defaultLanguageCode() {
-  return getConfigValue("default_language_code") || "en";
+  return getConfigValue("default_language_code") || DEFAULT_KEYWORD_LANGUAGE_CODE;
 }
 
 function normalizeTagName(value: string) {

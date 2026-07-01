@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import dotenv from "dotenv";
+import { DEFAULT_KEYWORD_LANGUAGE_CODE, DEFAULT_KEYWORD_LOCATION_CODE } from "./defaults";
 
 const runtimeDbPath = process.env.DB_PATH;
 
@@ -45,8 +46,8 @@ db.exec(`
     name TEXT NOT NULL,
     domain TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
-    location_code INTEGER NOT NULL DEFAULT 2840,
-    language_code TEXT NOT NULL DEFAULT 'en',
+    location_code INTEGER NOT NULL DEFAULT ${DEFAULT_KEYWORD_LOCATION_CODE},
+    language_code TEXT NOT NULL DEFAULT '${DEFAULT_KEYWORD_LANGUAGE_CODE}',
     crawl_protocol TEXT NOT NULL DEFAULT 'auto',
     crawl_host TEXT NOT NULL DEFAULT 'auto',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -70,8 +71,8 @@ db.exec(`
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     keyword TEXT NOT NULL,
-    location_code INTEGER NOT NULL DEFAULT 2840,
-    language_code TEXT NOT NULL DEFAULT 'en',
+    location_code INTEGER NOT NULL DEFAULT ${DEFAULT_KEYWORD_LOCATION_CODE},
+    language_code TEXT NOT NULL DEFAULT '${DEFAULT_KEYWORD_LANGUAGE_CODE}',
     search_volume INTEGER,
     difficulty INTEGER,
     cpc REAL,
@@ -86,8 +87,8 @@ db.exec(`
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     domain TEXT NOT NULL,
-    location_code INTEGER NOT NULL DEFAULT 2840,
-    language_code TEXT NOT NULL DEFAULT 'en',
+    location_code INTEGER NOT NULL DEFAULT ${DEFAULT_KEYWORD_LOCATION_CODE},
+    language_code TEXT NOT NULL DEFAULT '${DEFAULT_KEYWORD_LANGUAGE_CODE}',
     device TEXT NOT NULL DEFAULT 'desktop',
     serp_depth INTEGER NOT NULL DEFAULT 50,
     schedule_interval TEXT NOT NULL DEFAULT 'manual',
@@ -210,8 +211,8 @@ db.exec(`
     site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     keyword TEXT NOT NULL,
     domain TEXT NOT NULL DEFAULT '',
-    location_code INTEGER NOT NULL DEFAULT 2840,
-    language_code TEXT NOT NULL DEFAULT 'en',
+    location_code INTEGER NOT NULL DEFAULT ${DEFAULT_KEYWORD_LOCATION_CODE},
+    language_code TEXT NOT NULL DEFAULT '${DEFAULT_KEYWORD_LANGUAGE_CODE}',
     source TEXT NOT NULL,
     result_json TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

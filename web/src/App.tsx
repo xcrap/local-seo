@@ -104,8 +104,11 @@ const nav = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+const defaultKeywordLocationCode = 2840;
+const defaultKeywordLanguageCode = "en";
+
 const marketOptions = [
-  { code: 2840, label: "United States" },
+  { code: defaultKeywordLocationCode, label: "United States" },
   { code: 2620, label: "Portugal" },
   { code: 2826, label: "United Kingdom" },
   { code: 2724, label: "Spain" },
@@ -144,13 +147,13 @@ type ScanPlanTarget = {
 };
 
 function defaultLocationCodeFromConfig(config?: any) {
-  const code = Number(config?.default_location_code || 2840);
-  return marketOptions.some((market) => market.code === code) ? code : 2840;
+  const code = Number(config?.default_location_code || defaultKeywordLocationCode);
+  return marketOptions.some((market) => market.code === code) ? code : defaultKeywordLocationCode;
 }
 
 function defaultLanguageCodeFromConfig(config?: any) {
-  const code = String(config?.default_language_code || "en");
-  return languageOptions.some((language) => language.code === code) ? code : "en";
+  const code = String(config?.default_language_code || defaultKeywordLanguageCode);
+  return languageOptions.some((language) => language.code === code) ? code : defaultKeywordLanguageCode;
 }
 
 function defaultCrawlProtocolFromConfig(config?: any): Site["crawl_protocol"] {
@@ -1939,8 +1942,8 @@ function SitesPage({
     name: "",
     domain: "",
     notes: "",
-    locationCode: 2840,
-    languageCode: "en",
+    locationCode: defaultKeywordLocationCode,
+    languageCode: defaultKeywordLanguageCode,
     crawlProtocol: "auto",
     crawlHost: "auto",
   };
@@ -1955,8 +1958,8 @@ function SitesPage({
     name: "",
     domain: "",
     notes: "",
-    location_code: 2840,
-    language_code: "en",
+    location_code: defaultKeywordLocationCode,
+    language_code: defaultKeywordLanguageCode,
     crawl_protocol: "auto",
     crawl_host: "auto",
   });
@@ -2050,8 +2053,8 @@ function SitesPage({
       name: site.name,
       domain: site.domain || "",
       notes: site.notes || "",
-      location_code: site.location_code || 2840,
-      language_code: site.language_code || "en",
+      location_code: site.location_code || defaultKeywordLocationCode,
+      language_code: site.language_code || defaultKeywordLanguageCode,
       crawl_protocol: site.crawl_protocol || "auto",
       crawl_host: site.crawl_host || "auto",
     });
@@ -7188,8 +7191,8 @@ function SettingsPage() {
       await api.saveConfig({
         codex_model: String(form.codex_model || "").trim(),
         codex_reasoning_effort: String(form.codex_reasoning_effort || "medium").trim(),
-        default_location_code: String(form.default_location_code || 2840),
-        default_language_code: String(form.default_language_code || "en"),
+        default_location_code: String(form.default_location_code || defaultKeywordLocationCode),
+        default_language_code: String(form.default_language_code || defaultKeywordLanguageCode),
         default_crawl_protocol: String(form.default_crawl_protocol || "auto"),
         default_crawl_host: String(form.default_crawl_host || "auto"),
       });
@@ -7214,7 +7217,7 @@ function SettingsPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Default keyword market">
-                <Select value={String(form.default_location_code || 2840)} onValueChange={(value) => setForm({ ...form, default_location_code: Number(value) })}>
+                <Select value={String(form.default_location_code || defaultKeywordLocationCode)} onValueChange={(value) => setForm({ ...form, default_location_code: Number(value) })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
@@ -7222,7 +7225,7 @@ function SettingsPage() {
                 </Select>
               </Field>
               <Field label="Default keyword result language">
-                <Select value={form.default_language_code || "en"} onValueChange={(value) => setForm({ ...form, default_language_code: value })}>
+                <Select value={form.default_language_code || defaultKeywordLanguageCode} onValueChange={(value) => setForm({ ...form, default_language_code: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}

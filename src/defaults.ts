@@ -1,0 +1,2 @@
+export const DEFAULT_KEYWORD_LOCATION_CODE = 2840;
+export const DEFAULT_KEYWORD_LANGUAGE_CODE = "en";

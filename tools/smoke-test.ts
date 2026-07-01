@@ -13,6 +13,7 @@ process.env.CODEX_REASONING_EFFORT = "";
 
 const { sameSiteUrl } = await import("../src/seo");
 const { codexModel, codexReasoningEffort } = await import("../src/config");
+const { DEFAULT_KEYWORD_LANGUAGE_CODE, DEFAULT_KEYWORD_LOCATION_CODE } = await import("../src/defaults");
 if (codexModel() !== "") {
   throw new Error("Codex should use the local CLI default model unless an override is configured.");
 }
@@ -1108,7 +1109,7 @@ try {
     `);
     const insertSerpRun = localHistoryDb.prepare(`
       INSERT INTO serp_runs (id, site_id, keyword, domain, location_code, language_code, source, result_json, created_at)
-      VALUES (?, ?, ?, 'example.com', 2840, 'en', 'smoke-history', '{}', ?)
+      VALUES (?, ?, ?, 'example.com', ?, ?, 'smoke-history', '{}', ?)
     `);
     const insertBrandRun = localHistoryDb.prepare(`
       INSERT INTO brand_lookup_runs (id, site_id, query, competitors, source, result_json, created_at)
@@ -1120,15 +1121,15 @@ try {
     `);
     const insertSavedKeyword = localHistoryDb.prepare(`
       INSERT INTO saved_keywords (id, site_id, keyword, location_code, language_code, intent, source, created_at)
-      VALUES (?, ?, ?, 2840, 'en', 'manual', 'smoke-history', ?)
+      VALUES (?, ?, ?, ?, ?, 'manual', 'smoke-history', ?)
     `);
     const trackerId = randomUUID();
     localHistoryDb
       .prepare(`
         INSERT INTO rank_trackers (id, site_id, domain, location_code, language_code, created_at, updated_at)
-        VALUES (?, ?, 'example.com', 2840, 'en', '2026-06-30 15:00:00', '2026-06-30 15:00:00')
+        VALUES (?, ?, 'example.com', ?, ?, '2026-06-30 15:00:00', '2026-06-30 15:00:00')
       `)
-      .run(trackerId, site.id);
+      .run(trackerId, site.id, DEFAULT_KEYWORD_LOCATION_CODE, DEFAULT_KEYWORD_LANGUAGE_CODE);
     const insertRankRun = localHistoryDb.prepare(`
       INSERT INTO rank_runs (id, tracker_id, status, message, started_at, finished_at)
       VALUES (?, ?, 'completed', 'smoke-history', ?, ?)
@@ -1160,10 +1161,10 @@ try {
       insertedHistoryIds.rankRun.push(rankRunId);
       insertDomainSnapshot.run(domainId, site.id, `domain-history-${index}.example`, timestamp);
       insertBacklinkSnapshot.run(backlinkId, site.id, `backlink-history-${index}.example`, timestamp);
-      insertSerpRun.run(serpId, site.id, `serp history ${index}`, timestamp);
+      insertSerpRun.run(serpId, site.id, `serp history ${index}`, DEFAULT_KEYWORD_LOCATION_CODE, DEFAULT_KEYWORD_LANGUAGE_CODE, timestamp);
       insertBrandRun.run(brandId, site.id, `Brand history ${index}`, timestamp);
       insertPromptRun.run(promptId, site.id, `Prompt history ${index}`, timestamp);
-      insertSavedKeyword.run(keywordId, site.id, `smoke history keyword ${index}`, timestamp);
+      insertSavedKeyword.run(keywordId, site.id, `smoke history keyword ${index}`, DEFAULT_KEYWORD_LOCATION_CODE, DEFAULT_KEYWORD_LANGUAGE_CODE, timestamp);
       insertRankRun.run(rankRunId, trackerId, timestamp, timestamp);
     }
     const domainHistoryRows = await request(`/api/sites/${site.id}/domain-snapshots`);
