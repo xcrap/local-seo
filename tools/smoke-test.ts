@@ -366,6 +366,9 @@ try {
   if (webAppClient.includes('path="/backlinks"') || webAppClient.includes('to="/backlinks"')) {
     throw new Error("The React app should not keep a /backlinks UI route or redirect.");
   }
+  if (!webAppClient.includes('path="*" element={<NotFoundPage />}') || !webAppClient.includes("function NotFoundPage")) {
+    throw new Error("The React app should render a useful not-found screen for unknown local routes.");
+  }
   for (const legacyWebCall of ["api.projects", "api.project", "api.createProject", "api.updateProject", "api.deleteProject", "api.scanProject"]) {
     if (webAppClient.includes(legacyWebCall)) {
       throw new Error(`The app should call site-named API helpers, not ${legacyWebCall}.`);

@@ -1393,12 +1393,43 @@ function AppShell() {
                 <Route path="/ai" element={<AiPage site={activeSite} />} />
                 <Route path="/mcp" element={<McpPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             ) : (
               <SitesPage sites={sites} reloadSites={loadSites} activeSiteId="" selectSite={selectSite} />
             )}
           </div>
         </main>
+    </div>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Local route"
+        title="Page not found"
+        description="This screen is not part of the local SEO app."
+      />
+      <section className="rounded-md border bg-background">
+        <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div>
+            <h2 className="text-lg font-semibold">Choose a current screen</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              The app uses fresh local routes for sites, audits, organic research, links, Search Console, MCP, and AI jobs.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link to="/"><Gauge /> Open overview</Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link to="/sites"><FolderKanban /> Manage sites</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -290,6 +290,10 @@ try {
     await page.getByText("External backlink index", { exact: true }).waitFor();
     await page.getByRole("button", { name: /Backlink index not connected/i }).waitFor();
     await page.getByText("No web-wide backlink rows are generated locally").waitFor();
+    await page.goto(`${webUrl}/backlinks`, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: /^Page not found$/ }).waitFor();
+    await page.getByRole("link", { name: /^Open overview$/ }).click();
+    await page.getByRole("heading", { name: /Site control/i }).waitFor();
 
     const gscCsvPath = path.join(tempDir, "search-console-ui.csv");
     await writeFile(
