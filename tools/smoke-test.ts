@@ -257,6 +257,9 @@ try {
     throw new Error("The web client should send siteId in request bodies instead of projectId.");
   }
   const webAppClient = await readFile(path.join(rootDir, "web/src/App.tsx"), "utf8");
+  if (/type=["']date["']/.test(webAppClient) || !webAppClient.includes("function DatePicker") || !webAppClient.includes("<Calendar")) {
+    throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
+  }
   if (webAppClient.includes("projectId: project.id")) {
     throw new Error("The app should send siteId for selected-site actions.");
   }
