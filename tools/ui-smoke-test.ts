@@ -288,9 +288,10 @@ try {
     if (await page.getByText(/Search defaults|Search locale/i).count()) {
       throw new Error("Overview still presents keyword tool defaults as site search defaults or a site locale.");
     }
-    await siteControl.getByRole("link", { name: /^Open organic$/ }).waitFor();
-    await siteControl.getByRole("link", { name: /^Open links$/ }).waitFor();
-    await siteControl.getByRole("link", { name: /^Open ranks$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open site audits$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open organic research$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open local link graph$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open rank tracking$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open AI lab$/ }).waitFor();
 

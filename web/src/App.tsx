@@ -1719,7 +1719,7 @@ function SiteCommandCenter({
       evidence: latestAudit
         ? `${formatNumber(latestAudit.pages_crawled)} pages · ${formatNumber(latestAudit.issue_count)} issues · ${formatNumber(latestAuditSummary.checkedLinks || 0)} links checked`
         : "No crawl evidence saved yet.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/audits"><FileSearch /> Open audits</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/audits"><FileSearch /> Open site audits</Link></Button>,
       secondary: latestAudit ? (
         <Button asChild size="sm" variant="outline">
           <Link to={`/audits/${latestAudit.id}`}><FileSearch /> Open report</Link>
@@ -1731,7 +1731,7 @@ function SiteCommandCenter({
       area: "Organic research",
       status: summary?.savedKeywordCount ? "has keywords" : "ready",
       evidence: `${formatNumber(summary?.savedKeywordCount || 0)} saved keywords · local crawl pages feed this screen`,
-      action: <Button asChild size="sm" variant="secondary"><Link to="/domain"><Globe2 /> Open organic</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/domain"><Globe2 /> Open organic research</Link></Button>,
       secondary: null,
     },
     {
@@ -1741,7 +1741,7 @@ function SiteCommandCenter({
       evidence: latestAudit
         ? `${formatNumber(latestAuditSummary.linkTags || 0)} link tags · ${formatNumber(latestAuditSummary.brokenLinks || 0)} broken`
         : "Run a site scan to build the local link graph.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/links"><Link2 /> Open links</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/links"><Link2 /> Open local link graph</Link></Button>,
       secondary: null,
     },
     {
@@ -1749,7 +1749,7 @@ function SiteCommandCenter({
       area: "Rank tracking",
       status: summary?.trackerCount ? "tracking" : "manual",
       evidence: `${formatNumber(summary?.trackerCount || 0)} trackers · ${formatNumber(summary?.serpRunCount || 0)} SERP runs`,
-      action: <Button asChild size="sm" variant="secondary"><Link to="/rank"><Target /> Open ranks</Link></Button>,
+      action: <Button asChild size="sm" variant="secondary"><Link to="/rank"><Target /> Open rank tracking</Link></Button>,
       secondary: null,
     },
     {

@@ -531,9 +531,14 @@ try {
   if (!webAppClient.includes('siteActions(site, "mobile")')) {
     throw new Error("Saved-site rows should expose scan, edit, and delete actions in the mobile layout.");
   }
-  for (const explicitDashboardAction of ["Open organic", "Open links", "Open ranks", "Open Search Console", "Open AI lab"]) {
+  for (const explicitDashboardAction of ["Open site audits", "Open organic research", "Open local link graph", "Open rank tracking", "Open Search Console", "Open AI lab"]) {
     if (!webAppClient.includes(explicitDashboardAction)) {
       throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
+    }
+  }
+  for (const vagueDashboardAction of ["Open organic</Link>", "Open links</Link>", "Open ranks</Link>"]) {
+    if (webAppClient.includes(vagueDashboardAction)) {
+      throw new Error(`Dashboard actions should use destination names, not shortened labels: ${vagueDashboardAction}.`);
     }
   }
   if (webAppClient.includes('shellScanning ? "Starting" : "Scan"') || webAppClient.includes('><Plus /> Add</Link>')) {
