@@ -4520,9 +4520,6 @@ function AuditDetail({ audit }: { audit: any }) {
   const categories = Object.keys(summary.byCategory || {}).sort();
   const issueTypes = Array.from(new Set<string>(issues.map((issue: any) => String(issue.type || "")).filter(Boolean))).sort();
   const categoryEntries = Object.entries(summary.byCategory || {}).sort((a: any, b: any) => b[1] - a[1]);
-  const titleProblems = Number(summary.missingTitles || 0) + Number(summary.titleLengthIssues || 0) + issueTypeCount(issues, "title-multiple") + issueTypeCount(issues, "duplicate-title");
-  const descriptionProblems = Number(summary.missingDescriptions || 0) + Number(summary.descriptionLengthIssues || 0) + issueTypeCount(issues, "description-multiple") + issueTypeCount(issues, "duplicate-description");
-  const altProblems = Number(summary.missingAlt || 0) + Number(summary.genericAlt || 0) + Number(summary.longAlt || 0);
   const showIssues = () => setActiveTab("issues");
   const selectSeverity = (severity: string) => {
     setSeverityFilter(severity);
@@ -4582,6 +4579,7 @@ function AuditDetail({ audit }: { audit: any }) {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="progress">Progress</TabsTrigger>
           <TabsTrigger value="issues">Issues</TabsTrigger>
           <TabsTrigger value="checks">Checks</TabsTrigger>
           <TabsTrigger value="metadata">Metadata</TabsTrigger>
@@ -4593,8 +4591,6 @@ function AuditDetail({ audit }: { audit: any }) {
           <TabsTrigger value="raw">Evidence</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-5">
-          <AuditProgressPanel audit={audit} result={result} coverage={coverage} />
-
           <AuditReportOverview
             audit={audit}
             result={result}
@@ -4604,53 +4600,10 @@ function AuditDetail({ audit }: { audit: any }) {
             activeSeverity={severityFilter}
             onSeveritySelect={selectSeverity}
           />
-
-          <AuditEvidenceSnapshot
-            rows={[
-              {
-                area: "Impact",
-                status: (
-                  <div className="flex flex-wrap gap-1">
-                    <Badge variant={severityCounts.high ? "bad" : "outline"}>{formatNumber(severityCounts.high)} high</Badge>
-                    <Badge variant={severityCounts.medium ? "warn" : "outline"}>{formatNumber(severityCounts.medium)} medium</Badge>
-                    <Badge variant="outline">{formatNumber(severityCounts.low)} low</Badge>
-                  </div>
-                ),
-                evidence: `${formatNumber(audit.issue_count)} total issues from ${formatNumber(coverage.pages)} crawled pages`,
-                action: severityCounts.high ? (
-                  <Button size="sm" variant="outline" onClick={() => selectSeverity("high")}>Show high issues</Button>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => selectSeverity("all")}>Show all issues</Button>
-                ),
-              },
-              {
-                area: "Metadata",
-                status: `${formatNumber(titleProblems)} title · ${formatNumber(descriptionProblems)} description`,
-                evidence: "Title, description, duplicate, and length checks for every crawled page.",
-                action: <Button size="sm" variant="outline" onClick={() => selectCategory("metadata")}>Open metadata</Button>,
-              },
-              {
-                area: "Images",
-                status: `${formatNumber(coverage.imageTags)} tags · ${formatNumber(coverage.checkedImages)} checked`,
-                evidence: `${formatNumber(altProblems)} alt issues · ${formatNumber(coverage.brokenImages)} broken image URLs · ${formatNumber(coverage.largeImages)} large images`,
-                action: <Button size="sm" variant="outline" onClick={() => setActiveTab("images")}>Open images</Button>,
-              },
-              {
-                area: "Links and assets",
-                status: `${formatNumber(coverage.linkTags)} links · ${formatNumber(coverage.assetTags)} CSS/JS refs`,
-                evidence: `${formatNumber(coverage.checkedLinks)} checked links · ${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.checkedAssets)} CSS/JS checked`,
-                action: <Button size="sm" variant="outline" onClick={() => setActiveTab("links")}>Open links</Button>,
-              },
-              {
-                area: "Indexing and sitemap",
-                status: `${formatNumber(coverage.indexablePages)} indexable · ${formatNumber(coverage.nonIndexablePages)} non-indexable`,
-                evidence: `${formatNumber(coverage.sitemapUrls)} sitemap URLs · ${formatNumber(coverage.pagesMissingFromSitemap)} pages missing from sitemap · ${formatNumber(coverage.unknownIndexabilityPages)} unknown`,
-                action: <Button size="sm" variant="outline" onClick={() => setActiveTab("crawl")}>Open crawl</Button>,
-              },
-            ]}
-          />
-
-          <AuditActionBoard audit={audit} summary={summary} coverage={coverage} issues={issues} issueGroups={issueGroups} onSelectGroup={selectIssueGroup} />
+          <AuditActionBoard audit={audit} issueGroups={issueGroups} onSelectGroup={selectIssueGroup} />
+        </TabsContent>
+        <TabsContent value="progress">
+          <AuditProgressPanel audit={audit} result={result} coverage={coverage} />
         </TabsContent>
         <TabsContent value="issues" className="space-y-2">
           <div className="rounded-md border bg-muted/20 px-4 py-3">
@@ -4912,48 +4865,6 @@ function AuditCrawlEvidence({
         </Table>
       </ReportSection>
     </div>
-  );
-}
-
-function AuditEvidenceSnapshot({
-  rows,
-}: {
-  rows: Array<{
-    area: string;
-    status: ReactNode;
-    evidence: ReactNode;
-    action?: ReactNode;
-  }>;
-}) {
-  return (
-    <section className="rounded-md border bg-background">
-      <div className="border-b px-5 py-4">
-        <h2 className="text-lg font-semibold">Audit snapshot</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Key evidence from this saved crawl run.</p>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Area</TableHead>
-            <TableHead>Counts</TableHead>
-            <TableHead>Evidence</TableHead>
-            <TableHead className="text-right">Open</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.area}>
-              <TableCell className="font-medium">{row.area}</TableCell>
-              <TableCell className="min-w-56">{row.status}</TableCell>
-              <TableCell className="min-w-96 text-sm text-muted-foreground">{row.evidence}</TableCell>
-              <TableCell>
-                <div className="flex justify-end">{row.action}</div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </section>
   );
 }
 
@@ -5240,118 +5151,62 @@ function AuditReportOverview({
 
 function AuditActionBoard({
   audit,
-  summary,
-  coverage,
-  issues,
   issueGroups,
   onSelectGroup,
 }: {
   audit: any;
-  summary: any;
-  coverage: ReturnType<typeof auditCoverageMetrics>;
-  issues: any[];
   issueGroups: any[];
   onSelectGroup: (group: any) => void;
 }) {
   const priorityGroups = issueGroups
     .filter((group) => group.severity === "high" || group.severity === "medium");
-  const checks = [
-    { label: "Titles", value: Number(summary.missingTitles || 0) + Number(summary.titleLengthIssues || 0) + issueTypeCount(issues, "duplicate-title"), detail: `${formatNumber(coverage.pages)} pages checked`, tone: "bad" },
-    { label: "Descriptions", value: Number(summary.missingDescriptions || 0) + Number(summary.descriptionLengthIssues || 0) + issueTypeCount(issues, "duplicate-description"), detail: `${formatNumber(coverage.pages)} pages checked`, tone: "bad" },
-    { label: "Images", value: Number(summary.imageIssues || 0) + Number(coverage.brokenImages || 0), detail: `${formatNumber(coverage.imageTags)} tags · ${formatNumber(coverage.checkedImages)} URLs checked`, tone: "warn" },
-    { label: "Links", value: Number(coverage.brokenLinks || 0) + Number(coverage.redirectedLinks || 0) + Number(summary.emptyAnchorLinks || 0), detail: `${formatNumber(coverage.linkTags)} tags · ${formatNumber(coverage.checkedLinks)} checked`, tone: "warn" },
-    { label: "Indexing", value: Number(coverage.nonIndexablePages || 0) + Number(coverage.unknownIndexabilityPages || 0) + Number((summary.byCategory || {}).canonicals || 0), detail: coverage.unknownIndexabilityPages ? `${formatNumber(coverage.unknownIndexabilityPages)} pages need a fresh scan` : `${formatNumber(coverage.indexablePages)} of ${formatNumber(coverage.pages)} indexable`, tone: "bad" },
-    { label: "Speed", value: Number(summary.performanceIssues || 0) + Number(coverage.largeImages || 0), detail: coverage.measuredPageLoads ? `${formatMs(coverage.averagePageLoadMs)} avg · p95 ${formatMs(coverage.p95PageLoadMs)}` : `${formatNumber(coverage.checkedAssets)} CSS/JS checked`, tone: "warn" },
-  ];
-  const coverageRows = [
-    { label: "Pages crawled", value: coverage.pages, detail: coverage.unknownIndexabilityPages ? `${formatNumber(coverage.unknownIndexabilityPages)} unknown indexability` : `${formatNumber(coverage.indexablePages)} indexable` },
-    { label: "Sitemap URLs reached", value: coverage.sitemapUrls, detail: `${formatNumber(coverage.pagesMissingFromSitemap)} missing from sitemap` },
-    { label: "Links checked", value: coverage.checkedLinks, detail: `${formatNumber(coverage.brokenLinks)} failing` },
-    { label: "Image URLs checked", value: coverage.checkedImages, detail: `${formatNumber(coverage.brokenImages)} failing` },
-    { label: "Page responses timed", value: coverage.measuredPageLoads, detail: `avg ${formatMs(coverage.averagePageLoadMs)} · p95 ${formatMs(coverage.p95PageLoadMs)}` },
-    { label: "CSS image URLs", value: coverage.cssImageResources, detail: "background and stylesheet URLs" },
-    { label: "CSS/JS checked", value: coverage.checkedAssets, detail: `${formatNumber(coverage.brokenAssets)} failing` },
-    { label: "Orphan pages", value: coverage.orphanPages, detail: `${formatNumber(coverage.deepPages)} deep URLs` },
-  ];
   return (
-    <div className="space-y-5">
-      <ReportSection
-        title="Fix first"
-        description={
-          <div className="flex flex-wrap items-center gap-2">
-            <span>Grouped issues with the highest crawl and search impact.</span>
-            <Badge variant={audit.status === "completed" ? "good" : "warn"}>{scanStatusLabel(audit.status)}</Badge>
-          </div>
-        }
-      >
-          {priorityGroups.length ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Issue</TableHead>
-                  <TableHead>Affected</TableHead>
-                  <TableHead>Fix</TableHead>
-                  <TableHead className="text-right">Open</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {priorityGroups.map((group) => (
-                  <TableRow key={group.key}>
-                    <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
-                    <TableCell className="min-w-80">
-                      <div className="font-medium">{group.message}</div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
-                        <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="nums text-lg font-semibold">{formatNumber(group.count)}</TableCell>
-                    <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
-                        <ListChecks /> Show {formatNumber(group.count)} issues
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <EmptyState title="No priority blockers" text={audit.status === "completed" ? "High and medium issue groups are clear." : "Priority issues appear while the scan runs."} />
-          )}
-      </ReportSection>
-      <ReportSection title="Audit coverage" description="What this local run actually checked.">
+    <ReportSection
+      title="Fix first"
+      description={
+        <div className="flex flex-wrap items-center gap-2">
+          <span>Grouped issues with the highest crawl and search impact.</span>
+          <Badge variant={audit.status === "completed" ? "good" : "warn"}>{scanStatusLabel(audit.status)}</Badge>
+        </div>
+      }
+    >
+      {priorityGroups.length ? (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Area</TableHead>
-              <TableHead>Problems</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Evidence</TableHead>
+              <TableHead>Severity</TableHead>
+              <TableHead>Issue</TableHead>
+              <TableHead>Affected</TableHead>
+              <TableHead>Fix</TableHead>
+              <TableHead className="text-right">Open</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {checks.map((check) => (
-              <TableRow key={check.label}>
-                <TableCell className="min-w-44 font-medium">{check.label}</TableCell>
-                <TableCell className="nums text-lg font-semibold">{formatNumber(check.value)}</TableCell>
-                <TableCell><Badge variant={(Number(check.value) ? check.tone : "good") as any}>{Number(check.value) ? "issues" : "clear"}</Badge></TableCell>
-                <TableCell className="min-w-96 text-sm text-muted-foreground">{check.detail}</TableCell>
-              </TableRow>
-            ))}
-            {coverageRows.map((row) => (
-              <TableRow key={row.label}>
-                <TableCell className="min-w-44 font-medium">{row.label}</TableCell>
-                <TableCell className="nums text-lg font-semibold">{formatNumber(row.value)}</TableCell>
-                <TableCell><Badge variant="outline">measured</Badge></TableCell>
-                <TableCell className="min-w-96 text-sm text-muted-foreground">{row.detail}</TableCell>
+            {priorityGroups.map((group) => (
+              <TableRow key={group.key}>
+                <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
+                <TableCell className="min-w-80">
+                  <div className="font-medium">{group.message}</div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
+                    <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
+                  </div>
+                </TableCell>
+                <TableCell className="nums text-lg font-semibold">{formatNumber(group.count)}</TableCell>
+                <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
+                    <ListChecks /> Show {formatNumber(group.count)} issues
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </ReportSection>
-    </div>
+      ) : (
+        <EmptyState title="No priority blockers" text={audit.status === "completed" ? "High and medium issue groups are clear." : "Priority issues appear while the scan runs."} />
+      )}
+    </ReportSection>
   );
 }
 

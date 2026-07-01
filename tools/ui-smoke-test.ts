@@ -162,6 +162,11 @@ try {
     await page.getByRole("button", { name: /Add site and scan/i }).click();
 
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
+    await page.getByRole("heading", { name: /^Audit health$/ }).waitFor();
+    if (await page.getByRole("heading", { name: /^Audit snapshot$/ }).count()) {
+      throw new Error("Overview should not duplicate the audit snapshot table.");
+    }
+    await page.getByRole("tab", { name: /^Progress$/ }).click();
     await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
     await page.getByText("Resolve start URL").waitFor();
     await page.getByText("Read robots and sitemap").waitFor();
@@ -171,8 +176,8 @@ try {
     await page.getByText("Check CSS/JS").waitFor();
     await page.getByText("Build report").waitFor();
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
-    await page.getByRole("heading", { name: /Audit snapshot/i }).waitFor();
-    await page.getByText("Links and assets").waitFor();
+    await page.getByRole("tab", { name: /^Overview$/ }).click();
+    await page.getByRole("row", { name: /Resources.*image URLs checked/i }).waitFor();
     await page.getByRole("tab", { name: /^Issues$/ }).click();
     await page.getByRole("heading", { name: /^Priority work queue$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Recommended fix$/ }).waitFor();
@@ -183,7 +188,7 @@ try {
     await page.getByRole("columnheader", { name: /^Fix$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
-    await page.getByRole("button", { name: /Open images/i }).click();
+    await page.getByRole("tab", { name: /^Images$/ }).click();
     await page.getByText("Image tag inventory").waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("tab", { name: /^Checks$/ }).click();
