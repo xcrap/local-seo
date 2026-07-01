@@ -25,7 +25,7 @@ import {
   updateSavedKeywordTags,
 } from "./seo";
 import { getGscPerformance, inspectGscUrls } from "./gsc";
-import { resolveSavedSiteScanUrl } from "./site-target";
+import { resolveSavedSiteScanUrl, siteScanCandidates } from "./site-target";
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -255,7 +255,7 @@ const tools = [
   },
   {
     name: "scan_site",
-    description: "Start a local crawl audit for a saved site. Uses the site domain when no URL is supplied.",
+    description: "Start a local crawl audit for a saved site using its saved scan plan unless a URL is supplied.",
     inputSchema: {
       type: "object",
       properties: {
@@ -458,9 +458,21 @@ async function callTool(name: string, args: any) {
       const siteId = args.siteId || args.projectId;
       const site = getProject(siteId);
       if (!site) throw new Error("Site not found.");
+      const candidateUrls = args.url ? [String(args.url)] : site.domain ? siteScanCandidates(site) : [];
       const url = args.url || (site.domain ? await resolveSavedSiteScanUrl(site) : "");
       if (!url) throw new Error("Set a site domain or pass a URL.");
-      return startAudit(site.id, url);
+      const audit = startAudit(site.id, url);
+      return {
+        site: site.domain,
+        audit,
+        scanUrl: url,
+        candidateUrls,
+        scanPreferences: {
+          protocol: site.crawl_protocol || "auto",
+          host: site.crawl_host || "auto",
+        },
+        message: `Started site scan for ${site.domain || url}.`,
+      };
     }
     case "get_audit":
       return getAudit(args.auditId);

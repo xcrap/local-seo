@@ -359,9 +359,13 @@ try {
       params: { name: "scan_site", arguments: { siteId: localProject.id } },
     }),
   });
-  const mcpAuditUrl = localMcpScan.result?.structuredContent?.url || "";
-  if (!localMcpScan.result?.structuredContent?.id || !String(mcpAuditUrl).startsWith(fixtureUrl)) {
+  const mcpScan = localMcpScan.result?.structuredContent || {};
+  const mcpAuditUrl = mcpScan.audit?.url || mcpScan.scanUrl || "";
+  if (!mcpScan.audit?.id || !String(mcpAuditUrl).startsWith(fixtureUrl)) {
     throw new Error(`MCP site scan did not resolve through site preferences: ${mcpAuditUrl}`);
+  }
+  if (!Array.isArray(mcpScan.candidateUrls) || mcpScan.candidateUrls[0] !== fixtureUrl) {
+    throw new Error(`MCP site scan should return the saved site's scan plan: ${JSON.stringify(mcpScan.candidateUrls)}`);
   }
   const missingSite = await requestFailure("/api/sites/not-a-real-site/scan", { method: "POST" });
   if (missingSite.data?.error !== "Site not found.") {
@@ -447,7 +451,7 @@ try {
   if (!fixtureAudit.result?.summary?.cssImageResources || !fixtureAudit.result?.summary?.pictureSourceImages) {
     throw new Error("Fixture audit did not check CSS image URLs and picture source URLs.");
   }
-  const mcpFixtureAuditId = localMcpScan.result?.structuredContent?.id;
+  const mcpFixtureAuditId = localMcpScan.result?.structuredContent?.audit?.id;
   if (mcpFixtureAuditId) {
     await waitForAudit(mcpFixtureAuditId);
   }
@@ -854,6 +858,9 @@ try {
   const scanSiteTool = (mcp.result?.tools || []).find((tool: any) => tool.name === "scan_site");
   if (!scanSiteTool?.inputSchema?.required?.includes("siteId")) {
     throw new Error("MCP scan_site should expose siteId as the required site identifier.");
+  }
+  if (!/saved scan plan/i.test(scanSiteTool?.description || "")) {
+    throw new Error(`MCP scan_site should describe that it uses the saved scan plan: ${scanSiteTool?.description}`);
   }
   for (const legacyName of ["list_projects", "create_project", "get_project_summary"]) {
     if (toolNames.has(legacyName)) {
