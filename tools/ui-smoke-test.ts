@@ -9,6 +9,7 @@ const apiPort = 4510 + Math.floor(Math.random() * 300);
 const webPort = apiPort + 700;
 const webUrl = `http://127.0.0.1:${webPort}`;
 let fixtureUrl = "";
+let auditReportPath = "";
 
 const fixtureServer = Bun.serve({
   port: 0,
@@ -173,6 +174,7 @@ try {
     await page.getByRole("button", { name: /Add site and scan/i }).click();
 
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
+    auditReportPath = new URL(page.url()).pathname;
     await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
     if (await page.getByRole("heading", { name: /^Audit health$/ }).count()) {
       throw new Error("A running first scan should open on progress before the health overview.");
@@ -430,6 +432,16 @@ try {
     ) {
       throw new Error(`Scan history table should fit the viewport, got ${JSON.stringify(scanHistoryBox)} in ${JSON.stringify(scanHistoryViewport)}.`);
     }
+    if (auditReportPath) {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`${webUrl}${auditReportPath}`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { name: /Audit report/i }).waitFor();
+      await page.getByRole("heading", { name: /^Audit health$|^Scan progress$/ }).waitFor();
+      await assertNoHorizontalOverflow(page, "Mobile audit report");
+      await page.setViewportSize({ width: 1600, height: 1000 });
+      await page.goto(`${webUrl}/audits`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { name: /^Page speed tracking$/ }).waitFor();
+    }
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
     await page.getByRole("heading", { name: /^Delete scans for this site\?$/ }).waitFor();
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
@@ -565,14 +577,15 @@ try {
       throw new Error("Mobile Sites rows should show the scan plan without relying on hidden desktop table headers.");
     }
     await assertNoHorizontalOverflow(page, "Mobile sites with saved rows");
-    for (const [label, route] of [
+    const mobileRoutes: [string, string][] = [
       ["overview", "/"],
       ["sites", "/sites"],
       ["audits", "/audits"],
       ["organic research", "/domain"],
       ["links", "/links"],
       ["settings", "/settings"],
-    ] as const) {
+    ];
+    for (const [label, route] of mobileRoutes) {
       await page.goto(`${webUrl}${route}`, { waitUntil: "networkidle" });
       await assertNoHorizontalOverflow(page, `Mobile ${label}`);
     }
