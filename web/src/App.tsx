@@ -2966,52 +2966,50 @@ function DomainPage({ site }: { site: Site }) {
         </form>
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       </section>
-      <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_460px]">
-        <div className="space-y-6">
-          <LocalOrganicEvidence
-            audit={selectedAudit}
-            audits={auditRows}
-            selectedAuditId={selectedAudit?.id || ""}
-            onAuditChange={setSelectedAuditIdState}
-            siteDomain={site.domain}
-            onScan={scanSite}
-            scanning={scanning}
+      <div className="mt-6 space-y-6">
+        <LocalOrganicEvidence
+          audit={selectedAudit}
+          audits={auditRows}
+          selectedAuditId={selectedAudit?.id || ""}
+          onAuditChange={setSelectedAuditIdState}
+          siteDomain={site.domain}
+          onScan={scanSite}
+          scanning={scanning}
+        />
+        {overview?.warning ? (
+          <ProviderNotice title="External ranked-keyword dataset unavailable" text={overview.warning} source={overview.source} />
+        ) : null}
+        {overview?.source === "dataforseo" ? (
+          <StatsBand
+            title="Connected organic dataset"
+            items={[
+              { title: "Organic keywords", value: metricValue(overview.organicKeywords), icon: Search },
+              { title: "Organic traffic", value: metricValue(overview.organicTraffic), icon: BarChart3 },
+              { title: "Traffic value", value: metricValue(overview.estimatedValue), icon: Gauge },
+              { title: "Top pages", value: metricValue(pages?.pages?.length, overview.topPages?.length), icon: Globe2 },
+            ]}
           />
-          {overview?.warning ? (
-            <ProviderNotice title="External ranked-keyword dataset unavailable" text={overview.warning} source={overview.source} />
-          ) : null}
-          {overview?.source === "dataforseo" ? (
-            <StatsBand
-              title="Connected organic dataset"
-              items={[
-                { title: "Organic keywords", value: metricValue(overview.organicKeywords), icon: Search },
-                { title: "Organic traffic", value: metricValue(overview.organicTraffic), icon: BarChart3 },
-                { title: "Traffic value", value: metricValue(overview.estimatedValue), icon: Gauge },
-                { title: "Top pages", value: metricValue(pages?.pages?.length, overview.topPages?.length), icon: Globe2 },
-              ]}
-            />
-          ) : null}
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList>
-              <TabsTrigger value="keywords">Keywords</TabsTrigger>
-              <TabsTrigger value="pages">Pages</TabsTrigger>
-              <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
-            </TabsList>
-            <TabsContent value="keywords">
-              <ReportSection title="Ranked keywords" description={keywords ? <SourceBadge source={keywords.source} /> : "Run an analysis to load rows."}>
-                {keywords?.keywords?.length ? <DomainKeywordsTable rows={keywords.keywords} /> : <EmptyState title="No keyword rows" text={keywords?.warning || "Analyze an organic research site to load ranked keyword data."} />}
-              </ReportSection>
-            </TabsContent>
-            <TabsContent value="pages">
-              <ReportSection title="Top pages" description={pages ? <SourceBadge source={pages.source} /> : "Run an analysis to load rows."}>
-                {pages?.pages?.length ? <DomainPagesTable rows={pages.pages} /> : <EmptyState title="No page rows" text={pages?.warning || "Analyze an organic research site to load top page data."} />}
-              </ReportSection>
-            </TabsContent>
-            <TabsContent value="snapshot">
-              {overview ? <OrganicSnapshot result={overview} domain={domain} keywordRows={keywords?.keywords?.length || 0} pageRows={pages?.pages?.length || 0} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first organic research snapshot." />}
-            </TabsContent>
-          </Tabs>
-        </div>
+        ) : null}
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="keywords">Keywords</TabsTrigger>
+            <TabsTrigger value="pages">Pages</TabsTrigger>
+            <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
+          </TabsList>
+          <TabsContent value="keywords">
+            <ReportSection title="Ranked keywords" description={keywords ? <SourceBadge source={keywords.source} /> : "Run an analysis to load rows."}>
+              {keywords?.keywords?.length ? <DomainKeywordsTable rows={keywords.keywords} /> : <EmptyState title="No keyword rows" text={keywords?.warning || "Analyze an organic research site to load ranked keyword data."} />}
+            </ReportSection>
+          </TabsContent>
+          <TabsContent value="pages">
+            <ReportSection title="Top pages" description={pages ? <SourceBadge source={pages.source} /> : "Run an analysis to load rows."}>
+              {pages?.pages?.length ? <DomainPagesTable rows={pages.pages} /> : <EmptyState title="No page rows" text={pages?.warning || "Analyze an organic research site to load top page data."} />}
+            </ReportSection>
+          </TabsContent>
+          <TabsContent value="snapshot">
+            {overview ? <OrganicSnapshot result={overview} domain={domain} keywordRows={keywords?.keywords?.length || 0} pageRows={pages?.pages?.length || 0} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first organic research snapshot." />}
+          </TabsContent>
+        </Tabs>
         <HistoryList title="Organic research history" rows={history} labelKey="domain" labelTitle="Research site" />
       </div>
     </>
@@ -3400,57 +3398,55 @@ function LinksPage({ site }: { site: Site }) {
         </div>
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       </section>
-      <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_460px]">
-        <div className="space-y-6">
-          <LocalLinkEvidence
-            audit={selectedAudit}
-            audits={auditRows}
-            selectedAuditId={selectedAudit?.id || ""}
-            onAuditChange={setSelectedAuditIdState}
-            siteDomain={site.domain}
-            onScan={scanSite}
-            scanning={scanning}
+      <div className="mt-6 space-y-6">
+        <LocalLinkEvidence
+          audit={selectedAudit}
+          audits={auditRows}
+          selectedAuditId={selectedAudit?.id || ""}
+          onAuditChange={setSelectedAuditIdState}
+          siteDomain={site.domain}
+          onScan={scanSite}
+          scanning={scanning}
+        />
+        {overview?.warning ? (
+          <ProviderNotice title="External backlink index unavailable" text={overview.warning} source={overview.source} />
+        ) : null}
+        {overview?.source === "dataforseo" ? (
+          <StatsBand
+            title="Connected backlink index"
+            items={[
+              { title: "Backlinks", value: metricValue(overview.backlinks, overview.summary?.backlinks), icon: Link2 },
+              { title: "Ref. domains", value: metricValue(overview.referringDomains, overview.summary?.referringDomains), icon: Globe2 },
+              { title: "Dofollow %", value: metricValue(overview.dofollowRatio), icon: CheckCircle2 },
+            ]}
           />
-          {overview?.warning ? (
-            <ProviderNotice title="External backlink index unavailable" text={overview.warning} source={overview.source} />
-          ) : null}
-          {overview?.source === "dataforseo" ? (
-            <StatsBand
-              title="Connected backlink index"
-              items={[
-                { title: "Backlinks", value: metricValue(overview.backlinks, overview.summary?.backlinks), icon: Link2 },
-                { title: "Ref. domains", value: metricValue(overview.referringDomains, overview.summary?.referringDomains), icon: Globe2 },
-                { title: "Dofollow %", value: metricValue(overview.dofollowRatio), icon: CheckCircle2 },
-              ]}
-            />
-          ) : null}
-          <Tabs value={tab} onValueChange={changeTab}>
-            <TabsList>
-              <TabsTrigger value="backlinks">Backlinks</TabsTrigger>
-              <TabsTrigger value="domains">Domains</TabsTrigger>
-              <TabsTrigger value="pages">Pages</TabsTrigger>
-              <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
-            </TabsList>
-            <TabsContent value="backlinks">
-              <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Connect a real backlink index, then run a check."}>
-                {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title={backlinkIndexConnected ? "No backlink rows" : "No external backlink index connected"} text={profile?.warning || (backlinkIndexConnected ? "Check a domain to load real backlink rows." : "Local audits do not invent web-wide backlinks. Use the local link graph above until a real backlink index is connected.")} />}
-              </ReportSection>
-            </TabsContent>
-            <TabsContent value="domains">
-              <ReportSection title="Referring domains">
-                {profile?.tab === "domains" && profile.rows?.length ? <ReferringDomainsTable rows={profile.rows} /> : <EmptyState title="No domain rows" text={profile?.warning || "Switch tabs after running a backlink analysis."} />}
-              </ReportSection>
-            </TabsContent>
-            <TabsContent value="pages">
-              <ReportSection title="Top linked pages">
-                {profile?.tab === "pages" && profile.rows?.length ? <BacklinkPagesTable rows={profile.rows} /> : <EmptyState title="No page rows" text={profile?.warning || "Switch tabs after running a backlink analysis."} />}
-              </ReportSection>
-            </TabsContent>
-            <TabsContent value="snapshot">
-              {overview ? <BacklinkSnapshot result={overview} domain={domain} rows={profile?.rows?.length || 0} tab={profile?.tab || tab} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first backlink snapshot." />}
-            </TabsContent>
-          </Tabs>
-        </div>
+        ) : null}
+        <Tabs value={tab} onValueChange={changeTab}>
+          <TabsList>
+            <TabsTrigger value="backlinks">Backlinks</TabsTrigger>
+            <TabsTrigger value="domains">Domains</TabsTrigger>
+            <TabsTrigger value="pages">Pages</TabsTrigger>
+            <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
+          </TabsList>
+          <TabsContent value="backlinks">
+            <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Connect a real backlink index, then run a check."}>
+              {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title={backlinkIndexConnected ? "No backlink rows" : "No external backlink index connected"} text={profile?.warning || (backlinkIndexConnected ? "Check a domain to load real backlink rows." : "Local audits do not invent web-wide backlinks. Use the local link graph above until a real backlink index is connected.")} />}
+            </ReportSection>
+          </TabsContent>
+          <TabsContent value="domains">
+            <ReportSection title="Referring domains">
+              {profile?.tab === "domains" && profile.rows?.length ? <ReferringDomainsTable rows={profile.rows} /> : <EmptyState title="No domain rows" text={profile?.warning || "Switch tabs after running a backlink analysis."} />}
+            </ReportSection>
+          </TabsContent>
+          <TabsContent value="pages">
+            <ReportSection title="Top linked pages">
+              {profile?.tab === "pages" && profile.rows?.length ? <BacklinkPagesTable rows={profile.rows} /> : <EmptyState title="No page rows" text={profile?.warning || "Switch tabs after running a backlink analysis."} />}
+            </ReportSection>
+          </TabsContent>
+          <TabsContent value="snapshot">
+            {overview ? <BacklinkSnapshot result={overview} domain={domain} rows={profile?.rows?.length || 0} tab={profile?.tab || tab} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first backlink snapshot." />}
+          </TabsContent>
+        </Tabs>
         <HistoryList title="External backlink history" rows={history} labelKey="domain" labelTitle="Backlink index site" />
       </div>
     </>

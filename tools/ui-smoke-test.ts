@@ -261,10 +261,16 @@ try {
     await siteControl.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open AI lab$/ }).waitFor();
 
+    await page.setViewportSize({ width: 1600, height: 1000 });
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
     await page.getByLabel("Saved scan for page evidence").waitFor();
     await page.getByText(/saved scans? available for this site/i).first().waitFor();
+    const localCrawlPagesSection = page.locator("section").filter({ hasText: "Local crawl pages" }).first();
+    const localCrawlPagesBox = await localCrawlPagesSection.boundingBox();
+    if (!localCrawlPagesBox || localCrawlPagesBox.width < 1000) {
+      throw new Error(`Organic crawl evidence should use the full desktop width, got ${localCrawlPagesBox?.width}.`);
+    }
     await page.getByLabel("Organic research site").waitFor();
     await page.getByRole("button", { name: /^Analyze organic site$/ }).click();
     await page.getByText("External ranked-keyword dataset unavailable").waitFor();
@@ -287,6 +293,11 @@ try {
     await page.getByRole("heading", { name: /^Local link graph$/ }).waitFor();
     await page.getByLabel("Saved scan for link evidence").waitFor();
     await page.getByText(/saved scans? available for this site/i).first().waitFor();
+    const localLinkGraphSection = page.locator("section").filter({ hasText: "Local link graph" }).first();
+    const localLinkGraphBox = await localLinkGraphSection.boundingBox();
+    if (!localLinkGraphBox || localLinkGraphBox.width < 1000) {
+      throw new Error(`Local link graph should use the full desktop width, got ${localLinkGraphBox?.width}.`);
+    }
     await page.getByText("External backlink index", { exact: true }).waitFor();
     await page.getByRole("button", { name: /Backlink index not connected/i }).waitFor();
     await page.getByText("No web-wide backlink rows are generated locally").waitFor();
