@@ -230,8 +230,11 @@ try {
     body: JSON.stringify({ email: "admin@example.com", password: "local-password-123" }),
   });
   const dashboard = await request("/api/dashboard");
-  if (dashboard.activeProject !== null || dashboard.projects?.length !== 0) {
+  if (dashboard.activeSite !== null || dashboard.sites?.length !== 0) {
     throw new Error(`Fresh setup should not create a placeholder site: ${JSON.stringify(dashboard)}`);
+  }
+  if ("activeProject" in dashboard || "projects" in dashboard) {
+    throw new Error(`Dashboard response should expose sites, not projects: ${JSON.stringify(dashboard)}`);
   }
   const initialSites = await request("/api/sites");
   if (initialSites.length !== 0) {
@@ -258,6 +261,10 @@ try {
   const apiServerSource = await readFile(path.join(rootDir, "src/index.ts"), "utf8");
   if (apiServerSource.includes('"/api/projects')) {
     throw new Error("Public API routes should expose /api/sites only, not legacy /api/projects aliases.");
+  }
+  const seoSource = await readFile(path.join(rootDir, "src/seo.ts"), "utf8");
+  if (seoSource.includes("activeProject:") || /^\s*projects:/m.test(seoSource)) {
+    throw new Error("Dashboard API should return activeSite/sites terminology.");
   }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
   if (webApiClient.includes("/api/projects")) {
@@ -945,7 +952,7 @@ try {
   });
   const toolNames = new Set((mcp.result?.tools || []).map((tool: any) => tool.name));
   if (
-    !dashboardWithGsc.activeProject ||
+    !dashboardWithGsc.activeSite ||
     !Array.isArray(mcp.result?.tools) ||
     !toolNames.has("list_sites") ||
     !toolNames.has("scan_site") ||

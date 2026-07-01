@@ -3989,8 +3989,8 @@ export function dashboardSummary(projectId?: string) {
   const project = projectId ? getProject(projectId) || projects[0] : projects[0];
   if (!project) {
     return {
-      activeProject: null,
-      projects: [],
+      activeSite: null,
+      sites: [],
       savedKeywordCount: 0,
       trackerCount: 0,
       auditCount: 0,
@@ -4009,8 +4009,8 @@ export function dashboardSummary(projectId?: string) {
     [project.id],
   );
   return {
-    activeProject: project,
-    projects,
+    activeSite: project,
+    sites: projects,
     savedKeywordCount: get<{ count: number }>(
       "SELECT count(*) AS count FROM saved_keywords WHERE project_id = ?",
       [project.id],
