@@ -404,7 +404,12 @@ try {
   if (/from the latest (site|local) audit|The latest audit did not/i.test(webAppClient)) {
     throw new Error("Audit-derived evidence pages should not present local crawl data as latest-only.");
   }
-  for (const removedTargetLabel of ["Organic target", "External backlink target", "Analyze target", "Custom target"]) {
+  for (const requiredDomainLabel of ["Ranking domain", "Research domain", "Backlink domain", "Comparison domain", "Active site domain:"]) {
+    if (!webAppClient.includes(requiredDomainLabel)) {
+      throw new Error(`Site comparison fields should use explicit domain wording, missing ${requiredDomainLabel}.`);
+    }
+  }
+  for (const removedTargetLabel of ["Organic target", "External backlink target", "Analyze target", "Custom target", "SERP ownership site", "Organic research site", "Backlink index site", "Competitor/custom site"]) {
     if (webAppClient.includes(removedTargetLabel)) {
       throw new Error(`Organic and Links pages should use active-site/competitor wording, not "${removedTargetLabel}".`);
     }
@@ -437,7 +442,7 @@ try {
   }
   for (const specificHistoryLabel of [
     'labelTitle="Research site"',
-    'labelTitle="Backlink index site"',
+    'labelTitle="Backlink domain"',
     'labelTitle="Brand or domain"',
     'labelTitle="Prompt"',
   ]) {
@@ -445,8 +450,8 @@ try {
       throw new Error(`Saved history tables should use specific column labels: ${specificHistoryLabel}`);
     }
   }
-  if (!webAppClient.includes("Organic research site") || !webAppClient.includes("Backlink index site") || !webAppClient.includes("SERP ownership site")) {
-    throw new Error("Competitive pages should label their domain inputs as site-specific controls.");
+  if (!webAppClient.includes("Ranking domain") || !webAppClient.includes("Research domain") || !webAppClient.includes("Backlink domain")) {
+    throw new Error("Competitive pages should label domain inputs clearly.");
   }
   if (/Search defaults|Search market|Keyword language|Default search market|Default keyword language/.test(webAppClient)) {
     throw new Error("Site forms should label market/language as keyword tool defaults, not site search defaults.");

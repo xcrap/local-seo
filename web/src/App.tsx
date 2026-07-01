@@ -497,7 +497,7 @@ function SiteTargetField({
         {siteDomain ? (
           <div className="flex items-center gap-2">
             <Badge variant={usingSelectedSite ? "good" : "outline"}>
-              {usingSelectedSite ? "Active site" : "Competitor/custom site"}
+              {usingSelectedSite ? "Active site" : "Comparison domain"}
             </Badge>
             {!usingSelectedSite ? (
               <Button type="button" size="sm" variant="ghost" onClick={() => onChange(siteDomain)}>
@@ -508,7 +508,7 @@ function SiteTargetField({
         ) : null}
       </div>
       <Input aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} placeholder={siteDomain || "example.com"} />
-      {siteDomain ? <p className="text-xs text-muted-foreground">Active site: {siteDomain}</p> : null}
+      {siteDomain ? <p className="text-xs text-muted-foreground">Active site domain: {siteDomain}</p> : null}
       {hint ? <p className="text-xs leading-5 text-muted-foreground">{hint}</p> : null}
     </div>
   );
@@ -2710,10 +2710,10 @@ function SerpPage({ site }: { site: Site }) {
             <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="best local seo tool" required />
           </Field>
           <SiteTargetField
-            label="SERP ownership site"
+            label="Ranking domain"
             value={domain}
             siteDomain={site.domain}
-            hint="Use the active site or enter a competitor domain to highlight matching ranking rows."
+            hint="Use the active site to check its rankings, or enter a competitor domain to compare."
             onChange={setDomain}
           />
           <Button disabled={loading || !keyword.trim()}><Activity /> {loading ? "Analyzing" : "Analyze SERP"}</Button>
@@ -3099,10 +3099,10 @@ function DomainPage({ site }: { site: Site }) {
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
           <SiteTargetField
-            label="Organic research site"
+            label="Research domain"
             value={domain}
             siteDomain={site.domain}
-            hint="Use the active site or enter a competitor domain. Local crawl evidence below comes from saved audits."
+            hint="Use the active site or enter a competitor domain. Saved site scans provide the local crawl evidence below."
             onChange={setDomain}
           />
           <div className="flex items-end">
@@ -3515,10 +3515,10 @@ function LinksPage({ site }: { site: Site }) {
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
           <SiteTargetField
-            label="Backlink index site"
+            label="Backlink domain"
             value={domain}
             siteDomain={site.domain}
-            hint="Use the active site or enter a competitor domain. Local link evidence below comes from saved audits."
+            hint="Use the active site or enter a competitor domain. Saved site scans provide the local link evidence below."
             onChange={setDomain}
           />
           <div className="flex items-end">
@@ -3592,7 +3592,7 @@ function LinksPage({ site }: { site: Site }) {
             {overview ? <BacklinkSnapshot result={overview} domain={domain} rows={profile?.rows?.length || 0} tab={profile?.tab || tab} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first backlink snapshot." />}
           </TabsContent>
         </Tabs>
-        <HistoryList title="External backlink history" rows={history} labelKey="domain" labelTitle="Backlink index site" />
+        <HistoryList title="External backlink history" rows={history} labelKey="domain" labelTitle="Backlink domain" />
       </div>
     </>
   );
@@ -3780,7 +3780,7 @@ function BacklinkSnapshot({ result, domain, rows, tab }: { result: any; domain: 
     >
       <StatusEvidenceTable
         rows={[
-          { title: "Backlink index site", status: domain || result.domain || "-", tone: "good", text: "The domain or URL checked in this run." },
+          { title: "Backlink domain", status: domain || result.domain || "-", tone: "good", text: "The domain or URL checked in this run." },
           { title: "Visible rows", status: formatNumber(rows), tone: rows ? "good" : "warn", text: `Rows currently loaded in the ${tab} tab.` },
           { title: "Backlinks", status: formatMetricStatus(backlinks), tone: hasMetric(backlinks) ? "good" : "warn", text: "Total backlinks from the connected index." },
           { title: "Referring domains", status: formatMetricStatus(referringDomains), tone: hasMetric(referringDomains) ? "good" : "warn", text: "Unique linking domains from the connected index." },

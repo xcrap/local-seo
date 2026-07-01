@@ -345,7 +345,7 @@ try {
     if (!localCrawlPagesBox || localCrawlPagesBox.width < 1000) {
       throw new Error(`Organic crawl evidence should use the full desktop width, got ${localCrawlPagesBox?.width}.`);
     }
-    await page.getByLabel("Organic research site").waitFor();
+    await page.getByLabel("Research domain").waitFor();
     await page.getByRole("button", { name: /^Analyze organic site$/ }).click();
     await page.getByText("External ranked-keyword dataset unavailable").waitFor();
     await page.getByRole("tab", { name: /^Snapshot$/ }).click();
@@ -592,19 +592,19 @@ try {
     ]);
     await page.getByText("second.test updated locally.").waitFor();
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
-    await page.getByLabel("Organic research site").waitFor();
-    if (await page.getByLabel("Organic research site").inputValue() !== "second.test") {
-      throw new Error("Organic research domain field did not follow the newly active site.");
+    await page.getByLabel("Research domain").waitFor();
+    if (await page.getByLabel("Research domain").inputValue() !== "second.test") {
+      throw new Error("Research domain field did not follow the newly active site.");
     }
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
-    await page.getByLabel("Backlink index site").waitFor();
-    if (await page.getByLabel("Backlink index site").inputValue() !== "second.test") {
-      throw new Error("Links domain field did not follow the newly active site.");
+    await page.getByLabel("Backlink domain").waitFor();
+    if (await page.getByLabel("Backlink domain").inputValue() !== "second.test") {
+      throw new Error("Backlink domain field did not follow the newly active site.");
     }
     await page.getByRole("navigation").getByRole("link", { name: /^SERP analysis$/ }).click();
-    await page.getByLabel("SERP ownership site").waitFor();
-    if (await page.getByLabel("SERP ownership site").inputValue() !== "second.test") {
-      throw new Error("SERP ownership site did not follow the newly active site.");
+    await page.getByLabel("Ranking domain").waitFor();
+    if (await page.getByLabel("Ranking domain").inputValue() !== "second.test") {
+      throw new Error("Ranking domain did not follow the newly active site.");
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
