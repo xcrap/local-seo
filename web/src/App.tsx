@@ -2453,14 +2453,14 @@ function SavedKeywordsTable({
 
 function SerpPage({ site }: { site: Site }) {
   const [keyword, setKeyword] = useState("");
-  const [target, setTarget] = useState(site.domain);
+  const [domain, setDomain] = useState(site.domain);
   const [result, setResult] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setTarget(site.domain);
+    setDomain(site.domain);
   }, [site.id, site.domain]);
 
   async function load() {
@@ -2479,7 +2479,7 @@ function SerpPage({ site }: { site: Site }) {
     setLoading(true);
     setError("");
     try {
-      const data = await api.analyzeSerp({ siteId: site.id, keyword, target, depth: 20 });
+      const data = await api.analyzeSerp({ siteId: site.id, keyword, domain, depth: 20 });
       setResult(data);
       await load();
     } catch (err) {
@@ -2499,10 +2499,10 @@ function SerpPage({ site }: { site: Site }) {
           </Field>
           <SiteTargetField
             label="SERP ownership site"
-            value={target}
+            value={domain}
             siteDomain={site.domain}
             hint="Use the active site or enter a competitor domain to highlight matching ranking rows."
-            onChange={setTarget}
+            onChange={setDomain}
           />
           <Button disabled={loading || !keyword.trim()}><Activity /> {loading ? "Analyzing" : "Analyze SERP"}</Button>
         </form>
@@ -2515,7 +2515,7 @@ function SerpPage({ site }: { site: Site }) {
             result ? (
               <span className="flex flex-wrap items-center gap-2">
                 <SourceBadge source={result.source} />
-                <span>Active site position: {result.targetPosition || "not found"}</span>
+                <span>Active site position: {result.domainPosition || "not found"}</span>
                 {result.warning ? <span>{result.warning}</span> : null}
               </span>
             ) : "Run a query to inspect the SERP."
@@ -2541,7 +2541,7 @@ function SerpTable({ rows }: { rows: any[] }) {
       <TableHeader><TableRow><TableHead>Rank</TableHead><TableHead>Domain</TableHead><TableHead>Title</TableHead><TableHead>URL</TableHead></TableRow></TableHeader>
       <TableBody>
         {rows.map((row) => (
-          <TableRow key={`${row.rank}:${row.url}`} className={row.isTarget ? "bg-accent/45" : ""}>
+          <TableRow key={`${row.rank}:${row.url}`} className={row.isDomain ? "bg-accent/45" : ""}>
             <TableCell className="nums font-medium">{row.rank}</TableCell>
             <TableCell>{row.domain}</TableCell>
             <TableCell className="max-w-md truncate">{row.title}</TableCell>

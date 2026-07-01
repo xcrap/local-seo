@@ -734,10 +734,25 @@ try {
     method: "POST",
     body: JSON.stringify({ savedKeywordIds: [saved.rows[0].id], addTags: ["priority"] }),
   });
-  await request("/api/serp/analyze", {
+  const serpAnalysis = await request("/api/serp/analyze", {
+    method: "POST",
+    body: JSON.stringify({ siteId: project.id, keyword: "seo software", domain: "example.com" }),
+  });
+  if (
+    serpAnalysis.domain !== "example.com" ||
+    "target" in serpAnalysis ||
+    "targetPosition" in serpAnalysis ||
+    serpAnalysis.rows?.some((row: any) => "isTarget" in row)
+  ) {
+    throw new Error(`SERP analysis should expose domain fields, not target fields: ${JSON.stringify(serpAnalysis)}`);
+  }
+  const legacySerpTarget = await requestFailure("/api/serp/analyze", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, keyword: "seo software", target: "example.com" }),
   });
+  if (!/Use domain/i.test(String(legacySerpTarget.data?.error || ""))) {
+    throw new Error(`SERP analysis should reject target body input: ${JSON.stringify(legacySerpTarget)}`);
+  }
   const organicOverview = await request("/api/domain/overview", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, domain: "example.com" }),
@@ -1225,6 +1240,28 @@ try {
     "target" in (mcpDomainOverview.result?.structuredContent || {})
   ) {
     throw new Error(`MCP get_domain_overview should accept and return domain while mapping legacy internals: ${JSON.stringify(mcpDomainOverview)}`);
+  }
+  const mcpSerpAnalysis = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 202,
+      method: "tools/call",
+      params: {
+        name: "analyze_serp",
+        arguments: { siteId: project.id, keyword: "seo software", domain: "example.com" },
+      },
+    }),
+  });
+  const mcpSerp = mcpSerpAnalysis.result?.structuredContent || {};
+  if (
+    mcpSerpAnalysis.error ||
+    mcpSerp.domain !== "example.com" ||
+    "target" in mcpSerp ||
+    "targetPosition" in mcpSerp ||
+    mcpSerp.rows?.some((row: any) => "isTarget" in row)
+  ) {
+    throw new Error(`MCP analyze_serp should expose domain fields, not target fields: ${JSON.stringify(mcpSerpAnalysis)}`);
   }
   const mcpKeywordResearch = await request("/mcp", {
     method: "POST",

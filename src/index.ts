@@ -119,6 +119,22 @@ async function readDomainScopedJson(c: any) {
   return domainScopedBody(await readJson(c));
 }
 
+function publicSerpResult(row: any) {
+  if (!row || typeof row !== "object") return row;
+  const { target, targetPosition, rows, ...rest } = row;
+  return {
+    ...rest,
+    rows: Array.isArray(rows)
+      ? rows.map((resultRow: any) => {
+        const { isTarget, ...resultRest } = resultRow || {};
+        return { ...resultRest, isDomain: Boolean(isTarget) };
+      })
+      : rows,
+    domain: rest.domain || target || "",
+    domainPosition: targetPosition ?? null,
+  };
+}
+
 function siteQueryId(c: any) {
   if (c.req.query("projectId")) throw new Error("Use siteId.");
   return c.req.query("siteId");
@@ -381,7 +397,7 @@ app.get(
 );
 app.post(
   "/api/serp/analyze",
-  safe(async (c) => c.json(await getSerpAnalysis((await readSiteScopedJson(c)) as any))),
+  safe(async (c) => c.json(publicSerpResult(await getSerpAnalysis((await readDomainScopedJson(c)) as any)))),
 );
 
 app.get(

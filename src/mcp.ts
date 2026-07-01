@@ -45,6 +45,8 @@ function publicMcpResult(result: any): any {
     if (key === "project_name") publicKey = "site_name";
     if (key === "project_domain") publicKey = "site_domain";
     if (key === "target" && typeof value === "string" && !("domain" in result)) publicKey = "domain";
+    if (key === "targetPosition") publicKey = "domainPosition";
+    if (key === "isTarget") publicKey = "isDomain";
     output[publicKey] = publicMcpResult(value);
   }
   return output;
