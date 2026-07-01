@@ -106,7 +106,6 @@ export function defaultCrawlHostFromConfig(config?: any): Site["crawl_host"] {
 
 export const activeSiteStorageKey = "local-seo:site";
 export const selectedScanStoragePrefix = "local-seo:selected-scan";
-export const siteActionMessageStorageKey = "local-seo:site-action-message";
 
 export function selectedScanStorageKey(siteId: string) {
   return `${selectedScanStoragePrefix}:${siteId}`;
@@ -122,16 +121,6 @@ export function setSelectedScanId(siteId: string, scanId: string) {
 
 export function clearSelectedScanId(siteId?: string) {
   if (siteId) localStorage.removeItem(selectedScanStorageKey(siteId));
-}
-
-export function takeSiteActionMessage() {
-  const message = sessionStorage.getItem(siteActionMessageStorageKey) || "";
-  if (message) sessionStorage.removeItem(siteActionMessageStorageKey);
-  return message;
-}
-
-export function stashSiteActionMessage(message: string) {
-  sessionStorage.setItem(siteActionMessageStorageKey, message);
 }
 
 export function marketLabel(code: number) {
@@ -454,15 +443,13 @@ export function InfoTip({ children, label = "More detail" }: { children: ReactNo
 }
 
 export function Hint({ tip, children, className }: { tip: ReactNode; children: ReactNode; className?: string }) {
+  // A plain span (not a button): Hint is often rendered inside a clickable row
+  // or link, so an interactive element here would nest a button in a button.
+  // The tooltip still opens on hover; the visible text always carries the gist.
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
-          className={cn("has-tip cursor-help rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", className)}
-        >
-          {children}
-        </button>
+        <span className={cn("has-tip", className)}>{children}</span>
       </TooltipTrigger>
       <TooltipContent>{tip}</TooltipContent>
     </Tooltip>

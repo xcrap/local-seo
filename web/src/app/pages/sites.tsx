@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentProps, type SyntheticEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowUpRight, Bot, CheckCircle2, FileSearch, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, Bot, FileSearch, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@/components/ui";
-import { EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteActionMessageStorageKey, siteDisplayName, sortScanRows, stashSiteActionMessage, takeSiteActionMessage } from "../shared";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from "@/components/ui";
+import { EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteDisplayName, sortScanRows } from "../shared";
 import { cn } from "@/lib/utils";
 import { ScanTable } from "./scans";
 
@@ -71,7 +71,7 @@ export function Overview({
     navigate(`/scans/${scanId}`);
   }
 
-  async function createSiteAndScan(event: FormEvent) {
+  async function createSiteAndScan(event: SyntheticEvent) {
     event.preventDefault();
     const domain = firstDomain.trim();
     if (!domain) return;
@@ -472,7 +472,6 @@ export function SitesManager({
     crawl_host: "auto",
   });
   const [error, setError] = useState("");
-  const [actionMessage, setActionMessage] = useState(takeSiteActionMessage);
   const [scanningSiteId, setScanningSiteId] = useState("");
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
   const [deletingSiteId, setDeletingSiteId] = useState("");
@@ -501,16 +500,6 @@ export function SitesManager({
     }
     return map;
   }, [allScans]);
-
-  function showActionMessage(message: string, persistForRemount = false) {
-    if (persistForRemount) stashSiteActionMessage(message);
-    setActionMessage(message);
-  }
-
-  function clearActionMessage() {
-    sessionStorage.removeItem(siteActionMessageStorageKey);
-    setActionMessage("");
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -541,7 +530,6 @@ export function SitesManager({
       return;
     }
     setError("");
-    clearActionMessage();
     setCreatingAction(scanAfterCreate ? "scan" : "save");
     try {
       const created = await api.createSite({
@@ -562,15 +550,17 @@ export function SitesManager({
         return;
       }
       await reloadSites();
-      showActionMessage(`${cleanSiteDomain(created.domain) || created.name || "Site"} saved locally.`, true);
+      toast.success(`${cleanSiteDomain(created.domain) || created.name || "Site"} saved locally.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : scanAfterCreate ? "Could not add and scan site" : "Could not add site");
+      const message = err instanceof Error ? err.message : scanAfterCreate ? "Could not add and scan site" : "Could not add site";
+      setError(message);
+      toast.error(message);
     } finally {
       setCreatingAction("");
     }
   }
 
-  async function submit(event: FormEvent) {
+  async function submit(event: SyntheticEvent) {
     event.preventDefault();
     await createSite(true);
   }
@@ -579,7 +569,6 @@ export function SitesManager({
     setEditing(site);
     setShowEditKeywordDefaults(false);
     setError("");
-    clearActionMessage();
     setEditForm({
       name: site.name,
       domain: site.domain || "",
@@ -591,7 +580,7 @@ export function SitesManager({
     });
   }
 
-  async function submitEdit(event: FormEvent) {
+  async function submitEdit(event: SyntheticEvent) {
     event.preventDefault();
     if (!editing) return;
     setError("");
@@ -600,9 +589,11 @@ export function SitesManager({
       const updated = await api.updateSite(editing.id, editForm);
       setEditing(null);
       await reloadSites();
-      showActionMessage(`${cleanSiteDomain(updated.domain) || updated.name || "Site"} updated locally.`);
+      toast.success(`${cleanSiteDomain(updated.domain) || updated.name || "Site"} updated locally.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update site");
+      const message = err instanceof Error ? err.message : "Could not update site";
+      setError(message);
+      toast.error(message);
     } finally {
       setEditingSiteId("");
     }
@@ -610,18 +601,17 @@ export function SitesManager({
 
   async function deleteSite(site: Site) {
     setError("");
-    clearActionMessage();
     setDeletingSiteId(site.id);
     try {
       const message = `${cleanSiteDomain(site.domain) || site.name || "Site"} deleted locally.`;
-      if (site.id === activeSiteId) stashSiteActionMessage(message);
       await api.deleteSite(site.id);
       setDeleting(null);
       await reloadSites();
-      showActionMessage(message);
+      toast.success(message);
     } catch (err) {
-      sessionStorage.removeItem(siteActionMessageStorageKey);
-      setError(err instanceof Error ? err.message : "Could not delete site");
+      const message = err instanceof Error ? err.message : "Could not delete site";
+      setError(message);
+      toast.error(message);
     } finally {
       setDeletingSiteId("");
     }
@@ -630,7 +620,6 @@ export function SitesManager({
   async function scanSite(site: Site) {
     if (!site.domain) return;
     setError("");
-    clearActionMessage();
     setScanningSiteId(site.id);
     try {
       const result = await api.scanSite(site.id);
@@ -642,7 +631,7 @@ export function SitesManager({
       if (result.scan?.id) navigate(`/scans/${result.scan.id}`);
       else navigate("/scans");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start site scan");
+      toast.error(err instanceof Error ? err.message : "Could not start site scan");
       setScanningSiteId("");
     }
   }
@@ -689,21 +678,6 @@ export function SitesManager({
       </div>
     );
   }
-
-  const banners = (
-    <>
-      {actionMessage ? (
-        <p className="mb-4 flex items-center gap-2 rounded-lg bg-good-soft/60 px-3.5 py-2.5 text-sm text-good">
-          <CheckCircle2 className="size-4 shrink-0" /> {actionMessage}
-        </p>
-      ) : null}
-      {error && (
-        <p className="mb-4 flex items-center gap-2 rounded-lg bg-bad-soft/60 px-3.5 py-2.5 text-sm text-destructive">
-          <AlertTriangle className="size-4 shrink-0" /> {error}
-        </p>
-      )}
-    </>
-  );
 
   const onboarding = (
     <section className="rounded-2xl border border-dashed border-primary/35 p-6 sm:p-9">
@@ -954,7 +928,6 @@ export function SitesManager({
             ) : undefined
           }
         />
-        {banners}
         {sites.length === 0 ? (
           onboarding
         ) : (
@@ -980,7 +953,6 @@ export function SitesManager({
           <Button size="sm" onClick={() => setOpen(true)}><Plus /> Add site</Button>
         </div>
         <div className="p-5">
-          {banners}
           {sites.length === 0 ? (
             onboarding
           ) : (

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type SyntheticEvent, type ReactNode } from "react";
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Activity, Circle, FileSearch, FolderKanban, Gauge, KeyRound, LayoutGrid, LogOut, Plus, RefreshCw, Settings, ShieldCheck } from "lucide-react";
 import { api, auth, type Site } from "./api";
 import { ActiveSiteSelect, EmptyState, Field, SiteAvatar, activeSiteStorageKey, navGroups, navItems, setSelectedScanId, siteDisplayName } from "./app/shared";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Toaster, toast, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { KeywordsPage, RankPage, SavedPage, SerpPage } from "./app/pages/keywords";
 import { DomainPage, LinksPage } from "./app/pages/research";
@@ -19,7 +19,7 @@ function LoginScreen({ setupRequired, onSuccess }: { setupRequired: boolean; onS
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function submit(event: FormEvent) {
+  async function submit(event: SyntheticEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
@@ -97,7 +97,6 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
   const [sitesLoading, setSitesLoading] = useState(true);
   const [sitesError, setSitesError] = useState("");
   const [shellScanning, setShellScanning] = useState(false);
-  const [shellScanError, setShellScanError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const activeSite = useMemo(
@@ -136,7 +135,6 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
   function selectSite(id: string) {
     setActiveSiteId(id);
     localStorage.setItem(activeSiteStorageKey, id);
-    setShellScanError("");
   }
 
   async function scanActiveSite() {
@@ -145,7 +143,6 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
       return;
     }
     setShellScanning(true);
-    setShellScanError("");
     try {
       const result = await api.scanSite(activeSite.id);
       if (result.scan?.id) {
@@ -155,7 +152,7 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
         navigate("/scans");
       }
     } catch (err) {
-      setShellScanError(err instanceof Error ? err.message : "Could not start site scan");
+      toast.error(err instanceof Error ? err.message : "Could not start site scan");
     } finally {
       setShellScanning(false);
     }
@@ -163,7 +160,6 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 
   async function logout() {
     await auth.logout().catch(() => undefined);
-    setShellScanError("");
     setShellScanning(false);
     onLogout();
   }
@@ -225,7 +221,6 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
         onSelect={selectSite}
         onScan={scanActiveSite}
         scanning={shellScanning}
-        scanError={shellScanError}
       />
       <WorkspaceMobileHeader
         sites={sites}
@@ -233,7 +228,6 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
         onSelect={selectSite}
         onScan={scanActiveSite}
         scanning={shellScanning}
-        scanError={shellScanError}
         onNavigate={(path) => navigate(path)}
       />
       <main className="relative z-10 px-4 py-6 lg:ml-66 lg:px-9 lg:py-8">
@@ -314,10 +308,9 @@ type SidebarProps = {
   onSelect: (id: string) => void;
   onScan: () => void;
   scanning: boolean;
-  scanError: string;
 };
 
-function WorkspaceSidebar({ sites, activeSite, onSelect, onScan, scanning, scanError }: SidebarProps) {
+function WorkspaceSidebar({ sites, activeSite, onSelect, onScan, scanning }: SidebarProps) {
   return (
     <aside className="fixed bottom-0 left-0 top-14 z-20 hidden w-66 flex-col overflow-hidden border-r border-border/70 bg-surface/85 backdrop-blur lg:flex">
       <div className="border-b border-border/70 px-4 pb-4 pt-4">
@@ -334,12 +327,9 @@ function WorkspaceSidebar({ sites, activeSite, onSelect, onScan, scanning, scanE
           </div>
         ) : null}
         {activeSite?.domain ? (
-          <>
-            <Button className="mt-2.5 w-full" size="sm" onClick={onScan} disabled={scanning}>
-              <FileSearch /> {scanning ? "Starting scan…" : "Scan website"}
-            </Button>
-            {scanError ? <p className="mt-2 text-xs text-destructive">{scanError}</p> : null}
-          </>
+          <Button className="mt-2.5 w-full" size="sm" onClick={onScan} disabled={scanning}>
+            <FileSearch /> {scanning ? "Starting scan…" : "Scan website"}
+          </Button>
         ) : (
           <Button asChild className="mt-2.5 w-full" size="sm">
             <Link to="/"><Plus /> Add website</Link>
@@ -381,7 +371,6 @@ function WorkspaceMobileHeader({
   onSelect,
   onScan,
   scanning,
-  scanError,
   onNavigate,
 }: {
   sites: Site[];
@@ -389,7 +378,6 @@ function WorkspaceMobileHeader({
   onSelect: (id: string) => void;
   onScan: () => void;
   scanning: boolean;
-  scanError: string;
   onNavigate: (path: string) => void;
 }) {
   return (
@@ -421,7 +409,6 @@ function WorkspaceMobileHeader({
           </SelectContent>
         </Select>
       </div>
-      {scanError ? <p className="mt-2 text-xs text-destructive">{scanError}</p> : null}
     </div>
   );
 }
@@ -495,15 +482,23 @@ export default function App() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Badge>Loading local data</Badge>
+      <div className="grain flex min-h-screen items-center justify-center">
+        <div className="relative z-10 flex items-center gap-3 text-sm text-muted-foreground">
+          <Circle className="size-3 animate-pulse fill-primary text-primary motion-reduce:animate-none" />
+          Loading local data…
+        </div>
       </div>
     );
   }
 
-  if (!authenticated) {
-    return <LoginScreen setupRequired={setupRequired} onSuccess={() => setAuthenticated(true)} />;
-  }
-
-  return <AppRoot onLogout={() => setAuthenticated(false)} />;
+  return (
+    <>
+      {authenticated ? (
+        <AppRoot onLogout={() => setAuthenticated(false)} />
+      ) : (
+        <LoginScreen setupRequired={setupRequired} onSuccess={() => setAuthenticated(true)} />
+      )}
+      <Toaster />
+    </>
+  );
 }

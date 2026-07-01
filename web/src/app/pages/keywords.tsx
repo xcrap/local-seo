@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type ChangeEvent, type SyntheticEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Activity, CheckCircle2, Download, Plus, RefreshCw, Search, Tags, Target, Trash2, Upload } from "lucide-react";
 import { api, type KeywordResult, type Site } from "../../api";
-import { Badge, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from "@/components/ui";
+import { Badge, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, toast } from "@/components/ui";
 import { EmptyState, Field, HistoryList, HistoryTable, InfoTip, PageHeader, ReportSection, SiteDomainField, StatusDot, TagList, formatDate, formatMetricStatus, formatNumber, keywordMetricClass, sourceLabel, sourceVariant } from "../shared";
 
 function SourceMeta({ source, extra }: { source?: string; extra?: ReactNode }) {
@@ -20,8 +20,6 @@ export function KeywordsPage({ site }: { site: Site }) {
   const [limit, setLimit] = useState(25);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const selectedCount = Object.values(selected).filter(Boolean).length;
 
@@ -29,17 +27,15 @@ export function KeywordsPage({ site }: { site: Site }) {
     setQuery(site.domain || "");
   }, [site.id, site.domain]);
 
-  async function submit(event: FormEvent) {
+  async function submit(event: SyntheticEvent) {
     event.preventDefault();
     setLoading(true);
-    setError("");
-    setMessage("");
     try {
       const data = await api.researchKeywords({ siteId: site.id, query, limit });
       setResult(data);
       setSelected(Object.fromEntries(data.rows.slice(0, 10).map((row) => [row.keyword, true])));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Keyword research failed");
+      toast.error(err instanceof Error ? err.message : "Keyword research failed");
     } finally {
       setLoading(false);
     }
@@ -48,13 +44,11 @@ export function KeywordsPage({ site }: { site: Site }) {
   async function saveSelected() {
     const rows = (result?.rows || []).filter((row: KeywordResult) => selected[row.keyword]);
     if (!rows.length) return;
-    setError("");
-    setMessage("");
     try {
       await api.saveKeywords({ siteId: site.id, keywords: rows, source: result?.source || "research" });
-      setMessage(`Saved ${rows.length} keywords.`);
+      toast.success(`Saved ${rows.length} keywords.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save selected keywords");
+      toast.error(err instanceof Error ? err.message : "Could not save selected keywords");
     }
   }
 
@@ -80,8 +74,6 @@ export function KeywordsPage({ site }: { site: Site }) {
           </Field>
           <Button disabled={loading || !query.trim()}><Search /> {loading ? "Researching" : "Research"}</Button>
         </form>
-        {error ? <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
-        {message ? <p className="mt-3 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{message}</p> : null}
       </section>
       <div className="mt-6">
         {result ? (
@@ -165,13 +157,10 @@ export function SavedPage({ site }: { site: Site }) {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const selectedIds = Object.entries(selected).filter(([, checked]) => checked).map(([id]) => id);
 
   async function load() {
     setLoading(true);
-    setError("");
     try {
       const data = await api.querySavedKeywords(site.id, {
         search,
@@ -185,7 +174,7 @@ export function SavedPage({ site }: { site: Site }) {
       setMetricImports(await api.keywordMetricImports(site.id));
       setSelected({});
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load saved keywords");
+      toast.error(err instanceof Error ? err.message : "Could not load saved keywords");
     } finally {
       setLoading(false);
     }
@@ -197,41 +186,35 @@ export function SavedPage({ site }: { site: Site }) {
 
   async function applyTags(mode: "add" | "remove") {
     if (!selectedIds.length || !tagInput.trim()) return;
-    setError("");
-    setMessage("");
     try {
       await api.updateKeywordTags(site.id, {
         savedKeywordIds: selectedIds,
         ...(mode === "add" ? { addTags: tagInput.split(/\n|,/) } : { removeTagNames: tagInput.split(/\n|,/) }),
       });
-      setMessage(mode === "add" ? "Tags added." : "Tags removed.");
+      toast.success(mode === "add" ? "Tags added." : "Tags removed.");
       setTagInput("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update tags");
+      toast.error(err instanceof Error ? err.message : "Could not update tags");
     }
   }
 
   async function removeSelected() {
     if (!selectedIds.length) return;
-    setError("");
-    setMessage("");
     try {
       await api.removeSavedKeywords(site.id, selectedIds);
-      setMessage(`Deleted ${selectedIds.length} keywords.`);
+      toast.success(`Deleted ${selectedIds.length} keywords.`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete selected keywords");
+      toast.error(err instanceof Error ? err.message : "Could not delete selected keywords");
     }
   }
 
-  async function importMetricsCsv(event: FormEvent<HTMLInputElement>) {
+  async function importMetricsCsv(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
     if (!file) return;
     setImporting(true);
-    setError("");
-    setMessage("");
     try {
       const csv = await file.text();
       const imported = await api.importKeywordMetrics({
@@ -239,10 +222,10 @@ export function SavedPage({ site }: { site: Site }) {
         sourceName: file.name,
         csv,
       });
-      setMessage(`Imported ${formatNumber(imported.rowCount || imported.row_count || 0)} keyword metric rows from ${file.name}.`);
+      toast.success(`Imported ${formatNumber(imported.rowCount || imported.row_count || 0)} keyword metric rows from ${file.name}.`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not import keyword metrics CSV");
+      toast.error(err instanceof Error ? err.message : "Could not import keyword metrics CSV");
     } finally {
       input.value = "";
       setImporting(false);
@@ -302,8 +285,6 @@ export function SavedPage({ site }: { site: Site }) {
           </div>
         </div>
       </section>
-      {error ? <p className="mb-4 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
-      {message ? <p className="mb-4 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{message}</p> : null}
       {selectedIds.length > 0 && (
         <section className="mb-6 rounded-2xl border border-primary/25 bg-primary/[0.03] p-5 sm:p-6">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
@@ -381,7 +362,6 @@ export function SerpPage({ site }: { site: Site }) {
   const [result, setResult] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     setDomain(site.domain);
@@ -391,23 +371,22 @@ export function SerpPage({ site }: { site: Site }) {
     try {
       setRuns(await api.serpRuns(site.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load SERP history");
+      toast.error(err instanceof Error ? err.message : "Could not load SERP history");
     }
   }
   useEffect(() => {
     load().catch(console.error);
   }, [site.id]);
 
-  async function submit(event: FormEvent) {
+  async function submit(event: SyntheticEvent) {
     event.preventDefault();
     setLoading(true);
-    setError("");
     try {
       const data = await api.analyzeSerp({ siteId: site.id, keyword, domain, depth: 20 });
       setResult(data);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "SERP analysis failed");
+      toast.error(err instanceof Error ? err.message : "SERP analysis failed");
     } finally {
       setLoading(false);
     }
@@ -430,7 +409,6 @@ export function SerpPage({ site }: { site: Site }) {
           />
           <Button disabled={loading || !keyword.trim()}><Activity /> {loading ? "Analyzing" : "Analyze SERP"}</Button>
         </form>
-        {error ? <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
       </section>
       <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_460px]">
         <ReportSection
@@ -487,8 +465,6 @@ export function RankPage({ site }: { site: Site }) {
   const [keywordDrafts, setKeywordDrafts] = useState<Record<string, string>>({});
   const [selectedKeywords, setSelectedKeywords] = useState<Record<string, Record<string, boolean>>>({});
   const [loading, setLoading] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     setForm((current) => ({ ...current, domain: site.domain }));
@@ -498,18 +474,16 @@ export function RankPage({ site }: { site: Site }) {
     try {
       setTrackers(await api.rankTrackers(site.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load rank trackers");
+      toast.error(err instanceof Error ? err.message : "Could not load rank trackers");
     }
   }
   useEffect(() => {
     load().catch(console.error);
   }, [site.id]);
 
-  async function create(event: FormEvent) {
+  async function create(event: SyntheticEvent) {
     event.preventDefault();
     setLoading("create");
-    setError("");
-    setMessage("");
     try {
       await api.createRankTracker({
         siteId: site.id,
@@ -517,10 +491,10 @@ export function RankPage({ site }: { site: Site }) {
         keywords: form.keywords.split(/\n|,/).map((item) => item.trim()).filter(Boolean),
       });
       setForm({ domain: site.domain, keywords: "" });
-      setMessage("Rank tracker created.");
+      toast.success("Rank tracker created.");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create rank tracker");
+      toast.error(err instanceof Error ? err.message : "Could not create rank tracker");
     } finally {
       setLoading("");
     }
@@ -528,14 +502,12 @@ export function RankPage({ site }: { site: Site }) {
 
   async function check(id: string) {
     setLoading(id);
-    setError("");
-    setMessage("");
     try {
       await api.runRankCheck(id);
-      setMessage("Rank check finished.");
+      toast.success("Rank check finished.");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Rank check failed");
+      toast.error(err instanceof Error ? err.message : "Rank check failed");
     } finally {
       setLoading("");
     }
@@ -545,15 +517,13 @@ export function RankPage({ site }: { site: Site }) {
     const keywords = (keywordDrafts[trackerId] || "").split(/\n|,/).map((item) => item.trim()).filter(Boolean);
     if (!keywords.length) return;
     setLoading(`add-${trackerId}`);
-    setError("");
-    setMessage("");
     try {
       await api.addRankKeywords(trackerId, keywords);
       setKeywordDrafts({ ...keywordDrafts, [trackerId]: "" });
-      setMessage(`Added ${keywords.length} keywords.`);
+      toast.success(`Added ${keywords.length} keywords.`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add keywords");
+      toast.error(err instanceof Error ? err.message : "Could not add keywords");
     } finally {
       setLoading("");
     }
@@ -563,15 +533,13 @@ export function RankPage({ site }: { site: Site }) {
     const ids = Object.entries(selectedKeywords[trackerId] || {}).filter(([, checked]) => checked).map(([id]) => id);
     if (!ids.length) return;
     setLoading(`remove-${trackerId}`);
-    setError("");
-    setMessage("");
     try {
       await api.removeRankKeywords(trackerId, ids);
       setSelectedKeywords({ ...selectedKeywords, [trackerId]: {} });
-      setMessage(`Removed ${ids.length} keywords.`);
+      toast.success(`Removed ${ids.length} keywords.`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove keywords");
+      toast.error(err instanceof Error ? err.message : "Could not remove keywords");
     } finally {
       setLoading("");
     }
@@ -579,14 +547,12 @@ export function RankPage({ site }: { site: Site }) {
 
   async function syncMetrics(trackerId: string) {
     setLoading(`metrics-${trackerId}`);
-    setError("");
-    setMessage("");
     try {
       const result = await api.syncRankMetrics(trackerId);
-      setMessage(`Synced imported metrics for ${formatNumber(result.updated || 0)} keywords${result.skipped ? `; ${formatNumber(result.skipped)} still need CSV metrics` : ""}.`);
+      toast.success(`Synced imported metrics for ${formatNumber(result.updated || 0)} keywords${result.skipped ? `; ${formatNumber(result.skipped)} still need CSV metrics` : ""}.`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not sync keyword metrics");
+      toast.error(err instanceof Error ? err.message : "Could not sync keyword metrics");
     } finally {
       setLoading("");
     }
@@ -602,8 +568,6 @@ export function RankPage({ site }: { site: Site }) {
             <Field label="Keywords"><Textarea value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })} placeholder="one per line" /></Field>
             <Button type="submit" disabled={loading === "create"}><Plus /> {loading === "create" ? "Adding" : "Add tracker"}</Button>
           </form>
-          {error ? <p className="mt-4 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
-          {message ? <p className="mt-4 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{message}</p> : null}
         </ReportSection>
         <div className="space-y-4">
           {trackers.length ? trackers.map((tracker) => (

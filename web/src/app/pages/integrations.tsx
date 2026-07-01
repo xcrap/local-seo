@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type SyntheticEvent } from "react";
 import { BarChart3, Bot, ExternalLink, RefreshCw, Settings, Upload } from "lucide-react";
 import { api, type Site } from "../../api";
-import { Badge, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from "@/components/ui";
+import { Badge, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, toast } from "@/components/ui";
 import { DatePicker, EmptyState, Field, InfoTip, JobTable, PageHeader, ReportSection, StatsBand, StatusDot, StatusEvidenceTable, cleanSiteDomain, crawlHostOptions, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatDate, formatDateInput, formatNumber, formatPercent, formatPosition, languageOptions, marketOptions, preferredScanUrl, serpProviderStatus } from "../shared";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +16,6 @@ export function GscPage({ site }: { site: Site }) {
   const [inspection, setInspection] = useState<any>(null);
   const [dimension, setDimension] = useState("query");
   const [importSiteUrl, setImportSiteUrl] = useState(defaultGscProperty);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState("");
   const [gscTab, setGscTab] = useState("performance");
   const today = new Date();
@@ -53,39 +52,35 @@ export function GscPage({ site }: { site: Site }) {
   }
 
   async function connect() {
-    setError("");
     try {
       const { url } = await api.gscStart(site.id);
       window.open(url, "_blank", "width=680,height=780");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start Google connection");
+      toast.error(err instanceof Error ? err.message : "Could not start Google connection");
     }
   }
   async function loadSites() {
     setLoading("sites");
-    setError("");
     try {
       setSites(await api.gscSites(site.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load Search Console properties");
+      toast.error(err instanceof Error ? err.message : "Could not load Search Console properties");
     } finally {
       setLoading("");
     }
   }
   async function selectSite(siteUrl: string) {
     setLoading("site");
-    setError("");
     try {
       setStatus(await api.gscSetSite(site.id, siteUrl));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not select property");
+      toast.error(err instanceof Error ? err.message : "Could not select property");
     } finally {
       setLoading("");
     }
   }
   async function query() {
     setLoading("performance");
-    setError("");
     try {
       setPerformance(await api.gscPerformance({
         siteId: site.id,
@@ -95,17 +90,16 @@ export function GscPage({ site }: { site: Site }) {
         rowLimit: 100,
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not query Search Console performance");
+      toast.error(err instanceof Error ? err.message : "Could not query Search Console performance");
     } finally {
       setLoading("");
     }
   }
-  async function importCsv(event: FormEvent<HTMLInputElement>) {
+  async function importCsv(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
     if (!file) return;
     setLoading("import");
-    setError("");
     try {
       const csv = await file.text();
       const result = await api.gscImport({
@@ -117,7 +111,7 @@ export function GscPage({ site }: { site: Site }) {
       setImports((rows) => [result, ...rows.filter((row) => row.id !== result.id)]);
       showImport(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not import Search Console CSV");
+      toast.error(err instanceof Error ? err.message : "Could not import Search Console CSV");
     } finally {
       input.value = "";
       setLoading("");
@@ -125,18 +119,16 @@ export function GscPage({ site }: { site: Site }) {
   }
   async function inspect() {
     setLoading("inspection");
-    setError("");
     try {
       setInspection(await api.gscInspect({ siteId: site.id, urls: inspectUrls }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not inspect URLs");
+      toast.error(err instanceof Error ? err.message : "Could not inspect URLs");
     } finally {
       setLoading("");
     }
   }
   async function disconnect() {
     setLoading("disconnect");
-    setError("");
     try {
       await api.gscDisconnect(site.id);
       setSites([]);
@@ -144,7 +136,7 @@ export function GscPage({ site }: { site: Site }) {
       setInspection(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not disconnect Search Console");
+      toast.error(err instanceof Error ? err.message : "Could not disconnect Search Console");
     } finally {
       setLoading("");
     }
@@ -169,7 +161,6 @@ export function GscPage({ site }: { site: Site }) {
           </span>
         }
       />
-      {error ? <p className="mb-4 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
       <Tabs value={gscTab} onValueChange={setGscTab} className="space-y-5">
         <TabsList>
           <TabsTrigger value="performance">Performance</TabsTrigger>
@@ -471,7 +462,6 @@ export function AiPage({ site }: { site: Site }) {
   const [context, setContext] = useState(`Site: ${site.name}\nDomain: ${site.domain}`);
   const [activeJobId, setActiveJobId] = useState("");
   const [starting, setStarting] = useState(false);
-  const [error, setError] = useState("");
   const activeJob = jobs.find((job) => job.id === activeJobId) || jobs[0] || null;
 
   async function load() {
@@ -495,18 +485,17 @@ export function AiPage({ site }: { site: Site }) {
     return () => window.clearInterval(interval);
   }, [jobs]);
 
-  async function submit(event: FormEvent) {
+  async function submit(event: SyntheticEvent) {
     event.preventDefault();
     if (starting) return;
     setStarting(true);
-    setError("");
     try {
       const prompt = prompts.find((item) => item.key === type)?.template?.replace("{{context}}", context) || context;
       const job = await api.createAiJob({ type, prompt });
       if (job?.id) setActiveJobId(job.id);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start the Codex job. Is the local Codex CLI available?");
+      toast.error(err instanceof Error ? err.message : "Could not start the Codex job. Is the local Codex CLI available?");
     } finally {
       setStarting(false);
     }
@@ -530,7 +519,6 @@ export function AiPage({ site }: { site: Site }) {
             </Field>
             <Field label="Context"><Textarea className="min-h-48" value={context} onChange={(e) => setContext(e.target.value)} /></Field>
             <Button disabled={starting}><Bot /> {starting ? "Starting job" : "Start job"}</Button>
-            {error ? <p className="rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
           </form>
         </ReportSection>
         <div className="space-y-6">
@@ -727,8 +715,6 @@ export function SettingsPage() {
   const [config, setConfig] = useState<any>({});
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
-  const [saveError, setSaveError] = useState("");
 
   async function load() {
     const data = await api.config();
@@ -746,11 +732,9 @@ export function SettingsPage() {
     load().catch(console.error);
   }, []);
 
-  async function save(event: FormEvent) {
+  async function save(event: SyntheticEvent) {
     event.preventDefault();
     setSaving(true);
-    setSaveMessage("");
-    setSaveError("");
     try {
       await api.saveConfig({
         codex_model: String(form.codex_model || "").trim(),
@@ -761,9 +745,9 @@ export function SettingsPage() {
         default_crawl_host: String(form.default_crawl_host || "auto"),
       });
       await load();
-      setSaveMessage("App settings saved locally.");
+      toast.success("App settings saved locally.");
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Could not save app settings");
+      toast.error(err instanceof Error ? err.message : "Could not save app settings");
     } finally {
       setSaving(false);
     }
@@ -834,8 +818,6 @@ export function SettingsPage() {
                 </Field>
               </div>
             </div>
-            {saveMessage ? <p className="rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{saveMessage}</p> : null}
-            {saveError ? <p className="rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{saveError}</p> : null}
             <Button disabled={saving}><Settings /> {saving ? "Saving settings" : "Save app settings"}</Button>
           </form>
         </ReportSection>

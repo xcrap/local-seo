@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type SyntheticEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FileSearch, Globe2, Link2, Plus } from "lucide-react";
 import { api, type Site } from "../../api";
-import { Badge, Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
+import { Badge, Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, toast } from "@/components/ui";
 import { EmptyState, Field, FilteredRows, HistoryList, IndexabilityBadge, InfoTip, PageHeader, ProviderNotice, ReportSection, SiteDomainField, StatsBand, StatusDot, defaultEvidenceScan, domainKey, formatDate, formatNumber, LengthBadge, ScanLinksTable, hasIndexabilityEvidence, metricValue, pageH1Status, pageIssueTypesCount, scanIsActive, scanIssueCount, scanStatusLabel, sourceLabel, sourceVariant, setSelectedScanId, sortScanRows } from "../shared";
 
 function SourceMeta({ source, extra }: { source?: string; extra?: ReactNode }) {
@@ -28,8 +28,6 @@ export function DomainPage({ site }: { site: Site }) {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const selectedScan = useMemo(
     () => scanRows.find((scan) => scan.id === selectedScanId) || defaultEvidenceScan(scanRows),
     [scanRows, selectedScanId],
@@ -41,8 +39,6 @@ export function DomainPage({ site }: { site: Site }) {
     setOverview(null);
     setKeywords(null);
     setPages(null);
-    setError("");
-    setMessage("");
   }, [site.id, site.domain]);
 
   async function loadHistory() {
@@ -62,11 +58,9 @@ export function DomainPage({ site }: { site: Site }) {
     loadHistory().catch(console.error);
   }, [site.id]);
 
-  async function run(event?: FormEvent) {
+  async function run(event?: SyntheticEvent) {
     event?.preventDefault();
     setLoading(true);
-    setError("");
-    setMessage("");
     const body = { siteId: site.id, domain, pageSize: 50 };
     try {
       const [overviewData, keywordData, pageData] = await Promise.all([
@@ -79,19 +73,17 @@ export function DomainPage({ site }: { site: Site }) {
       setPages(pageData);
       await loadHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Organic research failed");
+      toast.error(err instanceof Error ? err.message : "Organic research failed");
     } finally {
       setLoading(false);
     }
   }
 
-  async function importOrganicCsv(event: FormEvent<HTMLInputElement>) {
+  async function importOrganicCsv(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
     if (!file) return;
     setImporting(true);
-    setError("");
-    setMessage("");
     try {
       const csv = await file.text();
       const imported = await api.importOrganicResearch({
@@ -100,7 +92,7 @@ export function DomainPage({ site }: { site: Site }) {
         sourceName: file.name,
         csv,
       });
-      setMessage(`Imported ${formatNumber(imported.keywordCount || 0)} keyword rows and ${formatNumber(imported.pageCount || 0)} page rows from ${file.name}.`);
+      toast.success(`Imported ${formatNumber(imported.keywordCount || 0)} keyword rows and ${formatNumber(imported.pageCount || 0)} page rows from ${file.name}.`);
       const body = { siteId: site.id, domain, pageSize: 50 };
       const [overviewData, keywordData, pageData] = await Promise.all([
         api.domainOverview(body),
@@ -112,7 +104,7 @@ export function DomainPage({ site }: { site: Site }) {
       setPages(pageData);
       await loadHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not import organic research CSV");
+      toast.error(err instanceof Error ? err.message : "Could not import organic research CSV");
     } finally {
       input.value = "";
       setImporting(false);
@@ -125,7 +117,6 @@ export function DomainPage({ site }: { site: Site }) {
       return;
     }
     setScanning(true);
-    setError("");
     try {
       const result = await api.scanSite(site.id);
       if (result.scan?.id) {
@@ -135,7 +126,7 @@ export function DomainPage({ site }: { site: Site }) {
         navigate("/scans");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start site scan");
+      toast.error(err instanceof Error ? err.message : "Could not start site scan");
     } finally {
       setScanning(false);
     }
@@ -176,8 +167,6 @@ export function DomainPage({ site }: { site: Site }) {
             </Field>
           </div>
         </div>
-        {error ? <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
-        {message ? <p className="mt-3 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{message}</p> : null}
       </section>
       <div className="mt-6 space-y-6">
         <LocalOrganicEvidence
@@ -468,7 +457,6 @@ export function LinksPage({ site }: { site: Site }) {
   const [tab, setTab] = useState("backlinks");
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [importMessage, setImportMessage] = useState("");
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
   const matchingImport = useMemo(
@@ -524,24 +512,23 @@ export function LinksPage({ site }: { site: Site }) {
       setProfile(profileData);
       await loadHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Backlink analysis failed");
+      toast.error(err instanceof Error ? err.message : "Backlink analysis failed");
     } finally {
       setLoading(false);
     }
   }
 
-  async function submit(event: FormEvent) {
+  async function submit(event: SyntheticEvent) {
     event.preventDefault();
     await run();
   }
 
-  async function importBacklinkCsv(event: FormEvent<HTMLInputElement>) {
+  async function importBacklinkCsv(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
     if (!file) return;
     setImporting(true);
     setError("");
-    setImportMessage("");
     try {
       const csv = await file.text();
       const imported = await api.importBacklinks({
@@ -551,7 +538,7 @@ export function LinksPage({ site }: { site: Site }) {
         csv,
       });
       await loadHistory();
-      setImportMessage(`Imported ${formatNumber(imported.rowCount || imported.row_count || 0)} backlink rows from ${file.name}.`);
+      toast.success(`Imported ${formatNumber(imported.rowCount || imported.row_count || 0)} backlink rows from ${file.name}.`);
       const body = { siteId: site.id, domain, tab, pageSize: 50 };
       const [overviewData, profileData] = await Promise.all([
         api.backlinksOverview(body),
@@ -560,7 +547,7 @@ export function LinksPage({ site }: { site: Site }) {
       setOverview(overviewData);
       setProfile(profileData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not import backlink CSV");
+      toast.error(err instanceof Error ? err.message : "Could not import backlink CSV");
     } finally {
       input.value = "";
       setImporting(false);
@@ -588,7 +575,7 @@ export function LinksPage({ site }: { site: Site }) {
         navigate("/scans");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start site scan");
+      toast.error(err instanceof Error ? err.message : "Could not start site scan");
     } finally {
       setScanning(false);
     }
@@ -633,7 +620,6 @@ export function LinksPage({ site }: { site: Site }) {
             </Field>
           </div>
         </div>
-        {importMessage ? <p className="mt-3 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{importMessage}</p> : null}
         {error ? <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
       </section>
       <div className="mt-6 space-y-6">

@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type SyntheticEvent, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, ExternalLink, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem, toast } from "@/components/ui";
 import { EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
 import { cn } from "@/lib/utils";
 
@@ -79,7 +79,7 @@ export function ScanReportRoute() {
       />
       {error ? <p className="rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
       {loading ? (
-        <EmptyState title="Loading report" text="Reading the saved scan from local SQLite." />
+        <ScanReportSkeleton />
       ) : scan ? (
         <ScanDetail scan={scan} />
       ) : (
@@ -167,7 +167,7 @@ export function ScansPage({ site }: { site: Site }) {
       window.clearInterval(interval);
     };
   }, [detail?.id, detail?.status]);
-  async function start(event: FormEvent) {
+  async function start(event: SyntheticEvent) {
     event.preventDefault();
     setError("");
     setStarting(true);
@@ -182,7 +182,7 @@ export function ScansPage({ site }: { site: Site }) {
       setShowCustomUrl(false);
       load().catch(console.error);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start scan");
+      toast.error(err instanceof Error ? err.message : "Could not start scan");
     } finally {
       setStarting(false);
     }
@@ -201,7 +201,7 @@ export function ScansPage({ site }: { site: Site }) {
       if (result.scan?.id) setSelectedScanId(site.id, result.scan.id);
       load().catch(console.error);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start site scan");
+      toast.error(err instanceof Error ? err.message : "Could not start site scan");
     } finally {
       setStarting(false);
     }
@@ -227,7 +227,7 @@ export function ScansPage({ site }: { site: Site }) {
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete the saved scan.");
+      toast.error(err instanceof Error ? err.message : "Could not delete the saved scan.");
     } finally {
       setDeletingScan(null);
     }
@@ -664,21 +664,17 @@ function ScanDetail({ scan }: { scan: any }) {
         <TabsContent value="issues">
           <TabCard className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center rounded-lg border border-border/70 bg-card p-0.5">
+            <ToggleGroup
+              type="single"
+              value={severityFilter}
+              onValueChange={(value) => selectSeverity(value || "all")}
+            >
               {["all", "high", "medium", "low"].map((severity) => (
-                <button
-                  key={severity}
-                  type="button"
-                  onClick={() => selectSeverity(severity)}
-                  className={cn(
-                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-                    severityFilter === severity ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
+                <ToggleGroupItem key={severity} value={severity} aria-label={severity === "all" ? "All severities" : `${severity} severity`}>
                   {severity === "all" ? "All severities" : severity}
-                </button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
             <Select value={categoryFilter} onValueChange={selectCategory}>
               <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -1594,6 +1590,29 @@ function ScanCheckRow({ row, onSelect }: { row: ScanCheckRowModel & { area?: str
 
 function TabCard({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("rounded-2xl border border-border/70 bg-card p-5", className)}>{children}</div>;
+}
+
+function ScanReportSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Skeleton key={index} className="h-8 w-20" />
+        ))}
+      </div>
+      <div className="rounded-2xl border border-border/70 bg-card p-5">
+        <Skeleton className="h-5 w-40" />
+        <div className="mt-5 grid gap-6 xl:grid-cols-[248px_minmax(0,1fr)]">
+          <Skeleton className="mx-auto size-[148px] rounded-full xl:mx-0" />
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Skeleton key={index} className="h-20 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ScanSection({ title, text, children }: { title: string; text: string; children: ReactNode }) {
