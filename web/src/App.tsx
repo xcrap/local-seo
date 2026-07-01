@@ -37,7 +37,7 @@ import {
   Upload,
   Zap,
 } from "lucide-react";
-import { api, auth, type KeywordResult, type Project } from "./api";
+import { api, auth, type KeywordResult, type Site } from "./api";
 import {
   Badge,
   Button,
@@ -139,8 +139,8 @@ const crawlHostOptions = [
 
 type ScanPlanTarget = {
   domain?: string;
-  crawl_protocol?: Project["crawl_protocol"];
-  crawl_host?: Project["crawl_host"];
+  crawl_protocol?: Site["crawl_protocol"];
+  crawl_host?: Site["crawl_host"];
 };
 
 function defaultLocationCodeFromConfig(config?: any) {
@@ -153,14 +153,14 @@ function defaultLanguageCodeFromConfig(config?: any) {
   return languageOptions.some((language) => language.code === code) ? code : "en";
 }
 
-function defaultCrawlProtocolFromConfig(config?: any): Project["crawl_protocol"] {
+function defaultCrawlProtocolFromConfig(config?: any): Site["crawl_protocol"] {
   const value = String(config?.default_crawl_protocol || "auto");
-  return crawlProtocolOptions.some((option) => option.value === value) ? value as Project["crawl_protocol"] : "auto";
+  return crawlProtocolOptions.some((option) => option.value === value) ? value as Site["crawl_protocol"] : "auto";
 }
 
-function defaultCrawlHostFromConfig(config?: any): Project["crawl_host"] {
+function defaultCrawlHostFromConfig(config?: any): Site["crawl_host"] {
   const value = String(config?.default_crawl_host || "auto");
-  return crawlHostOptions.some((option) => option.value === value) ? value as Project["crawl_host"] : "auto";
+  return crawlHostOptions.some((option) => option.value === value) ? value as Site["crawl_host"] : "auto";
 }
 
 const activeSiteStorageKey = "local-seo:site";
@@ -194,7 +194,7 @@ function languageLabel(code: string) {
   return languageOptions.find((item) => item.code === code)?.label || code;
 }
 
-function keywordRankDefaultsLabel(project: Project) {
+function keywordRankDefaultsLabel(project: Site) {
   return `${marketLabel(project.location_code)} · ${languageLabel(project.language_code)}`;
 }
 
@@ -237,7 +237,7 @@ function auditSiteDetail(row: any) {
   return host ? `Scan URL host: ${host}` : "Saved site record unavailable";
 }
 
-function scanHostCandidates(domain: string, crawlHost?: Project["crawl_host"]) {
+function scanHostCandidates(domain: string, crawlHost?: Site["crawl_host"]) {
   const root = domain.replace(/^www\./i, "");
   if (!root || localSiteHost(root)) return root ? [root] : [];
   const www = `www.${root}`;
@@ -246,7 +246,7 @@ function scanHostCandidates(domain: string, crawlHost?: Project["crawl_host"]) {
   return [root, www];
 }
 
-function scanProtocolCandidates(domain: string, crawlProtocol?: Project["crawl_protocol"]) {
+function scanProtocolCandidates(domain: string, crawlProtocol?: Site["crawl_protocol"]) {
   if (crawlProtocol === "https") return ["https"];
   if (crawlProtocol === "http") return ["http"];
   return localSiteHost(domain) ? ["http", "https"] : ["https", "http"];
@@ -349,12 +349,12 @@ function ScanPlanPreview({ project }: { project?: ScanPlanTarget | null }) {
   );
 }
 
-function siteDisplayName(project?: Project | null) {
+function siteDisplayName(project?: Site | null) {
   if (!project) return "No site";
   return project.name;
 }
 
-function siteSelectLabel(project: Project) {
+function siteSelectLabel(project: Site) {
   const domain = project.domain || "No website address";
   return `${siteDisplayName(project)} · ${domain} · ${scanTargetShortDetail(project)}`;
 }
@@ -364,7 +364,7 @@ function ActiveSiteSelect({
   activeSiteId,
   onSelect,
 }: {
-  sites: Project[];
+  sites: Site[];
   activeSiteId: string;
   onSelect: (id: string) => void;
 }) {
@@ -1054,7 +1054,7 @@ function Workspace() {
 }
 
 function WorkspaceShell() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Site[]>([]);
   const [activeProjectId, setActiveProjectId] = useState(
     localStorage.getItem(activeSiteStorageKey) || localStorage.getItem(legacyProjectStorageKey) || "",
   );
@@ -1072,7 +1072,7 @@ function WorkspaceShell() {
     if (!projects.length) setProjectsLoading(true);
     setProjectsError("");
     try {
-      const rows = await api.projects();
+      const rows = await api.sites();
       setProjects(rows);
       if (rows.length === 0) {
         setActiveProjectId("");
@@ -1113,7 +1113,7 @@ function WorkspaceShell() {
     setShellScanning(true);
     setShellScanError("");
     try {
-      const result = await api.scanProject(activeProject.id);
+      const result = await api.scanSite(activeProject.id);
       if (result.audit?.id) {
         setSelectedAuditId(activeProject.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
@@ -1245,7 +1245,7 @@ function WorkspaceShell() {
             ) : activeProject ? (
               <Routes key={activeProject.id}>
                 <Route path="/" element={<Overview project={activeProject} reloadProjects={loadProjects} selectProject={selectProject} />} />
-                <Route path="/sites" element={<ProjectsPage projects={projects} reloadProjects={loadProjects} activeProjectId={activeProject.id} selectProject={selectProject} />} />
+                <Route path="/sites" element={<SitesPage projects={projects} reloadProjects={loadProjects} activeProjectId={activeProject.id} selectProject={selectProject} />} />
                 <Route path="/projects" element={<Navigate to="/sites" replace />} />
                 <Route path="/keywords" element={<KeywordsPage project={activeProject} />} />
                 <Route path="/serp" element={<SerpPage project={activeProject} />} />
@@ -1263,7 +1263,7 @@ function WorkspaceShell() {
                 <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             ) : (
-              <ProjectsPage projects={projects} reloadProjects={loadProjects} activeProjectId="" selectProject={selectProject} />
+              <SitesPage projects={projects} reloadProjects={loadProjects} activeProjectId="" selectProject={selectProject} />
             )}
           </div>
         </main>
@@ -1276,7 +1276,7 @@ function Overview({
   reloadProjects,
   selectProject,
 }: {
-  project: Project;
+  project: Site;
   reloadProjects: () => Promise<void>;
   selectProject: (id: string) => void;
 }) {
@@ -1289,8 +1289,8 @@ function Overview({
   const [firstName, setFirstName] = useState("");
   const [firstLocationCode, setFirstLocationCode] = useState(2840);
   const [firstLanguageCode, setFirstLanguageCode] = useState("en");
-  const [firstCrawlProtocol, setFirstCrawlProtocol] = useState<Project["crawl_protocol"]>("auto");
-  const [firstCrawlHost, setFirstCrawlHost] = useState<Project["crawl_host"]>("auto");
+  const [firstCrawlProtocol, setFirstCrawlProtocol] = useState<Site["crawl_protocol"]>("auto");
+  const [firstCrawlHost, setFirstCrawlHost] = useState<Site["crawl_host"]>("auto");
   const [firstScanError, setFirstScanError] = useState("");
   const navigate = useNavigate();
   const scanLedgerRows = sortAuditRows(summary?.allAudits || summary?.latestAudits || []);
@@ -1319,7 +1319,7 @@ function Overview({
     setScanning(true);
     setScanError("");
     try {
-      const result = await api.scanProject(project.id);
+      const result = await api.scanSite(project.id);
       setScan(result);
       setScanAudit(result.audit);
       if (result.audit?.id) {
@@ -1346,7 +1346,7 @@ function Overview({
     setScanning(true);
     setFirstScanError("");
     try {
-      const created = await api.createProject({
+      const created = await api.createSite({
         name: firstName.trim() || domain,
         domain,
         locationCode: firstLocationCode,
@@ -1355,7 +1355,7 @@ function Overview({
         crawlHost: firstCrawlHost,
       } as any);
       selectProject(created.id);
-      const result = await api.scanProject(created.id);
+      const result = await api.scanSite(created.id);
       if (result.audit?.id) {
         setSelectedAuditId(created.id, result.audit.id);
       }
@@ -1411,7 +1411,7 @@ function Overview({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Scan protocol">
-                <Select value={firstCrawlProtocol} onValueChange={(value) => setFirstCrawlProtocol(value as Project["crawl_protocol"])}>
+                <Select value={firstCrawlProtocol} onValueChange={(value) => setFirstCrawlProtocol(value as Site["crawl_protocol"])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -1419,7 +1419,7 @@ function Overview({
                 </Select>
               </Field>
               <Field label="Host variant">
-                <Select value={firstCrawlHost} onValueChange={(value) => setFirstCrawlHost(value as Project["crawl_host"])}>
+                <Select value={firstCrawlHost} onValueChange={(value) => setFirstCrawlHost(value as Site["crawl_host"])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -1513,7 +1513,7 @@ function SiteCommandCenter({
   scanning,
   onScan,
 }: {
-  project: Project;
+  project: Site;
   summary: any;
   scanning: boolean;
   onScan: () => void;
@@ -1667,36 +1667,36 @@ function ScanCoverageList({ rows, auditStatus }: { rows: any[]; auditStatus?: st
   );
 }
 
-function ProjectsPage({
+function SitesPage({
   projects,
   reloadProjects,
   activeProjectId,
   selectProject,
 }: {
-  projects: Project[];
+  projects: Site[];
   reloadProjects: () => Promise<void>;
   activeProjectId: string;
   selectProject: (id: string) => void;
 }) {
-  type ProjectForm = {
+  type SiteForm = {
     name: string;
     domain: string;
     notes: string;
     locationCode: number;
     languageCode: string;
-    crawlProtocol: Project["crawl_protocol"];
-    crawlHost: Project["crawl_host"];
+    crawlProtocol: Site["crawl_protocol"];
+    crawlHost: Site["crawl_host"];
   };
-  type ProjectEditForm = {
+  type SiteEditForm = {
     name: string;
     domain: string;
     notes: string;
     location_code: number;
     language_code: string;
-    crawl_protocol: Project["crawl_protocol"];
-    crawl_host: Project["crawl_host"];
+    crawl_protocol: Site["crawl_protocol"];
+    crawl_host: Site["crawl_host"];
   };
-  const initialProjectForm: ProjectForm = {
+  const initialSiteForm: SiteForm = {
     name: "",
     domain: "",
     notes: "",
@@ -1706,11 +1706,11 @@ function ProjectsPage({
     crawlHost: "auto",
   };
   const [open, setOpen] = useState(false);
-  const [siteDefaults, setSiteDefaults] = useState<ProjectForm>(initialProjectForm);
-  const [form, setForm] = useState<ProjectForm>(initialProjectForm);
-  const [editing, setEditing] = useState<Project | null>(null);
-  const [deleting, setDeleting] = useState<Project | null>(null);
-  const [editForm, setEditForm] = useState<ProjectEditForm>({
+  const [siteDefaults, setSiteDefaults] = useState<SiteForm>(initialSiteForm);
+  const [form, setForm] = useState<SiteForm>(initialSiteForm);
+  const [editing, setEditing] = useState<Site | null>(null);
+  const [deleting, setDeleting] = useState<Site | null>(null);
+  const [editForm, setEditForm] = useState<SiteEditForm>({
     name: "",
     domain: "",
     notes: "",
@@ -1730,7 +1730,7 @@ function ProjectsPage({
       .then((data) => {
         if (cancelled) return;
         const defaults = {
-          ...initialProjectForm,
+          ...initialSiteForm,
           locationCode: defaultLocationCodeFromConfig(data),
           languageCode: defaultLanguageCodeFromConfig(data),
           crawlProtocol: defaultCrawlProtocolFromConfig(data),
@@ -1755,7 +1755,7 @@ function ProjectsPage({
     setError("");
     setCreatingAction(scanAfterCreate ? "scan" : "save");
     try {
-      const created = await api.createProject({
+      const created = await api.createSite({
         ...form,
         name: form.name.trim() || form.domain.trim() || "Untitled site",
       });
@@ -1763,7 +1763,7 @@ function ProjectsPage({
       setOpen(false);
       setForm(siteDefaults);
       if (scanAfterCreate) {
-        const result = await api.scanProject(created.id);
+        const result = await api.scanSite(created.id);
         if (result.audit?.id) {
           setSelectedAuditId(created.id, result.audit.id);
         }
@@ -1785,7 +1785,7 @@ function ProjectsPage({
     await createSite(true);
   }
 
-  function startEdit(project: Project) {
+  function startEdit(project: Site) {
     setEditing(project);
     setEditForm({
       name: project.name,
@@ -1803,7 +1803,7 @@ function ProjectsPage({
     if (!editing) return;
     setError("");
     try {
-      await api.updateProject(editing.id, editForm);
+      await api.updateSite(editing.id, editForm);
       setEditing(null);
       await reloadProjects();
     } catch (err) {
@@ -1811,10 +1811,10 @@ function ProjectsPage({
     }
   }
 
-  async function deleteProject(project: Project) {
+  async function deleteSite(project: Site) {
     setError("");
     try {
-      await api.deleteProject(project.id);
+      await api.deleteSite(project.id);
       setDeleting(null);
       await reloadProjects();
     } catch (err) {
@@ -1822,12 +1822,12 @@ function ProjectsPage({
     }
   }
 
-  async function scanProject(project: Project) {
+  async function scanSite(project: Site) {
     if (!project.domain) return;
     setError("");
     setScanningSiteId(project.id);
     try {
-      const result = await api.scanProject(project.id);
+      const result = await api.scanSite(project.id);
       if (result.audit?.id) {
         setSelectedAuditId(project.id, result.audit.id);
       }
@@ -1897,7 +1897,7 @@ function ProjectsPage({
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Scan protocol">
-                    <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Project["crawl_protocol"] })}>
+                    <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Site["crawl_protocol"] })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -1905,7 +1905,7 @@ function ProjectsPage({
                     </Select>
                   </Field>
                   <Field label="Host variant">
-                    <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Project["crawl_host"] })}>
+                    <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Site["crawl_host"] })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -1946,7 +1946,7 @@ function ProjectsPage({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Scan protocol">
-                <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Project["crawl_protocol"] })}>
+                <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Site["crawl_protocol"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -1954,7 +1954,7 @@ function ProjectsPage({
                 </Select>
               </Field>
               <Field label="Host variant">
-                <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Project["crawl_host"] })}>
+                <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Site["crawl_host"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -2010,7 +2010,7 @@ function ProjectsPage({
                           aria-label={`Scan ${project.name}`}
                           title={`Scan ${project.domain}`}
                           disabled={scanningSiteId === project.id}
-                          onClick={() => scanProject(project)}
+                          onClick={() => scanSite(project)}
                         >
                           <FileSearch /> {scanningSiteId === project.id ? "Starting" : "Scan"}
                         </Button>
@@ -2064,7 +2064,7 @@ function ProjectsPage({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Scan protocol">
-                <Select value={editForm.crawl_protocol} onValueChange={(value) => setEditForm({ ...editForm, crawl_protocol: value as Project["crawl_protocol"] })}>
+                <Select value={editForm.crawl_protocol} onValueChange={(value) => setEditForm({ ...editForm, crawl_protocol: value as Site["crawl_protocol"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -2072,7 +2072,7 @@ function ProjectsPage({
                 </Select>
               </Field>
               <Field label="Host variant">
-                <Select value={editForm.crawl_host} onValueChange={(value) => setEditForm({ ...editForm, crawl_host: value as Project["crawl_host"] })}>
+                <Select value={editForm.crawl_host} onValueChange={(value) => setEditForm({ ...editForm, crawl_host: value as Site["crawl_host"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -2098,7 +2098,7 @@ function ProjectsPage({
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={() => deleting && deleteProject(deleting)}>
+            <AlertDialogAction type="button" onClick={() => deleting && deleteSite(deleting)}>
               Delete site
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -2108,7 +2108,7 @@ function ProjectsPage({
   );
 }
 
-function KeywordsPage({ project }: { project: Project }) {
+function KeywordsPage({ project }: { project: Site }) {
   const [query, setQuery] = useState(project.domain || "");
   const [limit, setLimit] = useState(25);
   const [result, setResult] = useState<any>(null);
@@ -2220,7 +2220,7 @@ function KeywordTable({
   );
 }
 
-function SavedPage({ project }: { project: Project }) {
+function SavedPage({ project }: { project: Site }) {
   const [rows, setRows] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -2386,7 +2386,7 @@ function SavedKeywordsTable({
   );
 }
 
-function SerpPage({ project }: { project: Project }) {
+function SerpPage({ project }: { project: Site }) {
   const [keyword, setKeyword] = useState("");
   const [target, setTarget] = useState(project.domain);
   const [result, setResult] = useState<any>(null);
@@ -2488,7 +2488,7 @@ function SerpTable({ rows }: { rows: any[] }) {
   );
 }
 
-function RankPage({ project }: { project: Project }) {
+function RankPage({ project }: { project: Site }) {
   const [trackers, setTrackers] = useState<any[]>([]);
   const [form, setForm] = useState({ domain: project.domain, keywords: "" });
   const [keywordDrafts, setKeywordDrafts] = useState<Record<string, string>>({});
@@ -2727,7 +2727,7 @@ function RankRunsTable({ rows }: { rows: any[] }) {
   );
 }
 
-function DomainPage({ project }: { project: Project }) {
+function DomainPage({ project }: { project: Site }) {
   const navigate = useNavigate();
   const [target, setTarget] = useState(project.domain);
   const [overview, setOverview] = useState<any>(null);
@@ -2800,7 +2800,7 @@ function DomainPage({ project }: { project: Project }) {
     setScanning(true);
     setError("");
     try {
-      const result = await api.scanProject(project.id);
+      const result = await api.scanSite(project.id);
       if (result.audit?.id) {
         setSelectedAuditId(project.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
@@ -3117,7 +3117,7 @@ function DomainPagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function BacklinksPage({ project }: { project: Project }) {
+function BacklinksPage({ project }: { project: Site }) {
   const navigate = useNavigate();
   const [target, setTarget] = useState(project.domain);
   const [overview, setOverview] = useState<any>(null);
@@ -3205,7 +3205,7 @@ function BacklinksPage({ project }: { project: Project }) {
     setScanning(true);
     setError("");
     try {
-      const result = await api.scanProject(project.id);
+      const result = await api.scanSite(project.id);
       if (result.audit?.id) {
         setSelectedAuditId(project.id, result.audit.id);
         navigate(`/audits/${result.audit.id}`);
@@ -3561,7 +3561,7 @@ function BacklinkPagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function BrandLookupPage({ project }: { project: Project }) {
+function BrandLookupPage({ project }: { project: Site }) {
   const [query, setQuery] = useState(project.domain || project.name);
   const [competitors, setCompetitors] = useState("");
   const [result, setResult] = useState<any>(null);
@@ -3706,7 +3706,7 @@ function CitationList({ rows }: { rows: any[] }) {
   );
 }
 
-function PromptExplorerPage({ project }: { project: Project }) {
+function PromptExplorerPage({ project }: { project: Site }) {
   const [prompt, setPrompt] = useState(`What are the best options for ${project.domain || project.name}?`);
   const [highlightBrand, setHighlightBrand] = useState(project.domain || project.name);
   const [models, setModels] = useState<Record<string, boolean>>({
@@ -3942,7 +3942,7 @@ function AuditReportRoute() {
   );
 }
 
-function AuditsPage({ project }: { project: Project }) {
+function AuditsPage({ project }: { project: Site }) {
   const [url, setUrl] = useState(preferredAuditUrl(project));
   const [audits, setAudits] = useState<any[]>([]);
   const [allAudits, setAllAudits] = useState<any[]>([]);
@@ -4047,7 +4047,7 @@ function AuditsPage({ project }: { project: Project }) {
     setManualLedgerAuditId("");
     setManualLedgerSiteId("");
     try {
-      const result = await api.scanProject(project.id);
+      const result = await api.scanSite(project.id);
       setDetail(result.audit);
       setAudits((rows) => upsertAuditRow(rows, result.audit));
       setAllAudits((rows) => upsertAuditRow(rows, result.audit));
@@ -5857,7 +5857,7 @@ function AuditLinkInventoryTable({ rows }: { rows: any[] }) {
   );
 }
 
-function GscPage({ project }: { project: Project }) {
+function GscPage({ project }: { project: Site }) {
   const defaultInspectionUrl = project.domain ? `${preferredAuditUrl(project).replace(/\/$/, "")}/` : "";
   const defaultGscProperty = project.domain ? `sc-domain:${cleanSiteDomain(project.domain).replace(/^www\./i, "")}` : "";
   const [status, setStatus] = useState<any>(null);
@@ -6263,7 +6263,7 @@ function GscInspectionFact({ label, value, wide }: { label: string; value?: stri
   );
 }
 
-function AiPage({ project }: { project: Project }) {
+function AiPage({ project }: { project: Site }) {
   const [prompts, setPrompts] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [type, setType] = useState("seo.coach");

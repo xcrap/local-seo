@@ -9,8 +9,6 @@ export type Site = {
   crawl_host: "auto" | "root" | "www" | "both";
 };
 
-export type Project = Site;
-
 export type KeywordResult = {
   keyword: string;
   searchVolume: number | null;
@@ -50,15 +48,15 @@ export const api = {
   config: () => request<any>("/api/config"),
   saveConfig: (body: Record<string, string>) =>
     request<any>("/api/config", { method: "PUT", body: JSON.stringify(body) }),
-  projects: () => request<Project[]>("/api/sites"),
-  project: (id: string) => request<any>(`/api/sites/${id}`),
-  createProject: (body: Partial<Project>) =>
-    request<Project>("/api/sites", { method: "POST", body: JSON.stringify(body) }),
-  updateProject: (id: string, body: Partial<Project>) =>
-    request<Project>(`/api/sites/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-  deleteProject: (id: string) =>
+  sites: () => request<Site[]>("/api/sites"),
+  site: (id: string) => request<any>(`/api/sites/${id}`),
+  createSite: (body: Partial<Site>) =>
+    request<Site>("/api/sites", { method: "POST", body: JSON.stringify(body) }),
+  updateSite: (id: string, body: Partial<Site>) =>
+    request<Site>(`/api/sites/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteSite: (id: string) =>
     request<any>(`/api/sites/${id}`, { method: "DELETE" }),
-  scanProject: (id: string) =>
+  scanSite: (id: string) =>
     request<any>(`/api/sites/${id}/scan`, { method: "POST" }),
   researchKeywords: (body: any) =>
     request<{ id: string; source: string; rows: KeywordResult[] }>("/api/keywords/research", {

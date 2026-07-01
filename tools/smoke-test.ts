@@ -285,10 +285,20 @@ try {
   if (webApiClient.includes("/api/projects")) {
     throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");
   }
+  for (const legacyWebApiName of ["type Project", "projects:", "project:", "createProject", "updateProject", "deleteProject", "scanProject"]) {
+    if (webApiClient.includes(legacyWebApiName)) {
+      throw new Error(`The web API client should expose site-named helpers, not ${legacyWebApiName}.`);
+    }
+  }
   if (webApiClient.includes("JSON.stringify({ projectId")) {
     throw new Error("The web client should send siteId in request bodies instead of projectId.");
   }
   const webAppClient = await readFile(path.join(rootDir, "web/src/App.tsx"), "utf8");
+  for (const legacyWebCall of ["api.projects", "api.project", "api.createProject", "api.updateProject", "api.deleteProject", "api.scanProject"]) {
+    if (webAppClient.includes(legacyWebCall)) {
+      throw new Error(`The app should call site-named API helpers, not ${legacyWebCall}.`);
+    }
+  }
   if (/type=["']date["']/.test(webAppClient) || !webAppClient.includes("function DatePicker") || !webAppClient.includes("<Calendar")) {
     throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
   }
