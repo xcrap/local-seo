@@ -3738,9 +3738,9 @@ function BrandLookupPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="AI visibility" title="Brand lookup" description="Measure how a brand or domain appears across AI answers, citations, and share-of-voice competitors." />
+      <PageHeader eyebrow="Visibility" title="Brand lookup" description="Check real web-search evidence for a brand or domain. Connected AI visibility sources can add answer-model data." />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
-        <ReportSection title="Lookup" description="Competitors can be comma-separated or one per line.">
+        <ReportSection title="Lookup" description="Competitors can be comma-separated or one per line. Local mode compares real search evidence and saves the run in SQLite.">
           <form className="space-y-4" onSubmit={submit}>
             <Field label="Brand or domain"><Input value={query} onChange={(event) => setQuery(event.target.value)} required /></Field>
             <Field label="Competitors"><Textarea value={competitors} onChange={(event) => setCompetitors(event.target.value)} placeholder="competitor.com, otherbrand" /></Field>
@@ -3748,7 +3748,7 @@ function BrandLookupPage({ site }: { site: Site }) {
           </form>
         </ReportSection>
         <div className="space-y-6">
-          {result ? <BrandLookupResult result={result} /> : <EmptyState title="No lookup yet" text="Run a brand lookup to save an AI visibility snapshot." />}
+          {result ? <BrandLookupResult result={result} /> : <EmptyState title="No lookup yet" text="Run a brand lookup to save local visibility evidence." />}
           <HistoryList title="Lookup history" rows={runs} labelKey="query" labelTitle="Brand or domain" />
         </div>
       </div>

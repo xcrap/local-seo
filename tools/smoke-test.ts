@@ -421,6 +421,9 @@ try {
   if (webAppClient.includes("target domain")) {
     throw new Error("SERP analysis should not expose vague target-domain placeholder copy.");
   }
+  if (webAppClient.includes("appears across AI answers") || webAppClient.includes("save an AI visibility snapshot")) {
+    throw new Error("Brand lookup copy should not promise AI-answer evidence when local mode uses web-search evidence.");
+  }
   if (seoSource.includes("Target is required")) {
     throw new Error("SEO API errors should ask for a domain, not a vague target.");
   }
