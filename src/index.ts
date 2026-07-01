@@ -289,18 +289,18 @@ async function startSavedSiteScan(c: any) {
       {
         key: "domain-intelligence",
         label: "Organic research",
-        status: config.dataforseo_api_key ? "queued" : "local",
+        status: config.seo_metrics_source_connected ? "queued" : "local",
         route: "/domain",
-        message: config.dataforseo_api_key
+        message: config.seo_metrics_source_connected
           ? "Ranked keyword and top-page snapshot is queued."
           : "Local crawl evidence will be available from this scan. Connect a real organic dataset only for ranked keywords and traffic estimates.",
       },
       {
         key: "links",
         label: "Links",
-        status: config.dataforseo_api_key ? "queued" : "local",
+        status: config.seo_metrics_source_connected ? "queued" : "local",
         route: "/backlinks",
-        message: config.dataforseo_api_key
+        message: config.seo_metrics_source_connected
           ? "Backlink overview snapshot is queued."
           : "Local internal, external, and broken-link evidence will be available from this scan. Connect or import a backlink index only for web-wide backlinks.",
       },

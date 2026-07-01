@@ -8,6 +8,7 @@ const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
 process.env.DB_PATH = path.join(tempDir, "scope.sqlite");
 process.env.DATAFORSEO_API_KEY = "";
+process.env.SEO_METRICS_API_KEY = "";
 process.env.CODEX_MODEL = "";
 process.env.CODEX_REASONING_EFFORT = "";
 const { sameSiteUrl } = await import("../src/seo");
@@ -306,6 +307,9 @@ try {
   if (!/OpenSERP/i.test(envExampleSource + readmeSource) || !/SearXNG/i.test(envExampleSource + readmeSource)) {
     throw new Error("Docs should expose free/self-hosted SERP providers before optional paid metrics.");
   }
+  if (/DataForSEO|DATAFORSEO/.test(envExampleSource + readmeSource)) {
+    throw new Error("Docs and env examples should stay vendor-neutral for optional external metrics sources.");
+  }
   const apiServerSource = await readFile(path.join(rootDir, "src/index.ts"), "utf8");
   if (apiServerSource.includes('"/api/projects')) {
     throw new Error("Public API routes should expose /api/sites only, not legacy /api/projects aliases.");
@@ -344,6 +348,9 @@ try {
     throw new Error("The web client should send siteId in request bodies instead of projectId.");
   }
   const webAppClient = await readFile(path.join(rootDir, "web/src/App.tsx"), "utf8");
+  if (/DataForSEO|DATAFORSEO/.test(webAppClient)) {
+    throw new Error("The React UI should not advertise a paid metrics provider by name.");
+  }
   if (webAppClient.includes('path="/projects"') || webAppClient.includes('to="/projects"')) {
     throw new Error("The React app should not expose or redirect a legacy /projects route.");
   }
@@ -569,7 +576,10 @@ try {
   });
   const rejectedSecretConfig = await requestFailure("/api/config", {
     method: "PUT",
-    body: JSON.stringify({ dataforseo_api_key: "should-not-save-here" }),
+    body: JSON.stringify({
+      dataforseo_api_key: "should-not-save-here",
+      seo_metrics_api_key: "should-not-save-here",
+    }),
   });
   if (!/App settings cannot save/i.test(String(rejectedSecretConfig.data?.error || ""))) {
     throw new Error(`App settings API should reject secret/data-source keys: ${JSON.stringify(rejectedSecretConfig)}`);

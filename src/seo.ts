@@ -320,8 +320,8 @@ export function deleteSite(siteId: string) {
 }
 
 async function dataForSeo(pathname: string, payload: unknown) {
-  const apiKey = getConfigValue("dataforseo_api_key");
-  if (!apiKey) throw new Error("DataForSEO API key is not configured.");
+  const apiKey = getConfigValue("seo_metrics_api_key");
+  if (!apiKey) throw new Error("SEO metrics source is not configured.");
   const response = await fetch(`https://api.dataforseo.com${pathname}`, {
     method: "POST",
     headers: {
@@ -332,13 +332,13 @@ async function dataForSeo(pathname: string, payload: unknown) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`DataForSEO ${response.status}: ${JSON.stringify(data).slice(0, 300)}`);
+    throw new Error(`Connected SEO metrics source ${response.status}: ${JSON.stringify(data).slice(0, 300)}`);
   }
   return data as Record<string, any>;
 }
 
 function dataForSeoReady() {
-  return Boolean(getConfigValue("dataforseo_api_key"));
+  return Boolean(getConfigValue("seo_metrics_api_key"));
 }
 
 function providerRequiredMessage(feature: string) {
@@ -479,7 +479,7 @@ export async function researchKeywords(input: {
       warning = "";
     } catch (error) {
       source = "dataforseo-error";
-      warning = error instanceof Error ? error.message : "DataForSEO failed";
+      warning = error instanceof Error ? error.message : "Connected SEO metrics source failed";
     }
   } else {
     try {
@@ -1108,7 +1108,7 @@ export async function domainOverview(input: { siteId: string; domain?: string })
       estimatedValue: null,
       competitors: [],
       topPages: [],
-      warning: error instanceof Error ? error.message : "DataForSEO failed",
+      warning: error instanceof Error ? error.message : "Connected SEO metrics source failed",
     });
   }
   run(
@@ -1286,7 +1286,7 @@ export async function getDomainKeywordsPage(input: {
       }
     } catch (error) {
       source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "DataForSEO ranked keywords failed";
+      result.warning = error instanceof Error ? error.message : "Connected ranked-keyword source failed";
     }
   }
 
@@ -1365,7 +1365,7 @@ export async function getDomainPagesPage(input: {
       }
     } catch (error) {
       source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "DataForSEO relevant pages failed";
+      result.warning = error instanceof Error ? error.message : "Connected top-pages source failed";
     }
   }
 
@@ -1426,7 +1426,7 @@ export async function backlinksOverview(input: { siteId: string; domain?: string
       dofollowRatio: null,
       topAnchors: [],
       prospects: [],
-      warning: error instanceof Error ? error.message : "DataForSEO failed",
+      warning: error instanceof Error ? error.message : "Connected backlink index failed",
     });
   }
   run(
@@ -1539,7 +1539,7 @@ export async function getBacklinksProfile(input: {
       }
     } catch (error) {
       source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "DataForSEO backlinks profile failed";
+      result.warning = error instanceof Error ? error.message : "Connected backlink index failed";
     }
   }
 
@@ -1689,7 +1689,7 @@ export async function getSerpAnalysis(input: {
       }
     } catch (error) {
       source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "DataForSEO SERP failed";
+      result.warning = error instanceof Error ? error.message : "Connected SERP source failed";
     }
   } else {
     try {
@@ -1781,7 +1781,7 @@ export async function brandLookup(input: {
       source = "dataforseo";
     } catch (error) {
       source = "dataforseo-error";
-      result.warning = error instanceof Error ? error.message : "DataForSEO AI visibility failed";
+      result.warning = error instanceof Error ? error.message : "Connected AI visibility source failed";
     }
   } else {
     try {

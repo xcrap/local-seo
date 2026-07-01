@@ -757,7 +757,7 @@ function formatDate(value: string) {
 
 function sourceLabel(source?: string) {
   const labels: Record<string, string> = {
-    dataforseo: "DataForSEO",
+    dataforseo: "Connected SEO source",
     "provider-not-configured": "Not connected",
     "dataforseo-error": "Data source error",
     "duckduckgo-suggest": "DuckDuckGo suggest",
@@ -3246,7 +3246,7 @@ function BacklinksPage({ site }: { site: Site }) {
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
-  const backlinkIndexConnected = Boolean(config?.dataforseo_api_key);
+  const backlinkIndexConnected = Boolean(config?.seo_metrics_source_connected);
   const selectedAudit = useMemo(
     () => auditRows.find((audit) => audit.id === selectedAuditId) || defaultEvidenceAudit(auditRows),
     [auditRows, selectedAuditId],
@@ -6871,7 +6871,7 @@ function SettingsPage() {
               { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless a metrics source is connected." },
               { title: "SERP and rank checks", status: serpProviderStatus(config), tone: "good", text: "Uses local/self-hosted OpenSERP or SearXNG when configured, otherwise live DuckDuckGo results. The source is shown on each report." },
               { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally. Google connection is optional for live performance and URL inspection." },
-              { title: "Backlink index", status: config.dataforseo_api_key ? "Connected" : "Not connected", tone: config.dataforseo_api_key ? "good" : "warn", text: "No generated backlink rows are shown. Web-wide backlink rows require a real backlink index." },
+              { title: "Backlink index", status: config.seo_metrics_source_connected ? "Connected" : "Not connected", tone: config.seo_metrics_source_connected ? "good" : "warn", text: "No generated backlink rows are shown. Web-wide backlink rows require a real backlink index." },
               { title: "MCP endpoint", status: "Local", tone: "good", text: "The local JSON-RPC endpoint is available from the MCP screen." },
             ]}
           />

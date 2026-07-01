@@ -11,7 +11,7 @@ auth service.
 - Real local crawler data for technical SEO audits
 - Real DuckDuckGo suggestions/search results for free keyword ideas and web SERP checks
 - Optional self-hosted OpenSERP or SearXNG for free/local SERP and rank checks
-- Optional external SEO metrics/index datasets only when a real API key is configured
+- Optional external SEO metrics/index datasets only when a real source is configured
 - Google Search Console OAuth and performance querying
 - Local Codex jobs with medium reasoning by default
 - Local MCP JSON-RPC endpoint at `/mcp`
@@ -20,11 +20,11 @@ auth service.
 ## OpenSEO-Inspired Local Workflows
 
 - **Sites:** saved websites with domain, crawl URL preferences, optional keyword tool defaults, and notes.
-- **Keyword research:** real DuckDuckGo suggestions, with metrics only when a real metrics source is configured.
+- **Keyword research:** real DuckDuckGo suggestions, with metrics only when a real metrics source or import is configured.
 - **SERP analysis:** live web result snapshots, active-site ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
-- **Organic research:** ranked keywords and top pages for the active site or a comparison site when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
+- **Organic research:** local audit pages for the active site, plus ranked keywords and traffic estimates only when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
 - **Links and backlinks:** local crawl link graph from audits, plus backlink overview, backlink rows, referring domains, and top linked pages only from a real backlink index.
 - **Site audits:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, page response timing, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
 - **Brand lookup:** real web-search evidence and optional AI visibility datasets when connected.
@@ -46,7 +46,7 @@ Open `http://localhost:5173` during development. The API runs on
 
 `.env` is optional for the local product. Create it only when connecting
 optional data-source credentials such as Google OAuth, a self-hosted OpenSERP
-or SearXNG URL, an external SEO metrics/index key, MCP token, or a custom Codex
+or SearXNG URL, an external SEO metrics/index credential, MCP token, or a custom Codex
 model. In-app Settings are for app preferences, not secret fields.
 
 The first load lets you create the local admin user in the browser. You can also
@@ -67,8 +67,10 @@ domain.
 SERP and rank checks can use self-hosted OpenSERP, self-hosted SearXNG, or the
 built-in DuckDuckGo fallback. External SEO metrics are never generated locally.
 Backlink indexes, Google keyword volumes, CPC, keyword difficulty, and
-third-party traffic estimates require a real data source or imported data. The
-app shows not-connected states instead of invented rows.
+third-party traffic estimates require a real data source or imported data. Local
+audits still feed technical pages, internal/external links, images, assets,
+sitemap, robots, and response timing into reports. The app shows not-connected
+states instead of invented rows.
 
 This app is local-first and intentionally removes OpenSEO hosted features:
 billing, teams/orgs, hosted auth, Cloudflare Workers, D1, KV, R2, queues, and
