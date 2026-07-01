@@ -277,8 +277,11 @@ try {
       throw new Error(`Organic and Links pages should use selected-site/competitor wording, not "${legacyTargetLabel}".`);
     }
   }
-  if (!webAppClient.includes("Organic research site") || !webAppClient.includes("Backlink index site")) {
-    throw new Error("Organic and Links pages should label their domain inputs as site-specific controls.");
+  if (webAppClient.includes("target domain")) {
+    throw new Error("SERP analysis should not expose vague target-domain placeholder copy.");
+  }
+  if (!webAppClient.includes("Organic research site") || !webAppClient.includes("Backlink index site") || !webAppClient.includes("SERP ownership site")) {
+    throw new Error("Competitive pages should label their domain inputs as site-specific controls.");
   }
   if (!webAppClient.includes("Issue results") || !webAppClient.includes("Show {formatNumber")) {
     throw new Error("Audit issue actions should show an explicit filtered issue result count instead of generic Review buttons.");
@@ -295,7 +298,7 @@ try {
   if (webAppClient.includes(".slice(0, 25);")) {
     throw new Error("Local organic crawl evidence should not silently cap audit-derived page rows.");
   }
-  if (webAppClient.includes("rows.slice(0, 6)")) {
+  if (webAppClient.includes("rows.slice(0, 6)") || webAppClient.includes("runs.slice(0, 8)")) {
     throw new Error("Local history widgets should not silently cap saved history rows.");
   }
   for (const pattern of [

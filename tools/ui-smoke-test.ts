@@ -398,6 +398,11 @@ try {
     if (await page.getByLabel("Backlink index site").inputValue() !== "second.test") {
       throw new Error("Links target did not follow the newly selected site.");
     }
+    await page.getByRole("navigation").getByRole("link", { name: /^SERP analysis$/ }).click();
+    await page.getByLabel("SERP ownership site").waitFor();
+    if (await page.getByLabel("SERP ownership site").inputValue() !== "second.test") {
+      throw new Error("SERP ownership site did not follow the newly selected site.");
+    }
   } finally {
     await browser.close();
   }

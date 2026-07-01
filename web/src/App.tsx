@@ -2365,12 +2365,20 @@ function SerpPage({ project }: { project: Project }) {
 
   return (
     <>
-      <PageHeader eyebrow="SERP" title="SERP analysis" description="Inspect ranking pages, target ownership, intent mix, and content opportunities for one query." />
+      <PageHeader eyebrow="SERP" title="SERP analysis" description="Inspect ranking pages, selected-site ownership, intent mix, and content opportunities for one query." />
       <section className="rounded-md border bg-background p-5">
-        <form className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]" onSubmit={submit}>
-          <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="keyword" required />
-          <Input value={target} onChange={(event) => setTarget(event.target.value)} placeholder="target domain" />
-          <Button disabled={loading}><Activity /> {loading ? "Analyzing" : "Analyze SERP"}</Button>
+        <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end" onSubmit={submit}>
+          <Field label="Search query">
+            <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="best local seo tool" required />
+          </Field>
+          <SiteTargetField
+            label="SERP ownership site"
+            value={target}
+            siteDomain={project.domain}
+            hint="Use the selected site or enter a competitor domain to highlight matching ranking rows."
+            onChange={setTarget}
+          />
+          <Button disabled={loading || !keyword.trim()}><Activity /> {loading ? "Analyzing" : "Analyze SERP"}</Button>
         </form>
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       </section>
@@ -2381,7 +2389,7 @@ function SerpPage({ project }: { project: Project }) {
             result ? (
               <span className="flex flex-wrap items-center gap-2">
                 <SourceBadge source={result.source} />
-                <span>Target position: {result.targetPosition || "not found"}</span>
+                <span>Selected site position: {result.targetPosition || "not found"}</span>
                 {result.warning ? <span>{result.warning}</span> : null}
               </span>
             ) : "Run a query to inspect the SERP."
@@ -2391,7 +2399,7 @@ function SerpPage({ project }: { project: Project }) {
         </ReportSection>
         <ReportSection title="History">
           <div className="space-y-2">
-            {runs.length ? runs.slice(0, 8).map((run) => (
+            {runs.length ? runs.map((run) => (
               <div key={run.id} className="rounded-md border bg-background p-3 text-sm">
                 <div className="font-medium">{run.keyword}</div>
                 <div className="text-xs text-muted-foreground">{run.source} · {run.created_at}</div>
