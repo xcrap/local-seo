@@ -85,7 +85,7 @@ const tools = [
   },
   {
     name: "analyze_serp",
-    description: "Analyze one Google SERP for a keyword and target domain.",
+    description: "Analyze one Google SERP for a keyword and check ownership for the selected site or a comparison site.",
     inputSchema: {
       type: "object",
       properties: {

@@ -245,6 +245,10 @@ try {
   if (gscSource.includes(".slice(0, 5000)")) {
     throw new Error("Search Console CSV imports must not silently drop rows after 5,000 entries.");
   }
+  const readmeSource = await readFile(path.join(rootDir, "README.md"), "utf8");
+  if (/target domain/i.test(readmeSource)) {
+    throw new Error("README should explain selected-site/comparison-site workflows instead of vague target-domain wording.");
+  }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
   if (webApiClient.includes("/api/projects")) {
     throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");
@@ -938,7 +942,7 @@ try {
     }
   }
   const legacyDescriptionTool = (mcp.result?.tools || []).find((tool: any) =>
-    /^Legacy alias:/i.test(tool.description || "") || /workspace/i.test(tool.description || ""),
+    /^Legacy alias:/i.test(tool.description || "") || /workspace|target domain|project/i.test(tool.description || ""),
   );
   if (legacyDescriptionTool) {
     throw new Error(`MCP tools/list should not advertise legacy project/workspace copy: ${legacyDescriptionTool.name}`);

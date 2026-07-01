@@ -23,7 +23,7 @@ auth service.
 - **SERP analysis:** live web result snapshots, target ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
-- **Organic research:** ranked keywords and top pages for a target domain when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
+- **Organic research:** ranked keywords and top pages for the selected site or a comparison site when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
 - **Links and backlinks:** local crawl link graph from audits, plus backlink overview, backlink rows, referring domains, and top linked pages only from a real backlink index.
 - **Site audits:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
 - **Brand lookup:** real web-search evidence and optional AI visibility datasets when connected.
