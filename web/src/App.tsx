@@ -895,7 +895,7 @@ function scanPhaseKey(scan: any) {
   if (phase.includes("links")) return "links";
   if (phase.includes("crawl")) return "crawl";
   if (phase.includes("robots")) return "robots";
-  return "target";
+  return "resolve";
 }
 
 function scanPhaseLabel(scan: any) {
@@ -909,7 +909,7 @@ function scanPhaseLabel(scan: any) {
     links: "Checking links",
     crawl: "Crawling pages",
     robots: "Reading robots and sitemap",
-    target: "Resolving start URL",
+    resolve: "Resolving start URL",
   };
   return labels[scanPhaseKey(scan)] || "Scanning";
 }
@@ -5452,7 +5452,7 @@ type ScanStepState = "complete" | "running" | "pending" | "failed";
 
 function scanStepIndex(scan: any) {
   const order: Record<string, number> = {
-    target: 0,
+    resolve: 0,
     queued: 0,
     robots: 1,
     crawl: 2,

@@ -424,6 +424,9 @@ try {
   if (/First scan target|target candidates|Resolve target|tries \$\{formatNumber\(candidates\.length\)\} targets|tries \d+ targets/i.test(webAppClient)) {
     throw new Error("The app should present saved-site crawl settings as explicit crawl URLs, not vague target wording.");
   }
+  if (webAppClient.includes('return "target"') || webAppClient.includes("target: \"Resolving start URL\"")) {
+    throw new Error("Scan progress internals should name the first step resolve/start URL, not target.");
+  }
   if (!webAppClient.includes("Scan plan")) {
     throw new Error("The main site flow should expose the saved site's scan plan.");
   }
