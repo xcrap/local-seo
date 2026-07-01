@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Activity, BarChart3, Bot, ExternalLink, Gauge, RefreshCw, Search, Settings, Target, Upload } from "lucide-react";
+import { BarChart3, Bot, ExternalLink, RefreshCw, Settings, Upload } from "lucide-react";
 import { api, type Site } from "../../api";
 import { Badge, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from "@/components/ui";
-import { DatePicker, EmptyState, Field, JobTable, PageHeader, ReportSection, StatsBand, StatusEvidenceTable, cleanSiteDomain, crawlHostOptions, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatDate, formatNumber, formatPercent, formatPosition, languageOptions, marketOptions, preferredScanUrl, serpProviderStatus } from "../shared";
+import { DatePicker, EmptyState, Field, InfoTip, JobTable, PageHeader, ReportSection, StatsBand, StatusDot, StatusEvidenceTable, cleanSiteDomain, crawlHostOptions, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatDate, formatNumber, formatPercent, formatPosition, languageOptions, marketOptions, preferredScanUrl, serpProviderStatus } from "../shared";
 import { cn } from "@/lib/utils";
 
 export function GscPage({ site }: { site: Site }) {
@@ -25,6 +25,8 @@ export function GscPage({ site }: { site: Site }) {
   const [dateRange, setDateRange] = useState({ startDate: defaultStartDate, endDate: defaultEndDate });
   const latestImport = imports[0];
   const selectedGscProperty = status?.connection?.siteUrl || "";
+  const connectionTone = status?.connected || imports.length ? "good" : status?.configured ? "warn" : "outline";
+  const connectionLabel = status?.connected ? "Connected" : imports.length ? "Local imports" : status?.configured ? "Ready to connect" : "OAuth missing";
 
   async function load() {
     const [nextStatus, nextImports] = await Promise.all([
@@ -151,12 +153,23 @@ export function GscPage({ site }: { site: Site }) {
   return (
     <>
       <PageHeader
-        eyebrow="Google"
         title="Search Console"
         description="Connect Google when OAuth is available, or import a Search Console CSV into local SQLite."
-        action={<Badge variant={status?.connected || imports.length ? "good" : status?.configured ? "warn" : "outline"}>{status?.connected ? "Connected" : imports.length ? "Local imports" : status?.configured ? "Ready to connect" : "OAuth missing"}</Badge>}
+        meta={
+          <span className="flex flex-wrap items-center gap-x-2">
+            <span className="inline-flex items-center gap-1.5">
+              <StatusDot tone={connectionTone} /> {connectionLabel}
+            </span>
+            {imports.length ? (
+              <>
+                <span className="text-border">·</span>
+                <span>{formatNumber(imports.length)} local {imports.length === 1 ? "import" : "imports"}</span>
+              </>
+            ) : null}
+          </span>
+        }
       />
-      {error ? <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="mb-4 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
       <Tabs value={gscTab} onValueChange={setGscTab} className="space-y-5">
         <TabsList>
           <TabsTrigger value="performance">Performance</TabsTrigger>
@@ -167,7 +180,8 @@ export function GscPage({ site }: { site: Site }) {
         <TabsContent value="performance" className="space-y-5">
           <ReportSection
             title="Performance rows"
-            description={performance?.source === "import" ? `Viewing ${performance.import?.sourceName || "local import"} from ${formatDate(performance.import?.createdAt)}` : "Clicks, impressions, CTR, and average position from Search Console."}
+            description="Clicks, impressions, CTR, and average position from Search Console."
+            meta={performance?.source === "import" ? `Viewing ${performance.import?.sourceName || "local import"} · ${formatDate(performance.import?.createdAt)}` : undefined}
           >
             <div className="mb-5 grid gap-3 md:grid-cols-[1fr_1fr_180px_auto_auto]">
               <Field label="Start date">
@@ -210,7 +224,8 @@ export function GscPage({ site }: { site: Site }) {
         <TabsContent value="import" className="space-y-5">
           <ReportSection
             title="Local CSV import"
-            description="Export Search Console performance as CSV and store it in this app's SQLite database."
+            description="Export Search Console performance as CSV and store it in this app's SQLite database. Saved imports reopen without Google OAuth."
+            meta={imports.length ? `${formatNumber(imports.length)} saved` : undefined}
           >
             <div className="grid gap-4 lg:grid-cols-[minmax(260px,360px)_minmax(260px,1fr)]">
               <Field label="Property label">
@@ -220,20 +235,13 @@ export function GscPage({ site }: { site: Site }) {
                 <Input type="file" accept=".csv,text/csv" onChange={importCsv} disabled={loading === "import"} />
               </Field>
             </div>
-            <div className="mt-5">
-              {latestImport ? (
-                <StatusEvidenceTable
-                  rows={[
-                    { title: "Latest import", status: "Saved", tone: "good", text: `${latestImport.sourceName || "Search Console CSV"} · ${formatDate(latestImport.createdAt)}` },
-                    { title: "Rows", status: formatNumber(latestImport.rowCount), tone: "good", text: `${formatNumber(latestImport.totals?.clicks || 0)} clicks · ${formatNumber(latestImport.totals?.impressions || 0)} impressions` },
-                    { title: "Storage", status: "SQLite", tone: "good", text: "Rows are stored locally and can be reopened without Google OAuth." },
-                  ]}
-                />
-              ) : (
+            {imports.length ? (
+              <GscImportHistory rows={imports} onOpen={showImport} />
+            ) : (
+              <div className="mt-5">
                 <EmptyState title="No imports yet" text="Choose a Search Console CSV export to save real performance evidence locally." />
-              )}
-            </div>
-            {imports.length ? <GscImportHistory rows={imports} onOpen={showImport} /> : null}
+              </div>
+            )}
           </ReportSection>
         </TabsContent>
         <TabsContent value="inspection" className="space-y-5">
@@ -249,16 +257,8 @@ export function GscPage({ site }: { site: Site }) {
                     status: selectedGscProperty ? "Google API ready" : "Google property required",
                     tone: selectedGscProperty ? "good" : "warn",
                     text: selectedGscProperty
-                      ? `Live inspection will use ${selectedGscProperty}.`
-                      : "Local CSV imports cover performance rows only; Google URL Inspection is a live Search Console API.",
-                  },
-                  {
-                    title: "Default URL",
-                    status: defaultInspectionUrl || "No site",
-                    tone: defaultInspectionUrl ? "good" : "warn",
-                    text: defaultInspectionUrl
-                      ? "Generated from the active site's saved scan protocol and host variant."
-                      : "Add a website address before inspecting URLs.",
+                      ? `Live inspection uses ${selectedGscProperty}.`
+                      : "Local CSV imports cover performance rows only; live URL inspection needs a connected Google property.",
                   },
                 ]}
               />
@@ -278,12 +278,21 @@ export function GscPage({ site }: { site: Site }) {
         <TabsContent value="connection" className="space-y-5">
           <ReportSection
             title="Google connection"
-            description={status?.configured ? "OAuth is available in this local runtime." : "OAuth is not configured; local CSV import still works."}
+            description="Connect once for live performance queries and URL inspection. Local CSV import works without Google."
           >
             <div className="space-y-4">
               <StatusEvidenceTable
                 rows={[
-                  { title: "Google account", status: status?.connected ? "Connected" : "Not connected", tone: status?.connected ? "good" : "warn", text: status?.connection?.accountEmail || "Connect once, then choose the matching property." },
+                  {
+                    title: "Google account",
+                    status: status?.connected ? "Connected" : "Not connected",
+                    tone: status?.connected ? "good" : "warn",
+                    text:
+                      status?.connection?.accountEmail ||
+                      (status?.configured
+                        ? "Connect once, then choose the matching property."
+                        : "OAuth is not configured in this local runtime; local CSV import still works."),
+                  },
                   { title: "Selected property", status: status?.connection?.siteUrl ? "Selected" : "None", tone: status?.connection?.siteUrl ? "good" : "warn", text: status?.connection?.siteUrl || "Load properties and pick the property for this site." },
                 ]}
               />
@@ -312,7 +321,7 @@ export function GscPage({ site }: { site: Site }) {
 
 function GscImportHistory({ rows, onOpen }: { rows: any[]; onOpen: (row: any) => void }) {
   return (
-    <div className="mt-5 overflow-hidden rounded-md border">
+    <div className="mt-5">
       <Table>
         <TableHeader>
           <TableRow>
@@ -322,21 +331,22 @@ function GscImportHistory({ rows, onOpen }: { rows: any[]; onOpen: (row: any) =>
             <TableHead>Clicks</TableHead>
             <TableHead>Impressions</TableHead>
             <TableHead>Date</TableHead>
-            <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
-            <TableRow key={row.id}>
+            <TableRow
+              key={row.id}
+              className="cursor-pointer"
+              title={`Open ${row.sourceName || "Search Console CSV"}`}
+              onClick={() => onOpen(row)}
+            >
               <TableCell className="font-medium">{row.sourceName || "Search Console CSV"}</TableCell>
               <TableCell className="break-all text-sm text-muted-foreground">{row.siteUrl || "-"}</TableCell>
               <TableCell className="nums">{formatNumber(row.rowCount)}</TableCell>
               <TableCell className="nums">{formatNumber(row.totals?.clicks || 0)}</TableCell>
               <TableCell className="nums">{formatNumber(row.totals?.impressions || 0)}</TableCell>
               <TableCell>{formatDate(row.createdAt)}</TableCell>
-              <TableCell className="text-right">
-                <Button size="sm" variant="outline" onClick={() => onOpen(row)}>Open</Button>
-              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -357,12 +367,11 @@ function GscPerformanceSummary({ rows }: { rows: any[] }) {
   const position = totals.impressions ? totals.weightedPosition / totals.impressions : 0;
   return (
     <StatsBand
-      title="Performance totals"
       items={[
-        { title: "Clicks", value: totals.clicks, icon: Activity },
-        { title: "Impressions", value: totals.impressions, icon: Search },
-        { title: "CTR %", value: Number((ctr * 100).toFixed(1)), icon: Gauge },
-        { title: "Avg. position", value: Number(position.toFixed(1)), icon: Target },
+        { title: "Clicks", value: totals.clicks },
+        { title: "Impressions", value: totals.impressions },
+        { title: "CTR %", value: Number((ctr * 100).toFixed(1)) },
+        { title: "Avg. position", value: Number(position.toFixed(1)) },
       ]}
     />
   );
@@ -487,7 +496,11 @@ export function AiPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Local Codex" title="AI lab" description="SEO coach, keyword clustering, scan prioritization, competitor gaps, and AI visibility through local Codex medium jobs." />
+      <PageHeader
+        title="AI lab"
+        description="SEO coach, keyword clustering, scan prioritization, competitor gaps, and AI visibility through local Codex medium jobs."
+        meta={`${formatNumber(jobs.length)} saved ${jobs.length === 1 ? "job" : "jobs"}`}
+      />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
         <ReportSection title="Run Codex" description="Jobs are queued in SQLite and run through your local Codex CLI.">
           <form className="space-y-4" onSubmit={submit}>
@@ -504,13 +517,11 @@ export function AiPage({ site }: { site: Site }) {
         <div className="space-y-6">
           <ReportSection
             title="Jobs"
-            description={
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span>Saved local Codex runs from SQLite.</span>
-                <Button size="sm" variant="outline" type="button" onClick={() => load().catch(console.error)}>
-                  <RefreshCw /> Refresh
-                </Button>
-              </div>
+            meta="Saved local Codex runs from SQLite."
+            action={
+              <Button size="sm" variant="outline" type="button" onClick={() => load().catch(console.error)}>
+                <RefreshCw /> Refresh
+              </Button>
             }
           >
             {jobs.length ? <JobTable rows={jobs} selectedId={activeJob?.id || ""} onSelect={setActiveJobId} /> : <EmptyState title="No jobs" text="Start a local Codex workflow." />}
@@ -526,21 +537,24 @@ function AiJobOutput({ job }: { job: any }) {
   return (
     <ReportSection
       title="Job output"
-      description={job ? `${job.type} · ${formatDate(job.created_at)}` : "Select a saved Codex job to read its full local result."}
+      meta={job ? `${job.type} · ${formatDate(job.created_at)}` : undefined}
     >
       {job ? (
         <div className="space-y-4">
-          <StatusEvidenceTable
-            rows={[
-              { title: "Status", status: job.status || "-", tone: job.status === "completed" ? "good" : job.status === "failed" ? "bad" : "warn", text: job.message || "Local Codex job state." },
-              { title: "Started", status: job.started_at ? formatDate(job.started_at) : "-", tone: "outline", text: "Timestamp stored in local SQLite for this job." },
-              { title: "Finished", status: job.finished_at ? formatDate(job.finished_at) : "-", tone: job.finished_at ? "good" : "outline", text: "Completion timestamp from the saved job row." },
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="inline-flex items-center gap-2 font-medium">
+              <StatusDot tone={job.status === "completed" ? "good" : job.status === "failed" ? "bad" : "warn"} />
+              {job.status || "-"}
+            </span>
+            <span className="text-muted-foreground">
+              {job.started_at ? `· started ${formatDate(job.started_at)}` : "· not started"}
+              {job.finished_at ? ` · finished ${formatDate(job.finished_at)}` : ""}
+            </span>
+          </div>
           {job.error ? (
-            <pre className="max-h-[520px] overflow-auto rounded-md border border-destructive/40 bg-muted/30 p-4 text-sm leading-6 text-destructive whitespace-pre-wrap">{job.error}</pre>
+            <pre className="max-h-[520px] overflow-auto rounded-lg bg-bad-soft/40 p-4 text-sm leading-6 text-destructive whitespace-pre-wrap">{job.error}</pre>
           ) : job.result_text ? (
-            <pre className="max-h-[520px] overflow-auto rounded-md border bg-muted/30 p-4 text-sm leading-6 whitespace-pre-wrap">{job.result_text}</pre>
+            <pre className="max-h-[520px] overflow-auto rounded-lg bg-muted/45 p-4 text-sm leading-6 whitespace-pre-wrap">{job.result_text}</pre>
           ) : (
             <EmptyState title={job.status === "queued" || job.status === "running" ? "Codex is working" : "No output yet"} text={job.message || "The saved job has not produced text yet."} />
           )}
@@ -607,44 +621,24 @@ export function McpPage({ site }: { site: Site }) {
   return (
     <>
       <PageHeader
-        eyebrow="Agents"
         title="MCP"
         description="Local JSON-RPC tools for sites, scans, keywords, rank tracking, Search Console, AI jobs, and reports."
-        action={<Badge variant="good">{formatNumber(tools.length)} tools</Badge>}
+        meta={`${formatNumber(tools.length)} local tools · calls prefilled for ${site.name || exampleDomain || "the active site"}`}
       />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <ReportSection title="Endpoint" description="Use this from local agents and scripts.">
-            <div className="space-y-3">
-              <code className="block break-all rounded-md bg-secondary px-3 py-2 text-sm">{`POST ${endpoint}`}</code>
-              <p className="text-sm text-muted-foreground">If a local token is configured, include `Authorization: Bearer ...` with the request.</p>
-            </div>
+        <div className="space-y-6">
+          <ReportSection title="Endpoint" description="Use this from local agents and scripts. If a local token is configured, include an Authorization: Bearer header with the request.">
+            <code className="block break-all rounded-md bg-secondary px-3 py-2 text-sm">{`POST ${endpoint}`}</code>
           </ReportSection>
-          <ReportSection title="Active site" description="Examples below are ready for this site.">
-            <StatusEvidenceTable
-              rows={[
-                {
-                  title: site.name || exampleDomain || "Active site",
-                  status: exampleDomain || "No website address",
-                  tone: "good",
-                  text: `siteId ${exampleSiteId}`,
-                },
-              ]}
-            />
-          </ReportSection>
-          <ReportSection title="Common calls" description="Known-good JSON-RPC request shapes.">
-            <div className="space-y-3">
+          <ReportSection title="Common calls" description="Known-good JSON-RPC request shapes, prefilled with this site's siteId and domain.">
+            <div className="space-y-4">
               {examples.map((example) => <McpExample key={example.title} title={example.title} value={example.body} />)}
             </div>
           </ReportSection>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-6">
           {Object.entries(groupedTools).map(([group, rows]) => (
-            <ReportSection
-              key={group}
-              title={group}
-              description={`${formatNumber(rows.length)} local MCP tools`}
-            >
+            <ReportSection key={group} title={group} meta={`${formatNumber(rows.length)} tools`}>
               <McpToolTable rows={rows} />
             </ReportSection>
           ))}
@@ -701,9 +695,9 @@ function mcpToolGroup(name: string) {
 
 function McpExample({ title, value }: { title: string; value: unknown }) {
   return (
-    <div className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-3">
-      <div className="font-medium">{title}</div>
-      <pre className="mt-2 overflow-auto rounded-md bg-secondary p-3 text-xs leading-relaxed text-secondary-foreground">
+    <div>
+      <div className="text-sm font-medium">{title}</div>
+      <pre className="mt-1.5 overflow-auto rounded-md bg-secondary p-3 text-xs leading-relaxed text-secondary-foreground">
         {JSON.stringify(value, null, 2)}
       </pre>
     </div>
@@ -762,9 +756,9 @@ export function SettingsPage() {
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
         <ReportSection title="App preferences" description="Defaults used when a new site is added. Existing sites keep their own saved settings.">
           <form className="space-y-5" onSubmit={save}>
-            <div>
+            <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold">Keyword tool defaults</h3>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. They do not restrict multilingual site scans.</p>
+              <InfoTip>Used for keyword research, SERP checks, and rank tracking. They do not restrict multilingual site scans.</InfoTip>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Default keyword market">
@@ -803,9 +797,9 @@ export function SettingsPage() {
               </Field>
             </div>
             <div className="border-t pt-5">
-              <div className="mb-3">
-                <h3 className="font-semibold">Codex defaults</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Local AI jobs use medium reasoning. Leave the model empty to use your Codex CLI default.</p>
+              <div className="mb-3 flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Codex defaults</h3>
+                <InfoTip>Local AI jobs run through the Codex CLI with medium reasoning. Leave the model empty to use your Codex CLI default.</InfoTip>
               </div>
               <div className="space-y-4">
                 <Field label="Model override"><Input value={form.codex_model || ""} onChange={(e) => setForm({ ...form, codex_model: e.target.value })} placeholder="Codex CLI default" /></Field>
@@ -821,8 +815,8 @@ export function SettingsPage() {
                 </Field>
               </div>
             </div>
-            {saveMessage ? <p className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-primary">{saveMessage}</p> : null}
-            {saveError ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{saveError}</p> : null}
+            {saveMessage ? <p className="rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{saveMessage}</p> : null}
+            {saveError ? <p className="rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{saveError}</p> : null}
             <Button disabled={saving}><Settings /> {saving ? "Saving settings" : "Save app settings"}</Button>
           </form>
         </ReportSection>
@@ -840,11 +834,11 @@ export function SettingsPage() {
                 ),
               },
               { title: "Technical scans", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
-              { title: "Keyword ideas", status: "CSV import ready", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Import keyword metrics CSVs on the Saved keywords page for volume, CPC, and difficulty." },
-              { title: "SERP and rank checks", status: serpProviderStatus(config), tone: "good", text: "Uses local/self-hosted OpenSERP or SearXNG when configured, otherwise live DuckDuckGo results. The source is shown on each report." },
-              { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally. Google connection is optional for live performance and URL inspection." },
-              { title: "Backlink index", status: "CSV import ready", tone: "good", text: "Import backlink CSVs on the Links page. No generated backlink rows are shown." },
-              { title: "MCP endpoint", status: "Local", tone: "good", text: "The local JSON-RPC endpoint is available from the MCP screen." },
+              { title: "Keyword ideas", status: "CSV import ready", tone: "good", text: "DuckDuckGo suggestions provide real query ideas; import keyword metrics CSVs on the Saved keywords page for volume, CPC, and difficulty." },
+              { title: "SERP and rank checks", status: serpProviderStatus(config), tone: "good", text: "Uses local/self-hosted OpenSERP or SearXNG when configured, otherwise live DuckDuckGo results." },
+              { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally; the Google connection is optional for live performance and URL inspection." },
+              { title: "Backlink index", status: "CSV import ready", tone: "good", text: "Import backlink CSVs on the Links page; no backlink rows are ever generated." },
+              { title: "MCP endpoint", status: "Local", tone: "good", text: "Local JSON-RPC endpoint, documented on the MCP screen." },
             ]}
           />
         </ReportSection>

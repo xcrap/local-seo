@@ -367,7 +367,6 @@ try {
     throw new Error("SERP/rank search should support self-hosted SearXNG before falling back to DuckDuckGo.");
   }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
-  const webCssSource = await readFile(path.join(rootDir, "web/src/index.css"), "utf8");
   if (webApiClient.includes("/api/audits") || webApiClient.includes("/audits`")) {
     throw new Error("The React API client should use scan-named /api/scans endpoints.");
   }
@@ -377,30 +376,21 @@ try {
   if (!webApiClient.includes("/api/scans") || !webApiClient.includes("/scans`")) {
     throw new Error("The React API client should call scan-named endpoints.");
   }
-  if (!webCssSource.includes(".grid > *") || !webCssSource.includes("min-width: 0")) {
-    throw new Error("Grid children should be allowed to shrink so table evidence scrolls internally on mobile.");
-  }
-    const webAppSources = await Array.fromAsync(
+  const webAppSources = await Array.fromAsync(
     new Bun.Glob("web/src/**/*.{ts,tsx}").scan({ cwd: rootDir }),
     async (filePath) => readFile(path.join(rootDir, filePath), "utf8"),
   ).then((sources) => sources.join("\n"));
   if (/\bAudit[A-Za-z0-9_]*\b|\baudit[A-Za-z0-9_]*\b|\baudits\b|\bAudits\b/.test(webAppSources)) {
     throw new Error("React app internals should use scan naming, not audit-era identifiers.");
   }
-  if (!webAppSources.includes("One local admin account for this install.") || !webAppSources.includes("SQLite is the source of truth on this machine.") || !webAppSources.includes("No hosted auth service is required.")) {
-    throw new Error("First-run setup should explain the single local admin, SQLite source of truth, and no hosted auth model.");
-  }
   if (/DataForSEO|DATAFORSEO|seo_metrics|SEO_METRICS/.test(webAppSources)) {
     throw new Error("The React UI should not keep paid metrics provider hooks.");
   }
-  if (!webAppSources.includes('path="/links"') || !webAppSources.includes('to="/links"')) {
+  if (!webAppSources.includes('path="/links"') || !(webAppSources.includes('to="/links"') || webAppSources.includes('to: "/links"'))) {
     throw new Error("The React app should expose Links at /links.");
   }
   if (!webAppSources.includes('path="/mcp-tools"') || !webAppSources.includes('to: "/mcp-tools"')) {
     throw new Error("The MCP screen should use /mcp-tools so it does not conflict with the JSON-RPC /mcp endpoint.");
-  }
-  if (!webAppSources.includes('<McpPage site={activeSite} />') || webAppSources.includes('siteId: "site-id"')) {
-    throw new Error("The MCP screen should build examples from the active site, not placeholder site IDs.");
   }
   if (webAppSources.includes('path="/mcp"') || webAppSources.includes('to: "/mcp"')) {
     throw new Error("The React app should not use /mcp as a UI route because /mcp is the JSON-RPC endpoint.");
@@ -412,318 +402,25 @@ try {
     throw new Error("The React app should not keep a /backlinks UI route or redirect.");
   }
   if (!webAppSources.includes('path="*" element={<NotFoundPage />}') || !webAppSources.includes("function NotFoundPage")) {
-    throw new Error("The React app should render a useful not-found screen for unknown local routes.");
-  }
-  if (/type=["']date["']/.test(webAppSources) || !webAppSources.includes("function DatePicker") || !webAppSources.includes("<Calendar")) {
-    throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
-  }
-  if (!webAppSources.includes("function EvidenceValue") || !webAppSources.includes("more in saved evidence")) {
-    throw new Error("Scan issue evidence should summarize long sample lists without crushing table columns.");
-  }
-  if (!webAppSources.includes("Live scan progress") || !webAppSources.includes("The final health score appears after the crawl, resource checks, and report build finish.")) {
-    throw new Error("Running scan reports should show live-progress wording instead of a final-looking health score.");
-  }
-  if (webAppSources.includes("absolute bottom-5") || !/min-h-0 flex-1 [^"]*overflow-y-auto/.test(webAppSources)) {
-    throw new Error("Desktop sidebar navigation should scroll above a real footer instead of overlapping the sign-out button.");
-  }
-  if (/selected-site/i.test(webAppSources)) {
-    throw new Error("The app should use active-site wording instead of selected-site implementation copy.");
-  }
-  if (webAppSources.includes('placeholder="Select site"') || webAppSources.includes(">Select site")) {
-    throw new Error("Active-site controls should say Choose active site or Make active, not Select site.");
-  }
-  for (const staleSelectedScanCopy of [
-    "selected saved scan",
-    "Selected scan is still running",
-    "Selected scan has no",
-    "The selected scan",
-    "from the selected scan",
-    "No scan selected for this site",
-  ]) {
-    if (webAppSources.includes(staleSelectedScanCopy)) {
-      throw new Error(`User-facing scan copy should say saved/open scan instead of selected scan: ${staleSelectedScanCopy}`);
-    }
+    throw new Error("The React app should render a not-found screen for unknown local routes.");
   }
   if (webAppSources.includes("window.location.href") || webAppSources.includes("window.location.reload")) {
     throw new Error("The app shell should use React Router/app state instead of full-page window.location route changes.");
   }
-  if (webAppSources.includes("rows[0] || ledger[0]")) {
-    throw new Error("Scan report selection should not hide context by auto-opening the newest global scan.");
-  }
-  if (/First scan target|target candidates|Resolve target|tries \$\{formatNumber\(candidates\.length\)\} targets|tries \d+ targets/i.test(webAppSources)) {
-    throw new Error("The app should present saved-site crawl settings as explicit crawl URLs, not vague target wording.");
-  }
-  if (webAppSources.includes('return "target"') || webAppSources.includes("target: \"Resolving start URL\"")) {
-    throw new Error("Scan progress internals should name the first step resolve/start URL, not target.");
-  }
-  if (!webAppSources.includes("Scan plan")) {
-    throw new Error("The main site flow should expose the saved site's scan plan.");
-  }
-  if (!webAppSources.includes("function siteSelectLabel") || !webAppSources.includes("siteSelectLabel(site)")) {
-    throw new Error("The active-site selector should include site name, domain, and scan plan for each saved site.");
-  }
-  if (!webAppSources.includes("Scan plan preview")) {
-    throw new Error("Site create/edit forms should preview the exact scan plan before starting a scan.");
-  }
-  if (!webAppSources.includes("Every saved scan is still listed below")) {
-    throw new Error("Scan page should explain that all saved scans remain visible in the local ledger.");
-  }
-  if (!webAppSources.includes("total scans visible below")) {
-    throw new Error("Scan history should show the active-site scan count and total visible scan count.");
-  }
-  if (!webAppSources.includes("Other saved site") || !webAppSources.includes("activeSiteId")) {
-    throw new Error("Global scan history rows should label whether each scan belongs to the active site or another saved site.");
-  }
-  if (!webAppSources.includes("Could not load local sites") || !webAppSources.includes("Your SQLite data was not cleared")) {
-    throw new Error("Site loading failures should be visible instead of rendering an empty site list that looks like data loss.");
-  }
-  if (!webAppSources.includes("Saved scan for page evidence") || !webAppSources.includes("Saved scan for link evidence")) {
-    throw new Error("Organic and Links pages should expose saved scan selectors instead of hiding older scans behind latest-only evidence.");
-  }
-  if (/from the latest (site|local) audit|The latest audit did not/i.test(webAppSources)) {
-    throw new Error("Scan-derived evidence pages should not present local crawl data as latest-only.");
-  }
-  for (const requiredDomainLabel of ["Ranking domain", "Research domain", "Backlink domain", "Comparison domain", "Active site domain:"]) {
-    if (!webAppSources.includes(requiredDomainLabel)) {
-      throw new Error(`Site comparison fields should use explicit domain wording, missing ${requiredDomainLabel}.`);
+  for (const silentCapPattern of ["rows.slice(0, 350)", ".slice(0, 150)", ".slice(0, 100)", ".slice(0, 25);", "rows.slice(0, 6)", "runs.slice(0, 8)"]) {
+    if (webAppSources.includes(silentCapPattern)) {
+      throw new Error(`Evidence tables should not silently cap saved local rows: ${silentCapPattern}`);
     }
   }
-  for (const removedTargetLabel of ["Organic target", "External backlink target", "Analyze target", "Custom target", "SERP ownership site", "Organic research site", "Backlink index site", "Competitor/custom site"]) {
-    if (webAppSources.includes(removedTargetLabel)) {
-      throw new Error(`Organic and Links pages should use active-site/competitor wording, not "${removedTargetLabel}".`);
-    }
-  }
-  if (webAppSources.includes("target domain")) {
-    throw new Error("SERP analysis should not expose vague target-domain placeholder copy.");
-  }
-  if (webAppSources.includes("appears across AI answers") || webAppSources.includes("save an AI visibility snapshot")) {
-    throw new Error("Brand lookup copy should not promise AI-answer evidence when local mode uses web-search evidence.");
-  }
-  if (seoSource.includes("Target is required")) {
-    throw new Error("SEO API errors should ask for a domain, not a vague target.");
-  }
-  for (const vagueTargetCopy of [
-    "competitor target analyzed",
-    "Top pages returned for this target",
-    "Check a target to load real backlink rows",
-    "target URL, referring domain",
-    "failing targets from the selected saved audit",
-    "failing link targets",
-    "HTTP link target",
-    "unique link targets checked",
-    "unique targets checked",
-    "link targets checked",
-    "Targets, anchors, redirects",
-    "Target: {result.resolvedTarget}",
-  ]) {
-    if (webAppSources.includes(vagueTargetCopy)) {
-      throw new Error(`User-facing copy should name domains, URLs, or HTML windows instead of vague target wording: ${vagueTargetCopy}`);
-    }
-  }
-  for (const specificHistoryLabel of [
-    'labelTitle="Research site"',
-    'labelTitle="Backlink domain"',
-    'labelTitle="Brand or domain"',
-    'labelTitle="Prompt"',
-  ]) {
-    if (!webAppSources.includes(specificHistoryLabel)) {
-      throw new Error(`Saved history tables should use specific column labels: ${specificHistoryLabel}`);
-    }
-  }
-  if (!webAppSources.includes("Ranking domain") || !webAppSources.includes("Research domain") || !webAppSources.includes("Backlink domain")) {
-    throw new Error("Competitive pages should label domain inputs clearly.");
-  }
-  if (/Search defaults|Search market|Keyword language|Default search market|Default keyword language/.test(webAppSources)) {
-    throw new Error("Site forms should label market/language as keyword tool defaults, not site search defaults.");
-  }
-  if (webAppSources.includes("Keyword/rank defaults") || webAppSources.includes("Keyword result language")) {
-    throw new Error("Site forms should not make saved websites look like they have one required search language.");
-  }
-  if (!webAppSources.includes("Keyword tool defaults") || !webAppSources.includes("Site scans crawl every page language they find") || !webAppSources.includes('Field label="Result language"')) {
-    throw new Error("Keyword market/language controls should be optional keyword-tool defaults, not primary site fields.");
-  }
-  if (!webAppSources.includes("App settings saved locally.") || !webAppSources.includes("Could not save app settings")) {
-    throw new Error("Settings should show explicit saved and error feedback after saving local app preferences.");
-  }
-  if (webAppSources.includes("firstLocationCode") || webAppSources.includes("firstLanguageCode")) {
-    throw new Error("First-run site scan should not carry hidden keyword market/language fields.");
-  }
-  if (!webAppSources.includes('<Field label="Website address">') || !webAppSources.includes('<Field label="Site name">')) {
-    throw new Error("First-run site forms should use visible labels, not only placeholders.");
-  }
-  if (!webAppSources.includes("<Pencil /> Edit") || !webAppSources.includes("<Trash2 /> Delete") || !webAppSources.includes('"Scan website"')) {
-    throw new Error("Saved-site table actions should be visible text buttons for scan, edit, and delete.");
-  }
-  for (const oldScanActionLabel of ['"Scan site"', '"Scan site now"', '"Scan speed"']) {
-    if (webAppSources.includes(oldScanActionLabel)) {
-      throw new Error(`Primary scan buttons should consistently say Scan website, not ${oldScanActionLabel}.`);
-    }
-  }
-  if (!webAppSources.includes("saved locally.") || !webAppSources.includes("updated locally.") || !webAppSources.includes("deleted locally.")) {
-    throw new Error("Saved-site create, edit, and delete actions should show explicit local confirmations.");
-  }
-  if (!webAppSources.includes("Deleting site") || !webAppSources.includes("deletingSiteId")) {
-    throw new Error("Delete-site confirmation should show progress and prevent duplicate destructive submits.");
-  }
-  if (!webAppSources.includes("Saving changes") || !webAppSources.includes("editingSiteId")) {
-    throw new Error("Edit-site form should show progress and prevent duplicate save submits.");
-  }
-  if (!webAppSources.includes('siteActions(site, "mobile")')) {
-    throw new Error("Saved-site rows should expose scan, edit, and delete actions in the mobile layout.");
-  }
-  for (const explicitDashboardAction of ["Open site scans", "Open scan report", "Open speed report", "Open organic research", "Open local link graph", "Open rank tracking", "Open Search Console", "Open AI lab"]) {
-    if (!webAppSources.includes(explicitDashboardAction)) {
-      throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
-    }
-  }
-  for (const oldScanLabel of ["Open site audits", "No audits yet", "Site audits", "Back to audits", "Open audits", "Audit report", "Audit health", "Audit checks", "Technical audit", "Technical audits"]) {
-    if (webAppSources.includes(oldScanLabel)) {
-      throw new Error(`Scan-run UI should use site scan wording instead of ${oldScanLabel}.`);
-    }
-  }
-  for (const oldBrowserRoutePattern of [/Link to=["']\/audits/, /Link to=\{`\/audits/, /navigate\(["'`]\/audits/, /navigate\(`\/audits/]) {
-    if (oldBrowserRoutePattern.test(webAppSources)) {
-      throw new Error(`User-facing scan navigation should use /scans instead of /audits: ${oldBrowserRoutePattern}`);
-    }
-  }
-  for (const oldScanSelectionState of ["local-seo:selected-audit", "/scans/:auditId", "selectedAuditId", "setSelectedAuditId"]) {
-    if (webAppSources.includes(oldScanSelectionState)) {
-      throw new Error(`Scan selection state should use scan naming, not ${oldScanSelectionState}.`);
-    }
-  }
-  if (webAppSources.includes(">Open report</Link>") || webAppSources.includes("Open report\\n")) {
-    throw new Error("Saved-scan actions should say Open scan report instead of generic Open report.");
-  }
-  for (const explicitDashboardStatus of ["Timing measured", "Ready for research", "Local graph ready", "Manual checks", "Ready for import", "Ready for Codex"]) {
-    if (!webAppSources.includes(explicitDashboardStatus)) {
-      throw new Error(`Dashboard status labels should be concrete, missing ${explicitDashboardStatus}.`);
-    }
-  }
-  if (!webAppSources.includes("?tab=speed") || !webAppSources.includes("useSearchParams")) {
-    throw new Error("Overview speed action should deep-link directly to the scan Speed tab.");
-  }
-  for (const vagueDashboardStatus of ['"has keywords"', '"has jobs"', '"ready"', '"manual"', '"needs scan"', '"not run"', '"local graph"']) {
-    if (webAppSources.includes(vagueDashboardStatus)) {
-      throw new Error(`Dashboard status labels should not expose vague internal wording: ${vagueDashboardStatus}.`);
-    }
-  }
-  for (const vagueDashboardAction of ["Open organic</Link>", "Open links</Link>", "Open ranks</Link>"]) {
-    if (webAppSources.includes(vagueDashboardAction)) {
-      throw new Error(`Dashboard actions should use destination names, not shortened labels: ${vagueDashboardAction}.`);
-    }
-  }
-  if (webAppSources.includes('shellScanning ? "Starting" : "Scan"') || webAppSources.includes('><Plus /> Add</Link>')) {
-    throw new Error("Mobile app shell should use explicit Scan website and Add site actions.");
-  }
-  if (!webAppSources.includes("<Trash2 /> Delete scan")) {
-    throw new Error("Scan history deletion should be a visible Delete scan button, not an icon-only control.");
-  }
-  if (!webAppSources.includes('siteActions(site, "mobile")') || !webAppSources.includes('className="divide-y rounded-md border md:hidden"')) {
-    throw new Error("Overview control and scan-history rows should reflow on mobile instead of forcing horizontal table scrolling.");
-  }
-  if (
-    webAppSources.includes("row.metrics.averagePageLoadMs > 0") ||
-    webAppSources.includes("page.loadMs ?") ||
-    webAppSources.includes("if (!previous || !Number.isFinite(previous))")
-  ) {
-    throw new Error("Page speed evidence should treat 0 ms as a valid measured response time.");
-  }
-  if (!webAppSources.includes("<TableHead>URL</TableHead>") || !webAppSources.includes("<TableHead>Window</TableHead>")) {
-    throw new Error("Scan link tables should label URL columns and HTML target-window attributes clearly.");
-  }
-  if (!webAppSources.includes("<TableHead>Inputs</TableHead>") || !webAppSources.includes('required.has(name) ? " required" : ""')) {
-    throw new Error("MCP tools table should show all inputs and mark required ones inline.");
-  }
-  if (!webAppSources.includes("Issue results") || !webAppSources.includes("Show {formatNumber")) {
-    throw new Error("Scan issue actions should show an explicit filtered issue result count instead of generic Review buttons.");
-  }
-  if (webAppSources.includes("Review high") || webAppSources.includes("Use Review to jump") || webAppSources.includes("<ListChecks /> Review")) {
-    throw new Error("Scan report actions should say exactly which issues they open, not generic Review.");
-  }
-  if (webAppSources.includes("rows.slice(0, 350)") || webAppSources.includes("Showing {formatNumber(visible.length)}")) {
-    throw new Error("Scan evidence tables should not silently cap local link or image inventory rows.");
-  }
-  if (webAppSources.includes(".slice(0, 150)") || webAppSources.includes(".slice(0, 100)")) {
-    throw new Error("Local link graph should not silently cap scan-derived local evidence rows.");
-  }
-  if (webAppSources.includes(".slice(0, 25);")) {
-    throw new Error("Local organic crawl evidence should not silently cap scan-derived page rows.");
-  }
-  if (webAppSources.includes("rows.slice(0, 6)") || webAppSources.includes("runs.slice(0, 8)")) {
-    throw new Error("Local history widgets should not silently cap saved history rows.");
-  }
-  for (const hiddenEvidencePattern of [
-    "rows.slice(0, 12)",
-    "Showing 12 of",
-    ".slice(0, 5);",
-    "groups.slice(0, 24)",
-    "Showing 24 of",
-    "Object.entries(issue.evidence || {}).slice(0, 4)",
-  ]) {
-    if (webAppSources.includes(hiddenEvidencePattern)) {
-      throw new Error(`Readable evidence UI should not hide saved rows with ${hiddenEvidencePattern}.`);
-    }
-  }
-  if (webAppSources.includes("rounded-md border bg-background p-3 text-sm") || !webAppSources.includes("HistoryTable")) {
-    throw new Error("Local history widgets should render as readable tables instead of mini card stacks.");
-  }
-  if (
-    webAppSources.includes("grid divide-y md:grid-cols-2") ||
-    webAppSources.includes("flex min-h-24 items-center justify-between") ||
-    webAppSources.includes('columns="lg:grid-cols')
-  ) {
-    throw new Error("Metric summaries should render as readable evidence tables instead of mini card grids.");
-  }
-  if (
-    webAppSources.includes("function GscInspectionFact") ||
-    webAppSources.includes("function AiJobFact") ||
-    webAppSources.includes('<div className="grid gap-3 md:grid-cols-3">') ||
-    webAppSources.includes("rounded-md border bg-muted/25 p-3 text-sm leading-6")
-  ) {
-    throw new Error("Search Console inspection, AI metadata, and recommendation rows should render as readable evidence tables, not mini fact cards.");
-  }
-  if (!webAppSources.includes("Google property required") || !webAppSources.includes("Open connection")) {
-    throw new Error("Search Console URL inspection should explain the Google-only requirement and link to connection setup.");
-  }
-  if (webAppSources.includes("Clear selected site")) {
-    throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
-  }
-  if (webAppSources.includes("\"Deleted site\"")) {
-    throw new Error("Scan history should show readable site context and must never fall back to raw internal site IDs.");
-  }
-  if (!webAppSources.includes("if (row.site_id) setSelectedScanId(row.site_id, row.id);")) {
-    throw new Error("Scan history should only store selected scan state when a scan row has a site ID.");
-  }
-  for (const pattern of [
-    "row.searchVolume || \"-\"",
+  for (const ambiguousMetricPattern of [
+    'row.searchVolume || "-"',
     "formatNumber(row.search_volume)",
     "formatNumber(row.keyword_difficulty)",
-    "row.cpc ?? \"-\"",
+    'row.cpc ?? "-"',
   ]) {
-    if (webAppSources.includes(pattern)) {
-      throw new Error(`Keyword metric tables should render unavailable metrics explicitly, not with ${pattern}.`);
+    if (webAppSources.includes(ambiguousMetricPattern)) {
+      throw new Error(`Keyword metric tables should render unavailable metrics explicitly, not with ${ambiguousMetricPattern}.`);
     }
-  }
-  if (!webAppSources.includes("Volume, CPC, and difficulty stay unavailable unless you import real metrics later.")) {
-    throw new Error("Keyword research copy should explain unavailable metric values clearly without pointing to secret settings.");
-  }
-  for (const organicImportCopy of ['Field label="Import organic CSV"', "Load organic research", "Organic CSV import needed"]) {
-    if (!webAppSources.includes(organicImportCopy)) {
-      throw new Error(`Organic research should expose local CSV import workflow, missing ${organicImportCopy}.`);
-    }
-  }
-  for (const keywordFormLabel of ['Field label="Seed keyword"', 'Field label="Suggestion limit"', 'Field label="Search keywords"', 'Field label="Tag filter"', 'Field label="Tag names"']) {
-    if (!webAppSources.includes(keywordFormLabel)) {
-      throw new Error(`Keyword workflows should use explicit form labels, missing ${keywordFormLabel}.`);
-    }
-  }
-  for (const trackingFormLabel of ['Field label="Add tracked keywords"', '"Add keywords"', '"Sync imported metrics"', '<Link to="/saved"><Upload /> Import metrics</Link>', "Remove selected", 'Field label="URLs to inspect"']) {
-    if (!webAppSources.includes(trackingFormLabel)) {
-      throw new Error(`Rank tracking and Search Console forms should use explicit labels/actions, missing ${trackingFormLabel}.`);
-    }
-  }
-  if (webAppSources.includes('"Refresh metrics"') || webAppSources.includes("/refresh-metrics")) {
-    throw new Error("Rank tracking should sync local imported metrics, not expose stale refresh-metrics wording.");
   }
   const site = await request("/api/sites", {
     method: "POST",

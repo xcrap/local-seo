@@ -1,9 +1,19 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Activity, CheckCircle2, Download, Plus, RefreshCw, Search, Tags, Target, Trash2, Upload } from "lucide-react";
 import { api, type KeywordResult, type Site } from "../../api";
 import { Badge, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from "@/components/ui";
-import { EmptyState, Field, HistoryList, HistoryTable, PageHeader, ReportSection, SiteDomainField, SourceBadge, TagList, formatMetricStatus, formatNumber, keywordMetricClass } from "../shared";
+import { EmptyState, Field, HistoryList, HistoryTable, InfoTip, PageHeader, ReportSection, SiteDomainField, StatusDot, TagList, formatMetricStatus, formatNumber, keywordMetricClass, sourceLabel, sourceVariant } from "../shared";
+
+function SourceMeta({ source, extra }: { source?: string; extra?: ReactNode }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <StatusDot tone={sourceVariant(source) as any} />
+      <span>{sourceLabel(source)}</span>
+      {extra}
+    </span>
+  );
+}
 
 export function KeywordsPage({ site }: { site: Site }) {
   const [query, setQuery] = useState(site.domain || "");
@@ -50,8 +60,8 @@ export function KeywordsPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Research" title="Keyword research" description="Find real keyword suggestions. Volume, CPC, and difficulty stay unavailable unless you import real metrics later." />
-      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
+      <PageHeader title="Keyword research" description="Find real keyword suggestions. Volume, CPC, and difficulty stay unavailable unless you import real metrics later." />
+      <section className="rounded-2xl border border-border/70 bg-card p-5">
         <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_140px_auto] lg:items-end" onSubmit={submit}>
           <Field label="Seed keyword">
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={site.domain || "seed keyword"} />
@@ -61,15 +71,30 @@ export function KeywordsPage({ site }: { site: Site }) {
           </Field>
           <Button disabled={loading || !query.trim()}><Search /> {loading ? "Researching" : "Research"}</Button>
         </form>
-        {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
-        {message ? <p className="mt-3 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
+        {error ? <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
+        {message ? <p className="mt-3 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{message}</p> : null}
       </section>
       <div className="mt-6">
         {result ? (
-          <ReportSection title="Results" description={<><SourceBadge source={result.source} /> {result.warning ? <span className="ml-2">{result.warning}</span> : null}</>}>
-            <div className="mb-4 flex justify-end">
-              <Button variant="secondary" onClick={saveSelected} disabled={!result.rows?.length || selectedCount === 0}><CheckCircle2 /> Save {selectedCount || "selected"}</Button>
-            </div>
+          <ReportSection
+            title="Results"
+            meta={
+              <SourceMeta
+                source={result.source}
+                extra={
+                  <>
+                    <span>· {formatNumber(result.rows?.length || 0)} suggestions</span>
+                    {result.warning ? <InfoTip label="Result warning">{result.warning}</InfoTip> : null}
+                  </>
+                }
+              />
+            }
+            action={
+              <Button variant="secondary" size="sm" onClick={saveSelected} disabled={!result.rows?.length || selectedCount === 0}>
+                <CheckCircle2 /> Save {selectedCount || "selected"}
+              </Button>
+            }
+          >
             {result.rows?.length ? <KeywordTable rows={result.rows} selected={selected} setSelected={setSelected} /> : <EmptyState title="No keyword suggestions" text={result.warning || "No suggestions came back for this seed."} />}
           </ReportSection>
         ) : (
@@ -218,7 +243,6 @@ export function SavedPage({ site }: { site: Site }) {
   return (
     <>
       <PageHeader
-        eyebrow="Repository"
         title="Saved keywords"
         description="The local canonical keyword list for clustering, rank tracking, MCP tools, and Codex briefs."
         action={
@@ -233,7 +257,7 @@ export function SavedPage({ site }: { site: Site }) {
           </div>
         }
       />
-      <section className="mb-6 rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
+      <section className="mb-6 rounded-2xl border border-border/70 bg-card p-5">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-end">
           <Field label="Search keywords">
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search saved keywords" />
@@ -249,27 +273,30 @@ export function SavedPage({ site }: { site: Site }) {
           </Field>
           <Button onClick={load} disabled={loading}><Search /> {loading ? "Loading" : "Apply"}</Button>
         </div>
-        <div className="mt-4 rounded-md border bg-muted/25">
-          <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)_280px]">
-            <div className="border-b px-4 py-3 md:border-b-0 md:border-r">
-              <div className="text-sm font-medium">Keyword metrics</div>
-              <Badge className="mt-2" variant={metricImports.length ? "good" : "outline"}>{metricImports.length ? "Imported" : "CSV ready"}</Badge>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-border/60 pt-4">
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-1.5 text-sm font-medium">
+              <span>Keyword metrics</span>
+              <InfoTip label="About keyword metrics imports">
+                Import real keyword, volume, difficulty, CPC, and intent columns. Rows update the saved keyword list and matching rank tracker keywords.
+              </InfoTip>
             </div>
-            <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
-              Import real keyword, volume, difficulty, CPC, and intent columns. Rows update the saved keyword list and matching rank tracker keywords.
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <StatusDot tone={metricImports.length ? "good" : "outline"} />
+              <span>{metricImports.length ? `${formatNumber(metricImports.length)} imports saved` : "No metrics imported yet"}</span>
             </div>
-            <div className="px-4 py-3">
-              <Field label="Import metrics CSV">
-                <Input type="file" accept=".csv,text/csv" onChange={importMetricsCsv} disabled={importing} />
-              </Field>
-            </div>
+          </div>
+          <div className="w-full sm:w-80">
+            <Field label="Import metrics CSV">
+              <Input type="file" accept=".csv,text/csv" onChange={importMetricsCsv} disabled={importing} />
+            </Field>
           </div>
         </div>
       </section>
-      {error ? <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
-      {message ? <p className="mb-4 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
+      {error ? <p className="mb-4 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
+      {message ? <p className="mb-4 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{message}</p> : null}
       {selectedIds.length > 0 && (
-        <section className="mb-6 rounded-xl border border-primary/30 bg-primary/[0.03] p-5 sm:p-6">
+        <section className="mb-6 rounded-2xl border border-primary/25 bg-primary/[0.03] p-5 sm:p-6">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
             <Field label="Tag names">
               <Input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder="tag names, comma separated" />
@@ -280,16 +307,16 @@ export function SavedPage({ site }: { site: Site }) {
           </div>
         </section>
       )}
-      <ReportSection title="Saved keyword list">
-          {rows.length ? (
-            <SavedKeywordsTable rows={rows} selected={selected} setSelected={setSelected} />
-          ) : (
-            <EmptyState
-              title={loading ? "Loading keywords" : "No saved keywords"}
-              text={loading ? "Reading the local keyword list." : "Save keywords from research or through the MCP tool."}
-              action={!loading ? <Button asChild><Link to="/keywords"><Search /> Research keywords</Link></Button> : undefined}
-            />
-          )}
+      <ReportSection title="Saved keyword list" meta={`${formatNumber(rows.length)} shown`}>
+        {rows.length ? (
+          <SavedKeywordsTable rows={rows} selected={selected} setSelected={setSelected} />
+        ) : (
+          <EmptyState
+            title={loading ? "Loading keywords" : "No saved keywords"}
+            text={loading ? "Reading the local keyword list." : "Save keywords from research or through the MCP tool."}
+            action={!loading ? <Button asChild><Link to="/keywords"><Search /> Research keywords</Link></Button> : undefined}
+          />
+        )}
       </ReportSection>
       <div className="mt-6">
         <HistoryList title="Keyword metric imports" rows={metricImports} labelKey="sourceName" labelTitle="Source file" />
@@ -379,8 +406,8 @@ export function SerpPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="SERP" title="SERP analysis" description="Inspect ranking pages, active-site ownership, intent mix, and content opportunities for one query." />
-      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
+      <PageHeader title="SERP analysis" description="Inspect ranking pages, active-site ownership, intent mix, and content opportunities for one query." />
+      <section className="rounded-2xl border border-border/70 bg-card p-5">
         <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end" onSubmit={submit}>
           <Field label="Search query">
             <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="best local seo tool" required />
@@ -394,24 +421,28 @@ export function SerpPage({ site }: { site: Site }) {
           />
           <Button disabled={loading || !keyword.trim()}><Activity /> {loading ? "Analyzing" : "Analyze SERP"}</Button>
         </form>
-        {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
+        {error ? <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
       </section>
       <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_460px]">
         <ReportSection
           title="Ranking pages"
-          description={
+          meta={
             result ? (
-              <span className="flex flex-wrap items-center gap-2">
-                <SourceBadge source={result.source} />
-                <span>Active site position: {result.domainPosition || "not found"}</span>
-                {result.warning ? <span>{result.warning}</span> : null}
-              </span>
-            ) : "Run a query to inspect the SERP."
+              <SourceMeta
+                source={result.source}
+                extra={
+                  <>
+                    <span>· Active site position: {result.domainPosition || "not found"}</span>
+                    {result.warning ? <InfoTip label="Result warning">{result.warning}</InfoTip> : null}
+                  </>
+                }
+              />
+            ) : undefined
           }
         >
           {result?.rows?.length ? <SerpTable rows={result.rows} /> : <EmptyState title="No SERP yet" text="Analyze a keyword to save a local SERP run." />}
         </ReportSection>
-        <ReportSection title="SERP history" description={`${formatNumber(runs.length)} saved local runs`}>
+        <ReportSection title="SERP history" meta={`${formatNumber(runs.length)} saved`}>
           {runs.length ? (
             <HistoryTable rows={runs} labelKey="keyword" labelTitle="Query" />
           ) : (
@@ -554,29 +585,29 @@ export function RankPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="SERP" title="Rank tracking" description="Track keyword positions from real search results. Checks use a connected search data source when available, OpenSERP when configured, or DuckDuckGo live results." />
+      <PageHeader title="Rank tracking" description="Track keyword positions from real search results. Checks use a connected search data source when available, OpenSERP when configured, or DuckDuckGo live results." />
       <div className="grid gap-6 2xl:grid-cols-[420px_minmax(0,1fr)]">
-        <ReportSection title="New tracker" description="Add a domain and the keywords you want checked.">
+        <ReportSection title="New tracker">
           <form className="space-y-4" onSubmit={create}>
             <Field label="Domain"><Input value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} required /></Field>
             <Field label="Keywords"><Textarea value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })} placeholder="one per line" /></Field>
             <Button type="submit" disabled={loading === "create"}><Plus /> {loading === "create" ? "Adding" : "Add tracker"}</Button>
           </form>
-          {error ? <p className="mt-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
-          {message ? <p className="mt-4 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
+          {error ? <p className="mt-4 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
+          {message ? <p className="mt-4 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{message}</p> : null}
         </ReportSection>
         <div className="space-y-4">
           {trackers.length ? trackers.map((tracker) => (
             <ReportSection
               key={tracker.id}
               title={tracker.domain}
-              description={`${tracker.keywords.length} keywords · depth ${tracker.serp_depth}`}
-            >
-              <div className="mb-4 flex justify-end">
-                <Button variant="secondary" onClick={() => check(tracker.id)} disabled={loading === tracker.id}>
+              meta={`${formatNumber(tracker.keywords.length)} keywords · depth ${tracker.serp_depth}`}
+              action={
+                <Button variant="secondary" size="sm" onClick={() => check(tracker.id)} disabled={loading === tracker.id}>
                   <Target /> {loading === tracker.id ? "Checking" : "Run check"}
                 </Button>
-              </div>
+              }
+            >
               <Tabs defaultValue="latest">
                 <TabsList>
                   <TabsTrigger value="latest">Latest</TabsTrigger>

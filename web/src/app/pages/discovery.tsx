@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Bot, ExternalLink, Sparkles } from "lucide-react";
 import { api, type Site } from "../../api";
 import { Badge, Button, Input, Label, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@/components/ui";
-import { EmptyState, Field, HistoryList, PageHeader, ProviderNotice, ReportSection, SourceBadge, StatsBand, StatusEvidenceTable } from "../shared";
+import { EmptyState, Field, HistoryList, PageHeader, ProviderNotice, ReportSection, SourceBadge, StatsBand, StatusDot, StatusEvidenceTable } from "../shared";
 
 export function BrandLookupPage({ site }: { site: Site }) {
   const [query, setQuery] = useState(site.domain || site.name);
@@ -35,9 +35,13 @@ export function BrandLookupPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Visibility" title="Brand lookup" description="Check real web-search evidence for a brand or domain. The app does not invent answer-model visibility." />
+      <PageHeader
+        title="Brand lookup"
+        description="Check real web-search evidence for a brand or domain. The app does not invent answer-model visibility."
+        meta={`${formatRunCount(runs.length)} saved`}
+      />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
-        <ReportSection title="Lookup" description="Competitors can be comma-separated or one per line. Local mode compares real search evidence and saves the run in SQLite.">
+        <ReportSection title="Lookup" description="Competitors can be comma-separated or one per line. Each run compares real search evidence and is saved in SQLite.">
           <form className="space-y-4" onSubmit={submit}>
             <Field label="Brand or domain"><Input value={query} onChange={(event) => setQuery(event.target.value)} required /></Field>
             <Field label="Competitors"><Textarea value={competitors} onChange={(event) => setCompetitors(event.target.value)} placeholder="competitor.com, otherbrand" /></Field>
@@ -53,6 +57,10 @@ export function BrandLookupPage({ site }: { site: Site }) {
   );
 }
 
+function formatRunCount(count: number) {
+  return count === 1 ? "1 run" : `${count} runs`;
+}
+
 function BrandLookupResult({ result }: { result: any }) {
   const shareRows = result.shareOfVoice || [];
   const totalShare = shareRows.reduce((sum: number, row: any) => sum + Number(row.value || 0), 0);
@@ -63,7 +71,12 @@ function BrandLookupResult({ result }: { result: any }) {
       {result.warning ? <ProviderNotice title="Lookup warning" text={result.warning} source={result.source} /> : null}
       <ReportSection
         title="Share of voice"
-        description={<><SourceBadge source={result.source} /> {result.resolvedEntity ? <span className="ml-2">Resolved entity: {result.resolvedEntity}</span> : null}</>}
+        meta={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <SourceBadge source={result.source} />
+            {result.resolvedEntity ? <span>Resolved entity: {result.resolvedEntity}</span> : null}
+          </span>
+        }
       >
         <div className="space-y-3">
           {shareRows.length ? shareRows.map((row: any) => {
@@ -92,8 +105,8 @@ function BrandLookupResult({ result }: { result: any }) {
           }))}
         />
       ) : null}
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_460px]">
-        <ReportSection title="Citations" description="Real web evidence used for this lookup.">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_460px]">
+        <ReportSection title="Citations" description="Real web evidence used for this lookup." meta={citationRows.length ? `${citationRows.length} ${citationRows.length === 1 ? "source" : "sources"}` : undefined}>
           {citationRows.length ? <CitationList rows={citationRows} /> : <EmptyState title="No citations" text="No citation rows came back for this lookup." />}
         </ReportSection>
         <ReportSection title="Next actions" description="Grounded recommendations saved with this lookup.">
@@ -129,7 +142,6 @@ function CitationList({ rows }: { rows: any[] }) {
           <TableHead>Citation</TableHead>
           <TableHead>URL</TableHead>
           <TableHead>Evidence</TableHead>
-          <TableHead className="text-right">Open</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -137,21 +149,24 @@ function CitationList({ rows }: { rows: any[] }) {
           const href = citation.url || citation.link || "";
           return (
             <TableRow key={`${href || citation.title}:${index}`}>
-              <TableCell className="min-w-72">
-                <div className="font-medium">{citation.title || href || "Citation"}</div>
-              </TableCell>
-              <TableCell className="min-w-72 break-all text-xs text-muted-foreground">{href || "-"}</TableCell>
-              <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">
-                {citation.snippet || citation.description || "-"}
-              </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="min-w-64">
                 {href ? (
-                  <Button asChild size="sm" variant="outline">
-                    <a href={href} target="_blank" rel="noreferrer">
-                      <ExternalLink /> Open
-                    </a>
-                  </Button>
-                ) : null}
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-baseline gap-1.5 font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {citation.title || href}
+                    <ExternalLink className="size-3.5 shrink-0 self-center" />
+                  </a>
+                ) : (
+                  <span className="font-medium">{citation.title || "Citation"}</span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-64 break-all text-xs text-muted-foreground">{href || "-"}</TableCell>
+              <TableCell className="min-w-80 text-sm leading-6 text-muted-foreground">
+                {citation.snippet || citation.description || "-"}
               </TableCell>
             </TableRow>
           );
@@ -193,9 +208,13 @@ export function PromptExplorerPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="AI answers" title="Prompt explorer" description="Run prompts through local Codex. The app does not invent model-specific external answer data." />
+      <PageHeader
+        title="Prompt explorer"
+        description="Run prompts through local Codex. The app does not invent model-specific external answer data."
+        meta={`${formatRunCount(runs.length)} saved`}
+      />
       <div className="grid gap-6 2xl:grid-cols-[480px_minmax(0,1fr)]">
-        <ReportSection title="Prompt" description="Local mode queues one Codex medium job and saves the result in SQLite.">
+        <ReportSection title="Prompt">
           <form className="space-y-4" onSubmit={submit}>
             <Field label="Prompt"><Textarea className="min-h-32" value={prompt} onChange={(event) => setPrompt(event.target.value)} required /></Field>
             <Field label="Highlight brand"><Input value={highlightBrand} onChange={(event) => setHighlightBrand(event.target.value)} /></Field>
@@ -205,13 +224,13 @@ export function PromptExplorerPage({ site }: { site: Site }) {
                   title: "Local runner",
                   status: "Local Codex",
                   tone: "good",
-                  text: "Prompt explorer queues one local Codex job and saves the run in SQLite.",
+                  text: "Queues one local Codex job and saves the run in SQLite.",
                 },
                 {
                   title: "Reasoning",
                   status: "Medium",
                   tone: "outline",
-                  text: "Matches the app AI default. The full job output is read from the AI lab when complete.",
+                  text: "Matches the app AI default; read the full job output in the AI lab.",
                 },
               ]}
             />
@@ -229,34 +248,39 @@ export function PromptExplorerPage({ site }: { site: Site }) {
 
 function PromptResult({ result }: { result: any }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {result.warning ? <ProviderNotice title="Prompt warning" text={result.warning} source={result.source} /> : null}
       <ReportSection
         title="Run summary"
-        description={<><SourceBadge source={result.source} /> {result.highlightBrand ? <span className="ml-2">Watching: {result.highlightBrand}</span> : null}</>}
+        meta={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <SourceBadge source={result.source} />
+            {result.highlightBrand ? <span>Watching: {result.highlightBrand}</span> : null}
+          </span>
+        }
       >
         <div className="space-y-4">
           <StatusEvidenceTable
             rows={[
               { title: "Prompt", status: "Saved", tone: "good", text: result.prompt || "Prompt saved with this run." },
-              { title: "Runner", status: "Local Codex", tone: "good", text: "This run uses the local Codex job queue." },
-              { title: "Local job", status: result.jobId ? "Queued" : "None", tone: result.jobId ? "warn" : "good", text: result.jobId ? "Open AI lab to read the Codex result when it finishes." : "No local Codex job was queued for this run." },
+              { title: "Local job", status: result.jobId ? "Queued" : "None", tone: result.jobId ? "warn" : "good", text: result.jobId ? "Open the AI lab to read the Codex result when it finishes." : "No local Codex job was queued for this run." },
             ]}
           />
           {result.jobId ? <Button asChild variant="secondary"><Link to="/ai"><Bot /> Open AI lab</Link></Button> : null}
         </div>
       </ReportSection>
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2">
       {(result.results || []).map((row: any) => (
         <ReportSection
           key={row.model}
           title={row.model.replaceAll("_", " ")}
-          description={row.warning || row.status}
+          meta={row.warning || row.status}
         >
           <div className="space-y-4">
-            <Badge variant={row.brandMentioned ? "good" : "outline"}>
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+              <StatusDot tone={row.brandMentioned ? "good" : "outline"} />
               {row.brandMentioned ? "Mentioned" : "Not mentioned"}
-            </Badge>
+            </span>
             <p className="text-sm leading-6">{row.text}</p>
             {row.fanOutQueries?.length ? (
               <div className="space-y-2">

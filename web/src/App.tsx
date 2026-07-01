@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Activity, Circle, FileSearch, FolderKanban, Gauge, KeyRound, LayoutGrid, LogOut, Plus, RefreshCw, Settings, ShieldCheck } from "lucide-react";
 import { api, auth, type Site } from "./api";
-import { ActiveSiteSelect, EmptyState, Field, PageHeader, SiteAvatar, activeSiteStorageKey, navGroups, navItems, setSelectedScanId, siteDisplayName } from "./app/shared";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
+import { ActiveSiteSelect, EmptyState, Field, SiteAvatar, activeSiteStorageKey, navGroups, navItems, setSelectedScanId, siteDisplayName } from "./app/shared";
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { KeywordsPage, RankPage, SavedPage, SerpPage } from "./app/pages/keywords";
 import { DomainPage, LinksPage } from "./app/pages/research";
@@ -39,33 +39,22 @@ function LoginScreen({ setupRequired, onSuccess }: { setupRequired: boolean; onS
       <Card className="relative z-10 w-full max-w-md">
         <CardHeader className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <ShieldCheck className="size-5" />
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <ShieldCheck className="size-4.5" />
             </div>
             <div>
-              <CardTitle className="text-xl">Local SEO</CardTitle>
+              <CardTitle className="font-heading text-2xl font-medium">Local SEO</CardTitle>
               <CardDescription>
-                {setupRequired ? "Create the single local admin." : "Sign in to your local SEO app."}
+                {setupRequired ? "Create the single local admin." : "Welcome back."}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {setupRequired ? (
-            <div className="mb-4 divide-y rounded-md border bg-muted/15 text-sm">
-              <div className="grid gap-1 p-3 sm:grid-cols-[150px_1fr]">
-                <span className="font-medium">Admin</span>
-                <span className="text-muted-foreground">One local admin account for this install.</span>
-              </div>
-              <div className="grid gap-1 p-3 sm:grid-cols-[150px_1fr]">
-                <span className="font-medium">Storage</span>
-                <span className="text-muted-foreground">SQLite is the source of truth on this machine.</span>
-              </div>
-              <div className="grid gap-1 p-3 sm:grid-cols-[150px_1fr]">
-                <span className="font-medium">Auth</span>
-                <span className="text-muted-foreground">No hosted auth service is required.</span>
-              </div>
-            </div>
+            <p className="mb-4 rounded-lg bg-muted/40 px-3.5 py-2.5 text-[13px] leading-5 text-muted-foreground">
+              One local admin account for this install. SQLite is the source of truth on this machine — no hosted auth service is required.
+            </p>
           ) : null}
           <form className="space-y-4" onSubmit={submit}>
             <Field label="Email">
@@ -215,7 +204,7 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
   if (isHome) {
     return (
       <div className="grain min-h-screen">
-        <TopBar onLogout={logout} activeSite={activeSite} />
+        <TopBar onLogout={logout} />
         <main className="relative z-10 mx-auto w-full max-w-[1560px] px-5 pb-16 pt-7 lg:px-10 lg:pt-8">
           <Routes>
             <Route path="/" element={<SitesManager variant="home" sites={sites} reloadSites={loadSites} activeSiteId={activeSite?.id || ""} selectSite={selectSite} />} />
@@ -229,7 +218,7 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="grain min-h-screen">
-      <TopBar onLogout={logout} activeSite={activeSite} />
+      <TopBar onLogout={logout} />
       <WorkspaceSidebar
         sites={sites}
         activeSite={activeSite}
@@ -275,20 +264,15 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/25">
-        <Activity className="size-4.5" />
+      <div className="flex size-7.5 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <Activity className="size-4" />
       </div>
-      {!compact ? (
-        <div className="leading-tight">
-          <div className="font-heading text-[15px] font-semibold tracking-tight">Local SEO</div>
-          <div className="text-[11px] text-muted-foreground">Editorial analytics desk</div>
-        </div>
-      ) : null}
+      {!compact ? <span className="font-heading text-[17px] leading-none tracking-tight">Local SEO</span> : null}
     </div>
   );
 }
 
-function TopBar({ onLogout, activeSite }: { onLogout: () => void; activeSite?: Site | null }) {
+function TopBar({ onLogout }: { onLogout: () => void }) {
   const location = useLocation();
   const onSettings = location.pathname === "/settings";
   return (
@@ -298,27 +282,26 @@ function TopBar({ onLogout, activeSite }: { onLogout: () => void; activeSite?: S
           <Link to="/" aria-label="All sites">
             <BrandMark />
           </Link>
-          {activeSite ? (
-            <>
-              <span className="hidden text-border md:inline">/</span>
-              <NavLink
-                to="/overview"
-                className="hidden max-w-[16rem] truncate rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:inline-block"
-              >
-                {siteDisplayName(activeSite)}
-              </NavLink>
-            </>
-          ) : null}
         </div>
-        <div className="flex items-center gap-1.5">
-          <Button asChild variant={onSettings ? "secondary" : "ghost"} size="sm">
-            <Link to="/settings">
-              <Settings /> <span className="hidden sm:inline">Settings</span>
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" onClick={onLogout}>
-            <LogOut /> <span className="hidden sm:inline">Sign out</span>
-          </Button>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button asChild variant={onSettings ? "secondary" : "ghost"} size="icon" className="size-8 text-muted-foreground hover:text-foreground">
+                <Link to="/settings" aria-label="Settings">
+                  <Settings />
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground" aria-label="Sign out" onClick={onLogout}>
+                <LogOut />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Sign out</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </header>
@@ -337,53 +320,51 @@ type SidebarProps = {
 function WorkspaceSidebar({ sites, activeSite, onSelect, onScan, scanning, scanError }: SidebarProps) {
   return (
     <aside className="fixed bottom-0 left-0 top-14 z-20 hidden w-66 flex-col overflow-hidden border-r border-border/70 bg-surface/85 backdrop-blur lg:flex">
-      <div className="px-3 pt-4">
-        <div className="rounded-xl border border-border/80 bg-card p-3 shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-          <div className="flex items-center gap-2.5">
-            <SiteAvatar site={activeSite} className="size-9" />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[15px] font-semibold leading-tight">{activeSite ? siteDisplayName(activeSite) : "No site selected"}</div>
-              <div className="truncate text-xs text-muted-foreground">{activeSite?.domain || "Pick a site to begin"}</div>
-            </div>
+      <div className="border-b border-border/70 px-4 pb-4 pt-4">
+        <div className="flex items-center gap-2.5">
+          <SiteAvatar site={activeSite} className="size-9" />
+          <div className="min-w-0 flex-1">
+            <div className="font-heading truncate text-[15px] leading-tight">{activeSite ? siteDisplayName(activeSite) : "No site selected"}</div>
+            <div className="truncate text-xs text-muted-foreground">{activeSite?.domain || "Pick a site to begin"}</div>
           </div>
-          {sites.length > 1 ? (
-            <div className="mt-2.5">
-              <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={onSelect} />
-            </div>
-          ) : null}
-          {activeSite?.domain ? (
-            <>
-              <Button className="mt-2.5 w-full" size="sm" onClick={onScan} disabled={scanning}>
-                <FileSearch /> {scanning ? "Starting scan…" : "Scan website"}
-              </Button>
-              {scanError ? <p className="mt-2 text-xs text-destructive">{scanError}</p> : null}
-            </>
-          ) : (
-            <Button asChild className="mt-2.5 w-full" size="sm">
-              <Link to="/"><Plus /> Add website</Link>
-            </Button>
-          )}
         </div>
+        {sites.length > 1 ? (
+          <div className="mt-2.5">
+            <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={onSelect} />
+          </div>
+        ) : null}
+        {activeSite?.domain ? (
+          <>
+            <Button className="mt-2.5 w-full" size="sm" onClick={onScan} disabled={scanning}>
+              <FileSearch /> {scanning ? "Starting scan…" : "Scan website"}
+            </Button>
+            {scanError ? <p className="mt-2 text-xs text-destructive">{scanError}</p> : null}
+          </>
+        ) : (
+          <Button asChild className="mt-2.5 w-full" size="sm">
+            <Link to="/"><Plus /> Add website</Link>
+          </Button>
+        )}
       </div>
 
-      <nav className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-5">
+      <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-5 pt-4">
         {navGroups.map((group) => (
-          <div key={group.label} className="space-y-1">
-            <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{group.label}</div>
+          <div key={group.label} className="space-y-0.5">
+            <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60">{group.label}</div>
             {group.items.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    "group flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                    "group flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/15"
+                      ? "bg-primary/[0.08] text-primary"
                       : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                   )
                 }
               >
-                <Icon className="size-4 shrink-0 opacity-90" />
+                <Icon className="size-4 shrink-0 opacity-80" />
                 {label}
               </NavLink>
             ))}
@@ -448,10 +429,9 @@ function WorkspaceMobileHeader({
 function NoSiteSelected() {
   return (
     <div className="py-10">
-      <PageHeader eyebrow="Workspace" title="No site selected" description="Choose a site from the home screen to open its workspace, scans, and reports." />
       <EmptyState
         title="Pick a site to continue"
-        text="Your local SQLite data is grouped per site. Open one to see its overview, scans, keywords, and rankings."
+        text="Your local data is grouped per site. Open one to see its overview, scans, keywords, and rankings."
         action={
           <Button asChild>
             <Link to="/"><LayoutGrid /> Browse all sites</Link>
@@ -464,30 +444,22 @@ function NoSiteSelected() {
 
 function NotFoundPage() {
   return (
-    <div>
-      <PageHeader
-        eyebrow="Local route"
+    <div className="py-10">
+      <h1 className="sr-only">Page not found</h1>
+      <EmptyState
         title="Page not found"
-        description="This screen is not part of the local SEO app."
-      />
-      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-        <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div>
-            <h2 className="text-lg font-semibold">Choose a current screen</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              The app uses fresh local routes for sites, scans, organic research, links, Search Console, MCP, and AI jobs.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+        text="This screen is not part of the local SEO app."
+        action={
+          <>
             <Button asChild>
               <Link to="/overview"><Gauge /> Open overview</Link>
             </Button>
             <Button asChild variant="secondary">
               <Link to="/"><FolderKanban /> Manage sites</Link>
             </Button>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
     </div>
   );
 }

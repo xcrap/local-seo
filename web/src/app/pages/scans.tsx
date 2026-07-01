@@ -1,10 +1,16 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, CheckCircle2, Clock, ExternalLink, FileSearch, FileText, Image, ImageOff, Link2, ListChecks, Plus, Tags, Trash2, Zap } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, ExternalLink, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
-import { EmptyState, Field, IndexabilityBadge, LengthBadge, MetricTile, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusEvidenceTable, Tip, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanSpeedHistoryRows, scanStatusLabel, scanSiteDetail, scanSiteName, scanUrlDetail, scanUrlShortDetail, ScanUrlPills, scoreBadgeVariant, setSelectedScanId, sortScanRows, speedDeltaLabel, speedDeltaVariant, upsertScanRow } from "../shared";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
+import { EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
 import { cn } from "@/lib/utils";
+
+function scanStatusTone(status?: string): "good" | "warn" | "bad" {
+  if (status === "completed") return "good";
+  if (status === "failed") return "bad";
+  return "warn";
+}
 
 export function ScanReportRoute() {
   const { scanId } = useParams();
@@ -57,12 +63,21 @@ export function ScanReportRoute() {
   return (
     <>
       <PageHeader
-        eyebrow="Technical"
         title="Scan report"
         description="Technical evidence, broken assets, metadata, indexability, and fixes from this saved local scan."
+        meta={scan ? (
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="min-w-0 max-w-full break-all">{scan.url}</span>
+            <span className="text-border">·</span>
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <StatusDot tone={scanStatusTone(scan.status)} />
+              {scanStatusLabel(scan.status)} · {formatDate(scan.created_at || scan.updated_at)} · stored locally
+            </span>
+          </span>
+        ) : undefined}
         action={<Button asChild variant="outline"><Link to="/scans"><FileSearch /> Back to scans</Link></Button>}
       />
-      {error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
       {loading ? (
         <EmptyState title="Loading report" text="Reading the saved scan from local SQLite." />
       ) : scan ? (
@@ -87,7 +102,6 @@ export function ScansPage({ site }: { site: Site }) {
   const [showCustomUrl, setShowCustomUrl] = useState(false);
   const [manualLedgerScanId, setManualLedgerScanId] = useState("");
   const [manualLedgerSiteId, setManualLedgerSiteId] = useState("");
-  const activeScan = scanIsActive(detail) ? detail : allScans.find(scanIsActive);
   async function load() {
     const [siteRows, ledgerRows] = await Promise.all([
       api.scans(site.id),
@@ -165,6 +179,7 @@ export function ScansPage({ site }: { site: Site }) {
       setScans((rows) => upsertScanRow(rows, scan));
       setAllScans((rows) => upsertScanRow(rows, scan));
       if (scan?.id) setSelectedScanId(site.id, scan.id);
+      setShowCustomUrl(false);
       load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start scan");
@@ -229,20 +244,20 @@ export function ScansPage({ site }: { site: Site }) {
   }
   return (
     <>
-      <PageHeader eyebrow="Technical" title="Site scans" description="Scan the active site's saved crawl URL and open the report when it completes." />
-      <section className="border-y bg-background/40 px-4 py-4 sm:px-5">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">Scan plan</span>
-              {site.domain ? <Badge variant="outline">{scanUrlShortDetail(site)}</Badge> : null}
-            </div>
-            <div className="mt-3">
-              {site.domain ? <ScanUrlPills site={site} /> : <p className="text-xl font-semibold">Add a website address</p>}
-            </div>
-            {site.domain ? <p className="mt-2 text-sm text-muted-foreground">{scanUrlDetail(site)}</p> : null}
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row xl:justify-end">
+      <PageHeader
+        title="Site scans"
+        description="Scan the active site's saved crawl URL and open the report when it completes."
+        meta={site.domain ? (
+          <span className="flex flex-wrap items-center gap-x-2">
+            <span>{site.domain}</span>
+            <span className="text-border">·</span>
+            <Hint tip={`Crawl starts at ${preferredScanUrl(site)}`}>{scanUrlShortDetail(site)}</Hint>
+          </span>
+        ) : (
+          "No website address yet"
+        )}
+        action={
+          <>
             {site.domain ? (
               <Button disabled={starting} onClick={startSelectedSite}>
                 <FileSearch /> {starting ? "Starting" : `Scan ${site.domain}`}
@@ -250,93 +265,89 @@ export function ScansPage({ site }: { site: Site }) {
             ) : (
               <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
             )}
-            <Button type="button" variant="outline" onClick={() => setShowCustomUrl((value) => !value)}>
-              <FileSearch /> {showCustomUrl ? "Hide URL scan" : "Specific URL"}
-            </Button>
-          </div>
-        </div>
-        {showCustomUrl ? (
-          <form className="mt-4 grid gap-3 border-t pt-4 lg:grid-cols-[1fr_auto]" onSubmit={start}>
-            <Field label="URL to scan">
-              <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredScanUrl(site) || "https://example.com"}/page`} />
-            </Field>
-            <div className="flex items-end">
-              <Button variant="secondary" disabled={starting || !url.trim()}><FileSearch /> Scan URL</Button>
-            </div>
-          </form>
-        ) : null}
-        {error ? (
-          <p className="mt-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p>
-        ) : null}
-      </section>
-      <div className="mt-6 space-y-6">
-        {activeScan ? <ActiveScanBanner scan={activeScan} /> : null}
-        <ScanSpeedHistoryPanel scans={scans} />
-        <section className="space-y-4">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-normal">Scan report</h2>
-              <p className="text-sm text-muted-foreground">Technical evidence, broken assets, metadata, indexability, and fixes from the open scan report.</p>
-            </div>
-            {detail ? <Badge variant={detail.status === "completed" ? "good" : detail.status === "failed" ? "bad" : "warn"}>{detail.status}</Badge> : null}
-          </div>
-          {detail ? <ScanDetail scan={detail} /> : (
-            <EmptyState
-              title={allScans.length ? "No scan report open for this site" : "No scan report yet"}
-              text={allScans.length ? "Every saved scan is still listed below. Open a row to view it, or run a new scan for this site." : "Start a local site scan to fill this report with crawl evidence."}
-              action={
-                !allScans.length
-                  ? site.domain
-                    ? (
-                      <Button onClick={startSelectedSite} disabled={starting}>
-                        <FileSearch /> {starting ? "Starting" : "Scan website"}
-                      </Button>
-                    )
-                    : <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
-                  : undefined
-              }
-            />
-          )}
-        </section>
-
-        <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-          <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">All scan history</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Active site: {formatNumber(scans.length)} saved scans. Local database: {formatNumber(allScans.length)} total scans visible below.
-              </p>
-            </div>
-            {scans.length ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setConfirmClearScans(true)}
-                disabled={clearingScans}
-              >
-                <Trash2 /> Delete scans for this site
-              </Button>
+            <Popover open={showCustomUrl} onOpenChange={setShowCustomUrl}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline">Specific URL</Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-96 max-w-[calc(100vw-2rem)]">
+                <form className="space-y-3" onSubmit={start}>
+                  <Field label="URL to scan">
+                    <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredScanUrl(site) || "https://example.com"}/page`} />
+                  </Field>
+                  <Button className="w-full" variant="secondary" disabled={starting || !url.trim()}>
+                    <FileSearch /> {starting ? "Starting" : "Scan URL"}
+                  </Button>
+                </form>
+              </PopoverContent>
+            </Popover>
+          </>
+        }
+      />
+      {error ? (
+        <p className="mb-6 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p>
+      ) : null}
+      <div className="space-y-8">
+        <section>
+          <div className="mb-4 flex flex-wrap items-baseline gap-2.5">
+            <h2 className="font-heading text-lg leading-tight">Scan report</h2>
+            {detail ? (
+              <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                <StatusDot tone={scanStatusTone(detail.status)} />
+                {scanStatusLabel(detail.status)} · {formatDate(detail.created_at || detail.updated_at)}
+              </span>
             ) : null}
           </div>
-          <div className="p-5">
-            {allScans.length ? (
-              <ScanTable rows={allScans} showSite activeSiteId={site.id} selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingScan(allScans.find((scan) => scan.id === id) || { id })} />
-            ) : (
+          {detail ? <ScanDetail scan={detail} /> : (
+            <TabCard>
               <EmptyState
-                title="No scans yet"
-                text={site.domain ? "Start a technical scan for this site." : "Add a website address before running a scan."}
-                action={site.domain ? (
-                  <Button onClick={startSelectedSite} disabled={starting}>
-                    <FileSearch /> {starting ? "Starting" : "Scan website"}
-                  </Button>
-                ) : (
-                  <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
-                )}
+                title={allScans.length ? "No scan report open for this site" : "No scan report yet"}
+                text={allScans.length ? "Every saved scan is still listed below. Open a row to view it, or run a new scan for this site." : "Start a local site scan to fill this report with crawl evidence."}
+                action={
+                  !allScans.length
+                    ? site.domain
+                      ? (
+                        <Button onClick={startSelectedSite} disabled={starting}>
+                          <FileSearch /> {starting ? "Starting" : "Scan website"}
+                        </Button>
+                      )
+                      : <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
+                    : undefined
+                }
               />
-            )}
-          </div>
+            </TabCard>
+          )}
         </section>
+        <ReportSection
+          title="All scan history"
+          meta={`${formatNumber(scans.length)} for this site · ${formatNumber(allScans.length)} total in the local database`}
+          action={scans.length ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmClearScans(true)}
+              disabled={clearingScans}
+            >
+              <Trash2 /> Delete scans for this site
+            </Button>
+          ) : undefined}
+        >
+          {allScans.length ? (
+            <ScanTable rows={allScans} showSite activeSiteId={site.id} selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingScan(allScans.find((scan) => scan.id === id) || { id })} />
+          ) : (
+            <EmptyState
+              title="No scans yet"
+              text={site.domain ? "Start a technical scan for this site." : "Add a website address before running a scan."}
+              action={site.domain ? (
+                <Button onClick={startSelectedSite} disabled={starting}>
+                  <FileSearch /> {starting ? "Starting" : "Scan website"}
+                </Button>
+              ) : (
+                <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
+              )}
+            />
+          )}
+        </ReportSection>
       </div>
       <AlertDialog open={Boolean(deletingScan)} onOpenChange={(nextOpen) => !nextOpen && setDeletingScan(null)}>
         <AlertDialogContent>
@@ -375,111 +386,6 @@ export function ScansPage({ site }: { site: Site }) {
   );
 }
 
-function ActiveScanBanner({ scan }: { scan: any }) {
-  const progress = scanProgress(scan);
-  return (
-    <section className="rounded-md border border-primary/40 bg-primary/5 p-5">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="warn" className="gap-1"><Activity className="size-3" /> Scan running</Badge>
-            <span className="text-sm font-medium">{scanPhaseLabel(scan)}</span>
-          </div>
-          <div className="mt-3 max-w-4xl break-all text-lg font-semibold">{scan.url}</div>
-          <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-            <span>{formatNumber(scan.pages_crawled || 0)} pages crawled</span>
-            <span>{formatNumber(scan.issue_count || 0)} issues found</span>
-            <span>{formatNumber(progress)}% complete</span>
-          </div>
-          <div className="mt-4 max-w-3xl">
-            <ProgressBar value={progress} />
-          </div>
-        </div>
-        <Button asChild variant="secondary">
-          <Link to={`/scans/${scan.id}`}><FileSearch /> Open live report</Link>
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-function ScanSpeedHistoryPanel({ scans }: { scans: any[] }) {
-  const rows = scanSpeedHistoryRows(scans);
-  const latest = rows[0];
-  const previous = rows[1];
-  return (
-    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-      <div className="flex flex-col gap-3 border-b px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Page speed tracking</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Saved response timings from completed local scans for this site.
-          </p>
-        </div>
-        {latest ? (
-          <div className="flex flex-wrap gap-2">
-            <Badge variant={speedVariant(latest.metrics.averagePageLoadMs) as any}>Latest avg {formatMs(latest.metrics.averagePageLoadMs)}</Badge>
-            <Badge variant={speedDeltaVariant(latest.metrics.averagePageLoadMs, previous?.metrics.averagePageLoadMs) as any}>
-              {speedDeltaLabel(latest.metrics.averagePageLoadMs, previous?.metrics.averagePageLoadMs)}
-            </Badge>
-          </div>
-        ) : null}
-      </div>
-      {rows.length ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Scan</TableHead>
-              <TableHead>Average</TableHead>
-              <TableHead>Median</TableHead>
-              <TableHead>P95</TableHead>
-              <TableHead>Slowest page</TableHead>
-              <TableHead>Timed pages</TableHead>
-              <TableHead>Slow pages</TableHead>
-              <TableHead>Change</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => {
-              const previousRow = rows[index + 1];
-              return (
-                <TableRow key={row.scan.id}>
-                  <TableCell className="max-w-md">
-                    <div className="truncate font-medium">{row.scan.url}</div>
-                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="size-3" /> {formatDate(row.scan.created_at || row.scan.updated_at)}
-                    </div>
-                  </TableCell>
-                  <TableCell><Badge variant={speedVariant(row.metrics.averagePageLoadMs) as any}>{formatMs(row.metrics.averagePageLoadMs)}</Badge></TableCell>
-                  <TableCell className="nums">{formatMs(row.metrics.medianPageLoadMs)}</TableCell>
-                  <TableCell className="nums">{formatMs(row.metrics.p95PageLoadMs)}</TableCell>
-                  <TableCell className="nums">{formatMs(row.metrics.slowestPageLoadMs)}</TableCell>
-                  <TableCell className="nums">{formatNumber(row.metrics.measuredPageLoads)}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant={row.metrics.slowPages ? "warn" : "outline"}>{formatNumber(row.metrics.slowPages)} slow</Badge>
-                      <Badge variant={row.metrics.verySlowPages ? "bad" : "outline"}>{formatNumber(row.metrics.verySlowPages)} very slow</Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={speedDeltaVariant(row.metrics.averagePageLoadMs, previousRow?.metrics.averagePageLoadMs) as any}>
-                      {speedDeltaLabel(row.metrics.averagePageLoadMs, previousRow?.metrics.averagePageLoadMs)}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      ) : (
-        <div className="p-5">
-          <EmptyState title="No page speed history yet" text="Run a completed local scan to record response timing for each crawled HTML page." />
-        </div>
-      )}
-    </section>
-  );
-}
-
 export function ScanTable({
   rows,
   showSite,
@@ -496,166 +402,100 @@ export function ScanTable({
   onDelete?: (id: string, row: any) => void;
 }) {
   return (
-    <>
-      <div className="divide-y rounded-md border md:hidden">
-        {rows.map((row) => {
-          const counts = scanSeverityCounts(row);
-          const siteScope = activeSiteId && row.site_id
-            ? row.site_id === activeSiteId ? "Active site" : "Other saved site"
-            : "";
-          return (
-            <div key={row.id} className={cn("p-4", selectedId === row.id ? "bg-accent/45" : "")}>
-              <div className="break-all font-medium">{row.url}</div>
-              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
-              </div>
-              {showSite ? (
-                <div className="mt-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="text-sm font-medium">{scanSiteName(row)}</div>
-                    {siteScope ? <Badge variant={siteScope === "Active site" ? "good" : "outline"}>{siteScope}</Badge> : null}
-                  </div>
-                  <div className="mt-1 break-all text-xs text-muted-foreground">{scanSiteDetail(row)}</div>
-                </div>
-              ) : null}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge>
-                <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
-              </div>
-              <div className="mt-2">
-                <ProgressBar value={scanProgress(row)} />
-                <div className="mt-1 text-xs text-muted-foreground">{scanPhaseLabel(row)}</div>
-              </div>
-              <div className="mt-3 text-sm text-muted-foreground">{formatNumber(row.pages_crawled)} pages crawled</div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                <Badge variant={counts.high ? "bad" : "outline"}>{counts.high} high</Badge>
-                <Badge variant={counts.medium ? "warn" : "outline"}>{counts.medium} med</Badge>
-                <Badge variant="outline">{counts.low} low</Badge>
-              </div>
-              {(onInspect || onDelete) && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {onInspect && (
-                    <Button size="sm" variant="outline" asChild>
-                      <Link
-                        to={`/scans/${row.id}`}
-                        onClick={() => {
-                          if (row.site_id) setSelectedScanId(row.site_id, row.id);
-                        }}
-                      >
-                        <FileSearch /> Open scan report
-                      </Link>
-                    </Button>
-                  )}
-                  {onDelete && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      aria-label={`Delete scan report for ${row.url}`}
-                      onClick={() => onDelete(row.id, row)}
-                    >
-                      <Trash2 /> Delete scan
-                    </Button>
-                  )}
-                </div>
-              )}
+    <div className="divide-y divide-border/60">
+      {rows.map((row) => {
+        const counts = scanSeverityCounts(row);
+        const running = scanIsActive(row);
+        const completed = row.status === "completed";
+        const score = Number(row.score || 0);
+        const showSiteName = Boolean(showSite && (!activeSiteId || row.site_id !== activeSiteId));
+        const scanCell = (
+          <>
+            <div className="truncate font-medium">{row.url}</div>
+            <div className="mt-0.5 truncate text-xs text-muted-foreground">
+              {formatDate(row.created_at || row.updated_at)}
+              {showSiteName ? ` · ${scanSiteName(row)}` : ""}
             </div>
-          );
-        })}
-      </div>
-      <div className="hidden md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Scan</TableHead>
-              {showSite ? <TableHead>Site</TableHead> : null}
-              <TableHead>Result</TableHead>
-              <TableHead>Evidence</TableHead>
-              {(onInspect || onDelete) && <TableHead className="text-right">Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => {
-              const counts = scanSeverityCounts(row);
-              const siteScope = activeSiteId && row.site_id
-                ? row.site_id === activeSiteId ? "Active site" : "Other saved site"
-                : "";
-              return (
-                <TableRow
-                  key={row.id}
-                  className={cn(onInspect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
-                  onClick={() => onInspect?.(row.id, row)}
-                >
-                  <TableCell className="min-w-56 max-w-sm">
-                    <div className="truncate font-medium">{row.url}</div>
-                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
-                    </div>
-                  </TableCell>
-                  {showSite ? (
-                    <TableCell className="min-w-40">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="font-medium">{scanSiteName(row)}</div>
-                        {siteScope ? <Badge variant={siteScope === "Active site" ? "good" : "outline"}>{siteScope}</Badge> : null}
-                      </div>
-                      <div className="mt-1 break-all text-xs text-muted-foreground">{scanSiteDetail(row)}</div>
-                    </TableCell>
-                  ) : null}
-                  <TableCell className="min-w-44">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge>
-                      <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
-                    </div>
-                    <div className="mt-2 max-w-52">
-                      <ProgressBar value={scanProgress(row)} />
-                      <div className="mt-1 text-xs text-muted-foreground">{scanPhaseLabel(row)}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="min-w-52">
-                    <div className="text-sm text-muted-foreground">
-                      {formatNumber(row.pages_crawled)} pages crawled
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      <Badge variant={counts.high ? "bad" : "outline"}>{counts.high} high</Badge>
-                      <Badge variant={counts.medium ? "warn" : "outline"}>{counts.medium} med</Badge>
-                      <Badge variant="outline">{counts.low} low</Badge>
-                    </div>
-                  </TableCell>
-                  {(onInspect || onDelete) && (
-                    <TableCell className={cn("text-right", onDelete ? "min-w-56" : "min-w-40")}>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {onInspect && (
-                          <Button size="sm" variant="outline" asChild>
-                            <Link
-                              to={`/scans/${row.id}`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                if (row.site_id) setSelectedScanId(row.site_id, row.id);
-                              }}
-                            >
-                              <FileSearch /> Open scan report
-                            </Link>
-                          </Button>
-                        )}
-                        {onDelete && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            aria-label={`Delete scan report for ${row.url}`}
-                            onClick={(event) => { event.stopPropagation(); onDelete(row.id, row); }}
-                          >
-                            <Trash2 /> Delete scan
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    </>
+          </>
+        );
+        const rowContent = (
+          <>
+            {onInspect ? (
+              <button
+                type="button"
+                className="min-w-0 flex-1 cursor-pointer rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                title={`Open scan report for ${row.url}`}
+                onClick={() => onInspect(row.id, row)}
+              >
+                {scanCell}
+              </button>
+            ) : (
+              <div className="min-w-0 flex-1">{scanCell}</div>
+            )}
+            {running ? (
+              <div className="w-28 shrink-0">
+                <div className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+                  <StatusDot tone="warn" /> {scanPhaseLabel(row)}
+                </div>
+                <div className="mt-1.5"><ProgressBar value={scanProgress(row)} /></div>
+              </div>
+            ) : completed ? (
+              <div className="flex shrink-0 items-baseline gap-2.5">
+                <span className="metric text-xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  {formatNumber(counts.high)} high · {formatNumber(counts.medium)} med · {formatNumber(counts.low)} low
+                </span>
+              </div>
+            ) : (
+              <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-medium">
+                <StatusDot tone={scanStatusTone(row.status)} /> {scanStatusLabel(row.status)}
+              </span>
+            )}
+            {(onInspect || onDelete) ? (
+              <div className="flex shrink-0 items-center">
+                {onInspect ? (
+                  <Button asChild size="icon" variant="ghost" className="size-8 text-muted-foreground hover:text-foreground">
+                    <Link
+                      to={`/scans/${row.id}`}
+                      aria-label={`Open scan report for ${row.url}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (row.site_id) setSelectedScanId(row.site_id, row.id);
+                      }}
+                    >
+                      <ArrowUpRight />
+                    </Link>
+                  </Button>
+                ) : null}
+                {onDelete ? (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-8 text-muted-foreground hover:text-destructive"
+                    aria-label={`Delete scan report for ${row.url}`}
+                    onClick={(event) => { event.stopPropagation(); onDelete(row.id, row); }}
+                  >
+                    <Trash2 />
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        );
+        return (
+          <div
+            key={row.id}
+            className={cn(
+              "flex items-center gap-3 rounded-xl px-3 py-3 transition-colors",
+              onInspect ? "hover:bg-accent/35" : "",
+              selectedId === row.id ? "bg-muted/55" : "",
+            )}
+          >
+            {rowContent}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -705,7 +545,7 @@ function ScanDetail({ scan }: { scan: any }) {
   const coverage = scanCoverageMetrics(scan, result, summary);
   const categories = Object.keys(summary.byCategory || {}).sort();
   const issueTypes = Array.from(new Set<string>(issues.map((issue: any) => String(issue.type || "")).filter(Boolean))).sort();
-  const categoryEntries = Object.entries(summary.byCategory || {}).sort((a: any, b: any) => b[1] - a[1]);
+  const categoryCounts: Record<string, number> = summary.byCategory || {};
   useEffect(() => {
     setActiveTab(requestedTab);
   }, [scan.id, requestedTab]);
@@ -805,63 +645,38 @@ function ScanDetail({ scan }: { scan: any }) {
         <TabsContent value="progress">
           <ScanProgressPanel scan={scan} result={result} coverage={coverage} />
         </TabsContent>
-        <TabsContent value="issues" className="space-y-2">
-          <div className="rounded-md border bg-muted/20 px-4 py-3">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="text-sm font-medium">Issue results</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Showing {formatNumber(filteredIssues.length)} of {formatNumber(issues.length)} saved issues
-                  {activeIssueFilters.length ? ` for ${activeIssueFilters.join(" · ")}` : "."}
-                </p>
-              </div>
-              {activeIssueFilters.length ? (
-                <Button size="sm" variant="outline" onClick={resetIssueFilters}>
-                  Clear filters
-                </Button>
-              ) : null}
-            </div>
-          </div>
-          {issueGroups.length ? <ScanIssueGroups groups={issueGroups} onSelect={selectIssueGroup} /> : null}
-          {categoryEntries.length ? (
-            <div className="flex flex-wrap gap-2 pb-2">
-              {categoryEntries.map(([category, count]: any) => (
-                <Button
-                  key={category}
-                  size="sm"
-                  variant={categoryFilter === category ? "default" : "outline"}
-                  onClick={() => selectCategory(category)}
+        <TabsContent value="issues">
+          <TabCard className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center rounded-lg border border-border/70 bg-card p-0.5">
+              {["all", "high", "medium", "low"].map((severity) => (
+                <button
+                  key={severity}
+                  type="button"
+                  onClick={() => selectSeverity(severity)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                    severityFilter === severity ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
                 >
-                  {issueCategoryLabel(category)} <span className="nums">{count}</span>
-                </Button>
+                  {severity === "all" ? "All severities" : severity}
+                </button>
               ))}
-              <Button size="sm" variant={categoryFilter === "all" ? "default" : "outline"} onClick={() => selectCategory("all")}>
-                All
-              </Button>
             </div>
-          ) : null}
-          <div className="flex flex-wrap gap-2 pb-2">
-            {["all", "high", "medium", "low"].map((severity) => (
-              <Button
-                key={severity}
-                size="sm"
-                variant={severityFilter === severity ? "default" : "outline"}
-                onClick={() => selectSeverity(severity)}
-              >
-                {severity === "all" ? "All severities" : severity}
-              </Button>
-            ))}
             <Select value={categoryFilter} onValueChange={selectCategory}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All categories</SelectItem>
                 {categories.map((category) => (
-                  <SelectItem key={category} value={category}>{issueCategoryLabel(category)}</SelectItem>
+                  <SelectItem key={category} value={category}>
+                    {issueCategoryLabel(category)}
+                    {categoryCounts[category] ? ` (${formatNumber(categoryCounts[category])})` : ""}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={(value) => { setTypeFilter(value); setSelectedCheckTypes([]); setSelectedCheckLabel(""); showIssues(); }}>
-              <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-52 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All issue types</SelectItem>
                 {issueTypes.map((type) => (
@@ -870,28 +685,56 @@ function ScanDetail({ scan }: { scan: any }) {
               </SelectContent>
             </Select>
             {selectedCheckLabel ? <Badge variant="outline">Showing {selectedCheckLabel}</Badge> : null}
+            <div className="ml-auto flex items-center gap-1.5 text-[13px] text-muted-foreground">
+              <span>
+                Showing {formatNumber(filteredIssues.length)} of {formatNumber(issues.length)} saved issues
+                {activeIssueFilters.length ? ` for ${activeIssueFilters.join(" · ")}` : ""}
+              </span>
+              {activeIssueFilters.length ? (
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={resetIssueFilters}>
+                  Clear filters
+                </Button>
+              ) : null}
+            </div>
           </div>
           {filteredIssues.length ? <ScanIssuesTable rows={filteredIssues} /> : <EmptyState title="No matching issues" text={scan.status === "completed" ? "This filter has no issues." : "Issues will appear while the scan runs."} />}
+          </TabCard>
         </TabsContent>
         <TabsContent value="checks">
           <ScanCheckMatrix summary={summary} coverage={coverage} issues={issues} onSelectCheck={selectScanCheck} />
         </TabsContent>
         <TabsContent value="metadata">
-          {pages.length ? <ScanMetadataTable rows={pages} /> : <EmptyState title="No metadata yet" text="Metadata appears as soon as pages are crawled." />}
+          <TabCard>
+            {pages.length ? (
+              <FilteredRows rows={pages} placeholder="Filter pages…">
+                {(rows) => <ScanMetadataTable rows={rows} />}
+              </FilteredRows>
+            ) : <EmptyState title="No metadata yet" text="Metadata appears as soon as pages are crawled." />}
+          </TabCard>
         </TabsContent>
         <TabsContent value="pages">
-          {pages.length ? <ScanPagesTable rows={pages} /> : <EmptyState title="No pages yet" text="Pages will appear while the scan runs." />}
+          <TabCard>
+            {pages.length ? (
+              <FilteredRows rows={pages} placeholder="Filter pages…">
+                {(rows) => <ScanPagesTable rows={rows} />}
+              </FilteredRows>
+            ) : <EmptyState title="No pages yet" text="Pages will appear while the scan runs." />}
+          </TabCard>
         </TabsContent>
         <TabsContent value="links">
           <div className="space-y-4">
             {links.length ? (
               <ScanSection title="Checked links" text="Every unique HTTP URL that the crawler verified. Broken and redirecting links are highlighted in the Status column.">
-                <ScanLinksTable rows={links} />
+                <FilteredRows rows={links} placeholder="Filter links…">
+                  {(rows) => <ScanLinksTable rows={rows} />}
+                </FilteredRows>
               </ScanSection>
             ) : <EmptyState title="No links checked yet" text="Links are checked after the page crawl finishes." />}
             {linkInventory.length ? (
               <ScanSection title="Link inventory" text="All link tags found during the crawl, including anchor text, rel attributes, and source page.">
-                <ScanLinkInventoryTable rows={linkInventory} />
+                <FilteredRows rows={linkInventory} placeholder="Filter link tags…">
+                  {(rows) => <ScanLinkInventoryTable rows={rows} />}
+                </FilteredRows>
               </ScanSection>
             ) : null}
           </div>
@@ -899,24 +742,32 @@ function ScanDetail({ scan }: { scan: any }) {
         <TabsContent value="images" className="space-y-4">
           {pages.some((page: any) => page.images > 0) ? (
             <ScanSection title="Image summary by page" text="Missing src, alt text, and size attributes grouped by affected page.">
-              <ScanImageSummaryTable rows={pages} />
+              <FilteredRows rows={pages} placeholder="Filter pages…">
+                {(rows) => <ScanImageSummaryTable rows={rows} />}
+              </FilteredRows>
             </ScanSection>
           ) : null}
           {imageInventory.length ? (
             <ScanSection title="Image tag inventory" text="Every image tag collected from the crawl, including content/decorative classification and tag-level problems.">
-              <ScanImageInventoryTable rows={imageInventory} />
+              <FilteredRows rows={imageInventory} placeholder="Filter image tags…">
+                {(rows) => <ScanImageInventoryTable rows={rows} />}
+              </FilteredRows>
             </ScanSection>
           ) : null}
           {images.length ? (
             <ScanSection title="Checked image URLs" text="Image resources fetched by the crawler, including Open Graph images when present.">
-              <ScanImagesTable rows={images} />
+              <FilteredRows rows={images} placeholder="Filter image URLs…">
+                {(rows) => <ScanImagesTable rows={rows} />}
+              </FilteredRows>
             </ScanSection>
           ) : <EmptyState title="No images checked yet" text="Images are checked after the page crawl finishes." />}
         </TabsContent>
         <TabsContent value="assets" className="space-y-4">
           {assets.length ? (
             <ScanSection title="Checked CSS and JavaScript" text="Stylesheet and script URLs fetched during the scan with status, content type, and size.">
-              <ScanAssetsTable rows={assets} />
+              <FilteredRows rows={assets} placeholder="Filter assets…">
+                {(rows) => <ScanAssetsTable rows={rows} />}
+              </FilteredRows>
             </ScanSection>
           ) : <EmptyState title="No CSS or JavaScript assets checked yet" text="Assets are checked after links and images." />}
         </TabsContent>
@@ -990,24 +841,14 @@ function ScanCrawlEvidence({
   return (
     <div className="space-y-4">
       <ReportSection title="Robots and sitemap evidence" description="What the crawler actually discovered before and during the page crawl.">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Area</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Evidence</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {evidenceRows.map((row) => (
-              <TableRow key={row.area}>
-                <TableCell className="min-w-44 font-medium">{row.area}</TableCell>
-                <TableCell><Badge variant={row.tone as any}>{row.status}</Badge></TableCell>
-                <TableCell className="min-w-96 break-all text-sm text-muted-foreground">{row.evidence}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <StatusEvidenceTable
+          rows={evidenceRows.map((row) => ({
+            title: row.area,
+            status: row.status,
+            tone: row.tone as any,
+            text: <span className="break-all">{row.evidence}</span>,
+          }))}
+        />
       </ReportSection>
 
       <ReportSection title="Sitemap files" description="Each sitemap file fetched and parsed during the scan.">
@@ -1058,8 +899,13 @@ function ScanCrawlEvidence({
               return (
                 <TableRow key={row.metric}>
                   <TableCell className="font-medium">{row.metric}</TableCell>
-                  <TableCell className="nums text-lg font-semibold">{formatNumber(row.count)}</TableCell>
-                  <TableCell><Badge variant={tone as any}>{row.problem ? (count ? "inspect" : "clear") : "measured"}</Badge></TableCell>
+                  <TableCell className="metric text-lg">{formatNumber(row.count)}</TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
+                      <StatusDot tone={tone as any} />
+                      {row.problem ? (count ? "inspect" : "clear") : "measured"}
+                    </span>
+                  </TableCell>
                   <TableCell className="min-w-96 text-sm text-muted-foreground">{row.detail}</TableCell>
                 </TableRow>
               );
@@ -1108,18 +954,19 @@ function scanStepState(scan: any, index: number): ScanStepState {
   return "pending";
 }
 
-function ScanStepBadge({ state }: { state: ScanStepState }) {
-  if (state === "complete") {
-    return <Badge variant="good" className="gap-1"><CheckCircle2 className="size-3" /> Done</Badge>;
-  }
-  if (state === "failed") {
-    return <Badge variant="bad" className="gap-1"><AlertTriangle className="size-3" /> Failed</Badge>;
-  }
-  if (state === "running") {
-    return <Badge variant="warn" className="gap-1"><Activity className="size-3" /> Running</Badge>;
-  }
-  return <Badge variant="outline" className="gap-1"><Clock className="size-3" /> Pending</Badge>;
-}
+const scanStepStatusLabel: Record<ScanStepState, string> = {
+  complete: "Done",
+  running: "Running",
+  pending: "Pending",
+  failed: "Failed",
+};
+
+const scanStepStatusTone: Record<ScanStepState, "good" | "warn" | "bad" | "outline"> = {
+  complete: "good",
+  running: "warn",
+  pending: "outline",
+  failed: "bad",
+};
 
 function ScanProgressPanel({
   scan,
@@ -1171,47 +1018,31 @@ function ScanProgressPanel({
     },
   ];
   return (
-    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-      <div className="border-b px-5 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Scan progress</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {scanPhaseLabel(scan)} · {formatNumber(coverage.pages)} pages · {formatNumber(scan.issue_count || 0)} issues
-            </p>
-          </div>
-          <Badge variant={scan.status === "completed" ? "good" : scan.status === "failed" ? "bad" : "warn"}>{scanStatusLabel(scan.status)}</Badge>
-        </div>
-        <div className="mt-4 space-y-2">
-          <ProgressBar value={progress} />
-          <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span className="break-all">{result.startUrl || scan.url}</span>
-            <span className="nums">{formatNumber(progress)}%</span>
-          </div>
+    <ReportSection
+      title="Scan progress"
+      meta={`${scanPhaseLabel(scan)} · ${formatNumber(coverage.pages)} pages · ${formatNumber(scan.issue_count || 0)} issues`}
+    >
+      <div className="space-y-2">
+        <ProgressBar value={progress} />
+        <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span className="break-all">{result.startUrl || scan.url}</span>
+          <span className="nums">{formatNumber(progress)}%</span>
         </div>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Step</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Evidence</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {steps.map((step, index) => (
-            <TableRow key={step.label}>
-              <TableCell className="min-w-52">
-                <div className="font-medium">{step.label}</div>
-                <div className="mt-1 break-all text-xs text-muted-foreground">{step.detail}</div>
-              </TableCell>
-              <TableCell className="min-w-32"><ScanStepBadge state={scanStepState(scan, index)} /></TableCell>
-              <TableCell className="min-w-96 text-sm text-muted-foreground">{step.evidence}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </section>
+      <div className="mt-4">
+        <StatusEvidenceTable
+          rows={steps.map((step, index) => {
+            const state = scanStepState(scan, index);
+            return {
+              title: step.label,
+              status: scanStepStatusLabel[state],
+              tone: scanStepStatusTone[state],
+              text: <span className="break-words">{step.detail} — {step.evidence}</span>,
+            };
+          })}
+        />
+      </div>
+    </ReportSection>
   );
 }
 
@@ -1247,27 +1078,23 @@ function ScanReportOverview({
     {
       label: "Pages crawled",
       value: formatNumber(coverage.pages),
-      icon: FileText,
       hint: `${formatNumber(coverage.indexablePages)} indexable · ${formatNumber(coverage.nonIndexablePages)} noindex · ${formatNumber(coverage.sitemapUrls)} in sitemap`,
     },
     {
       label: "Links checked",
       value: formatNumber(coverage.checkedLinks),
-      icon: Link2,
       tone: coverage.brokenLinks ? "bad" : "good",
       hint: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.redirectedLinks)} redirecting`,
     },
     {
       label: "Images checked",
       value: formatNumber(coverage.checkedImages),
-      icon: Image,
       tone: coverage.brokenImages ? "bad" : coverage.largeImages ? "warn" : "good",
       hint: `${formatNumber(coverage.brokenImages)} broken · ${formatNumber(coverage.largeImages || 0)} large`,
     },
     {
       label: "Avg response",
       value: coverage.measuredPageLoads ? formatMs(coverage.averagePageLoadMs) : "—",
-      icon: Zap,
       tone: coverage.verySlowPages ? "bad" : coverage.slowPages ? "warn" : coverage.measuredPageLoads ? "good" : "default",
       hint: coverage.measuredPageLoads
         ? `p95 ${formatMs(coverage.p95PageLoadMs)} · ${formatNumber(coverage.slowPages)} slow pages`
@@ -1276,27 +1103,21 @@ function ScanReportOverview({
     {
       label: "Metadata gaps",
       value: formatNumber(metaIssues),
-      icon: Tags,
       tone: metaIssues ? "warn" : "good",
       hint: `${formatNumber(summary.titleLengthIssues || 0)} title · ${formatNumber(summary.descriptionLengthIssues || 0)} description length`,
     },
     {
       label: "Image alt/size",
       value: formatNumber(imageAltIssues),
-      icon: ImageOff,
       tone: imageAltIssues ? "warn" : "good",
       hint: `${formatNumber(summary.imagesMissingLazyLoading || 0)} lazy · ${formatNumber(summary.cssImageResources || 0)} CSS images`,
     },
   ];
 
   return (
-    <ReportSection
-      title={isActive ? "Live scan progress" : "Scan health"}
-      description={`${scanPhaseLabel(scan)} · ${formatDate(scan.created_at)} · stored in local SQLite`}
-      action={<Badge variant={isFailed ? "bad" : isActive ? "warn" : scoreBadgeVariant(finalScore)}>{scanStatusLabel(scan.status)}</Badge>}
-    >
+    <ReportSection title={isActive ? "Live scan progress" : "Scan health"}>
       <div className="grid gap-6 xl:grid-cols-[248px_minmax(0,1fr)]">
-        <div className="flex flex-col items-center gap-4 border-b border-border/70 pb-6 text-center xl:items-start xl:border-b-0 xl:border-r xl:pb-0 xl:pr-6 xl:text-left">
+        <div className="flex flex-col items-center gap-4 border-b border-border/60 pb-6 text-center xl:border-b-0 xl:border-r xl:pb-0 xl:pr-6">
           <ScoreDial
             score={isCompleted || isFailed ? finalScore : progress}
             size={148}
@@ -1310,38 +1131,55 @@ function ScanReportOverview({
               <p className="text-xs leading-5 text-muted-foreground">The final health score appears after the crawl, resource checks, and report build finish.</p>
             </div>
           ) : (
-            <div className="w-full space-y-2.5">
-              <div className="flex flex-wrap justify-center gap-1.5 xl:justify-start">
-                <Button size="sm" variant={activeSeverity === "high" ? "default" : "outline"} onClick={() => onSeveritySelect("high")}>
-                  <span className={cn("size-1.5 rounded-full", severityCounts.high ? "bg-bad" : "bg-muted-foreground/40")} /> {formatNumber(severityCounts.high)} high
-                </Button>
-                <Button size="sm" variant={activeSeverity === "medium" ? "default" : "outline"} onClick={() => onSeveritySelect("medium")}>
-                  <span className={cn("size-1.5 rounded-full", severityCounts.medium ? "bg-warn" : "bg-muted-foreground/40")} /> {formatNumber(severityCounts.medium)} med
-                </Button>
-                <Button size="sm" variant={activeSeverity === "low" ? "default" : "outline"} onClick={() => onSeveritySelect("low")}>
-                  <span className="size-1.5 rounded-full bg-muted-foreground/40" /> {formatNumber(severityCounts.low)} low
-                </Button>
+            <div className="w-full space-y-3">
+              <div className="flex items-start justify-center gap-7">
+                {[
+                  { key: "high", label: "High", count: severityCounts.high, color: severityCounts.high ? "var(--bad)" : undefined },
+                  { key: "medium", label: "Medium", count: severityCounts.medium, color: severityCounts.medium ? "var(--warn)" : undefined },
+                  { key: "low", label: "Low", count: severityCounts.low, color: undefined },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => onSeveritySelect(item.key)}
+                    className="group rounded-md text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  >
+                    <span className="metric block text-xl leading-none" style={{ color: item.color || "var(--foreground)" }}>
+                      {formatNumber(item.count)}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-1 block text-[11px] font-medium uppercase tracking-[0.08em] transition-colors",
+                        activeSeverity === item.key ? "text-foreground" : "text-muted-foreground group-hover:text-foreground",
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </button>
+                ))}
               </div>
               <p className="text-xs leading-5 text-muted-foreground">
-                {formatNumber(scan.issue_count || 0)} issues across {formatNumber(coverage.pages)} pages. Tap a severity to filter the issue list.
+                <Hint tip="Tap a severity to filter the issue list.">
+                  {formatNumber(scan.issue_count || 0)} issues · {formatNumber(coverage.pages)} pages
+                </Hint>
               </p>
             </div>
           )}
-          {scan.error ? <p className="w-full rounded-lg border border-destructive/30 bg-bad-soft/60 p-3 text-left text-xs text-destructive">{scan.error}</p> : null}
+          {scan.error ? <p className="w-full rounded-lg bg-bad-soft/60 p-3 text-left text-xs text-destructive">{scan.error}</p> : null}
         </div>
 
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-3">
+          <MetricTileGrid>
             {tiles.map((tile) => (
               <MetricTile key={tile.label} {...tile} />
             ))}
-          </div>
-          <Tip>
+          </MetricTileGrid>
+          <p className="text-xs leading-5 text-muted-foreground">
             {resourceFailures
               ? `Resource failures detected — ${formatNumber(coverage.brokenLinks)} links, ${formatNumber(coverage.brokenImages)} images and ${formatNumber(coverage.brokenAssets)} assets need attention. `
               : "All checked links, images and assets responded. "}
             Crawl started at <span className="break-all font-medium">{sourceUrl}</span>.
-          </Tip>
+          </p>
         </div>
       </div>
     </ReportSection>
@@ -1364,44 +1202,31 @@ function ScanActionBoard({
     <ReportSection
       title="Fix first"
       description="Grouped issues with the highest crawl and search impact — ranked by severity, then reach."
-      action={<Badge variant={scan.status === "completed" ? "good" : "warn"}>{scanStatusLabel(scan.status)}</Badge>}
     >
       {priorityGroups.length ? (
-        <div className="space-y-3">
-          {priorityGroups.map((group, index) => {
-            const accent = group.severity === "high" ? "bg-bad" : "bg-warn";
-            return (
-              <div
-                key={group.key}
-                className="relative overflow-hidden rounded-xl border border-border bg-card/60 p-4 pl-5 transition-colors hover:border-border/60 hover:bg-accent/30"
-              >
-                <span className={cn("absolute inset-y-0 left-0 w-1", accent)} />
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">{index + 1}</span>
-                      <Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge>
-                      <span className="font-medium leading-snug">{group.message}</span>
-                    </div>
-                    <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{group.recommendation}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
-                      <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-4 lg:flex-col lg:items-end">
-                    <div className="text-right leading-none">
-                      <div className="metric text-2xl">{formatNumber(group.count)}</div>
-                      <div className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">affected</div>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
-                      <ListChecks /> Show issues
-                    </Button>
-                  </div>
+        <div className="divide-y divide-border/60">
+          {priorityGroups.map((group, index) => (
+            <div key={group.key} className="flex flex-col gap-3 py-3.5 first:pt-0 last:pb-0 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="metric w-4 shrink-0 text-right text-sm text-muted-foreground">{index + 1}</span>
+                  <Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge>
+                  <span className="font-medium leading-snug">{group.message}</span>
                 </div>
+                <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{group.recommendation}</p>
+                <p className="text-xs text-muted-foreground">{issueCategoryLabel(group.category)} · {String(group.type || "").replaceAll("-", " ")}</p>
               </div>
-            );
-          })}
+              <div className="flex shrink-0 items-center gap-4 lg:flex-col lg:items-end">
+                <div className="text-right leading-none">
+                  <div className="metric text-2xl">{formatNumber(group.count)}</div>
+                  <div className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">affected</div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
+                  <ListChecks /> Show issues
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <EmptyState
@@ -1706,7 +1531,6 @@ function ScanCheckMatrix({
             <TableHead>Check</TableHead>
             <TableHead>Count</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Issue types</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
@@ -1720,104 +1544,47 @@ function ScanCheckMatrix({
 
 function ScanCheckRow({ row, onSelect }: { row: ScanCheckRowModel & { area?: string; areaText?: string }; onSelect: (row: ScanCheckRowModel) => void }) {
   const value = Number(row.value || 0);
-  const variant = row.problem ? (value > 0 ? row.severity || "warn" : "good") : "outline";
+  const tone = row.problem ? (value > 0 ? (row.severity === "bad" ? "bad" : "warn") : "good") : "outline";
   const clickable = Boolean(row.problem && value > 0 && row.types?.length);
   return (
     <TableRow>
-      <TableCell className="min-w-44">
+      <TableCell className="min-w-40">
         <div className="font-medium">{row.area}</div>
-        <div className="mt-1 text-xs text-muted-foreground">{row.areaText}</div>
+        <div className="mt-0.5 text-xs text-muted-foreground">{row.areaText}</div>
       </TableCell>
-      <TableCell className="min-w-56 font-medium">{row.label}</TableCell>
-      <TableCell className="nums text-lg font-semibold">{formatNumber(value)}</TableCell>
-      <TableCell>
-        {row.problem ? (
-          <Badge variant={variant as any}>{value ? "issues" : "clear"}</Badge>
-        ) : (
-          <Badge variant="outline">evidence</Badge>
-        )}
-      </TableCell>
-      <TableCell className="min-w-64">
+      <TableCell className="min-w-56">
+        <div className="font-medium">{row.label}</div>
         {row.types?.length ? (
-          <div className="flex flex-wrap gap-1">
-            {row.types.map((type) => <Badge key={type} variant="outline">{type.replaceAll("-", " ")}</Badge>)}
-          </div>
-        ) : (
-          <span className="text-sm text-muted-foreground">Measured evidence</span>
-        )}
+          <div className="mt-0.5 text-xs text-muted-foreground">{row.types.map((type) => type.replaceAll("-", " ")).join(" · ")}</div>
+        ) : null}
+      </TableCell>
+      <TableCell className="metric text-lg">{formatNumber(value)}</TableCell>
+      <TableCell>
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
+          <StatusDot tone={tone} />
+          {row.problem ? (value ? "issues" : "clear") : "evidence"}
+        </span>
       </TableCell>
       <TableCell className="text-right">
         {clickable ? (
           <Button size="sm" variant="outline" onClick={() => onSelect(row)}>
             <ListChecks /> Show {formatNumber(value)} issues
           </Button>
-        ) : row.problem ? (
-          <Badge variant="good">No issues</Badge>
-        ) : (
-          <Badge variant="outline">Evidence</Badge>
-        )}
+        ) : null}
       </TableCell>
     </TableRow>
   );
 }
 
-function ScanIssueGroups({ groups, onSelect }: { groups: any[]; onSelect: (group: any) => void }) {
-  return (
-    <ReportSection
-      title="Priority work queue"
-      description={
-        <div className="flex flex-wrap items-center gap-2">
-          <span>Grouped by issue type so repeated failures become one clear task.</span>
-          <Badge variant="outline">{formatNumber(groups.length)} groups</Badge>
-        </div>
-      }
-    >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Severity</TableHead>
-            <TableHead>Issue group</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Affected</TableHead>
-            <TableHead>Recommended fix</TableHead>
-            <TableHead className="text-right">Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {groups.map((group) => (
-            <TableRow key={group.key}>
-              <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
-              <TableCell className="min-w-72">
-                <div className="font-medium">{group.message}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{String(group.type || "").replaceAll("-", " ")}</div>
-              </TableCell>
-              <TableCell className="min-w-36">
-                <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
-              </TableCell>
-              <TableCell className="nums text-lg font-semibold">{formatNumber(group.count)}</TableCell>
-              <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
-              <TableCell className="text-right">
-                <Button size="sm" variant="outline" onClick={() => onSelect(group)}>
-                  <ListChecks /> Show {formatNumber(group.count)} issues
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </ReportSection>
-  );
+function TabCard({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("rounded-2xl border border-border/70 bg-card p-5", className)}>{children}</div>;
 }
 
 function ScanSection({ title, text, children }: { title: string; text: string; children: ReactNode }) {
   return (
-    <div className="space-y-3">
-      <div>
-        <div className="font-medium">{title}</div>
-        <p className="text-sm text-muted-foreground">{text}</p>
-      </div>
+    <ReportSection title={title} description={text}>
       {children}
-    </div>
+    </ReportSection>
   );
 }
 
@@ -1842,10 +1609,7 @@ function ScanIssuesTable({ rows }: { rows: any[] }) {
               <TableCell className="min-w-72 max-w-lg align-top">
                 <div className="font-medium">{issue.message}</div>
                 <div className="mt-1 break-all text-xs leading-5 text-muted-foreground">{issue.url || "No page URL saved"}</div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge variant="outline">{issueCategoryLabel(issue.category)}</Badge>
-                  <Badge variant="outline">{String(issue.type || "").replaceAll("-", " ")}</Badge>
-                </div>
+                <div className="mt-1.5 text-xs text-muted-foreground">{issueCategoryLabel(issue.category)} · {String(issue.type || "").replaceAll("-", " ")}</div>
               </TableCell>
               <TableCell className="min-w-64 max-w-sm align-top text-sm leading-6 text-muted-foreground">
                 {issue.recommendation || "Inspect this item and update the affected page."}

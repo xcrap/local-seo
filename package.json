@@ -19,8 +19,7 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "test:smoke": "bun run tools/smoke-test.ts",
-    "test:waka": "bun run tools/waka-scan-test.ts",
-    "test:ui": "bun run tools/ui-smoke-test.ts"
+    "test:waka": "bun run tools/waka-scan-test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

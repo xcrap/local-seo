@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type ComponentProps, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AlertTriangle, BarChart3, Bot, CheckCircle2, ChevronRight, FileSearch, Gauge, Globe2, Link2, Pencil, Plus, Search, Target, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Bot, CheckCircle2, FileSearch, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@/components/ui";
-import { EmptyState, Field, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreBadgeVariant, setSelectedScanId, SiteAvatar, siteActionMessageStorageKey, siteDisplayName, sortScanRows, stashSiteActionMessage, takeSiteActionMessage } from "../shared";
+import { EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteActionMessageStorageKey, siteDisplayName, sortScanRows, stashSiteActionMessage, takeSiteActionMessage } from "../shared";
 import { cn } from "@/lib/utils";
 import { ScanTable } from "./scans";
 
@@ -122,10 +122,41 @@ export function Overview({
       <PageHeader
         title={siteDisplayName(site)}
         description={site.domain ? undefined : "Add a site to unlock scans, reports, rankings, and Search Console."}
-        action={<Badge variant="outline">{site.domain || "No site yet"}</Badge>}
+        meta={
+          site.domain ? (
+            <span className="flex flex-wrap items-center gap-x-2">
+              <span>{site.domain}</span>
+              <span className="text-border">·</span>
+              <Hint
+                tip={
+                  <span className="space-y-1">
+                    <span className="block">Crawl starts at {preferredScanUrl(site)}</span>
+                    <span className="block">Keyword tools: {keywordToolDefaultsLabel(site)}</span>
+                  </span>
+                }
+              >
+                {scanUrlShortDetail(site)}
+              </Hint>
+            </span>
+          ) : (
+            "No website address yet"
+          )
+        }
+        action={
+          site.domain ? (
+            <>
+              <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
+                <Link to="/"><Pencil /> Edit site</Link>
+              </Button>
+              <Button size="sm" onClick={scanSite} disabled={scanning}>
+                <FileSearch /> {scanning ? "Starting" : "Scan website"}
+              </Button>
+            </>
+          ) : undefined
+        }
       />
       {!site.domain ? (
-        <section className="mb-6 rounded-xl border border-primary/30 bg-primary/[0.03] p-5 sm:p-6">
+        <section className="mb-6 rounded-2xl border border-primary/25 bg-primary/[0.03] p-5 sm:p-6">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">Start with a site scan</h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the website address once. The scan report opens automatically and stays saved locally.</p>
@@ -162,42 +193,39 @@ export function Overview({
             </div>
             <ScanPlanPreview site={firstScanPlan} />
           </form>
-          {firstScanError && <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{firstScanError}</p>}
+          {firstScanError && <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{firstScanError}</p>}
         </section>
       ) : null}
-      {scanError && <p className="mb-6 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{scanError}</p>}
+      {scanError && <p className="mb-6 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{scanError}</p>}
       {scan && (
-        <section className="mb-6 rounded-xl border border-primary/30 bg-primary/[0.03] p-5 sm:p-6">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold">
-              {scanRun?.status === "completed" ? "Scan complete" : scanRun?.status === "failed" ? "Scan failed" : "Scan running"} for {scan.scanUrl || scanRun?.url || scan.site}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {scanRun?.pages_crawled || 0} pages scanned · {scanRun?.issue_count || 0} issues found
-            </p>
+        <section className="mb-6 rounded-2xl border border-primary/25 bg-primary/[0.03] p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-heading text-lg leading-tight">
+                {scanRun?.status === "completed" ? "Scan complete" : scanRun?.status === "failed" ? "Scan failed" : "Scan running"}
+                <span className="ml-2 text-sm text-muted-foreground">{scan.scanUrl || scanRun?.url || scan.site}</span>
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {scanRun?.pages_crawled || 0} pages scanned · {scanRun?.issue_count || 0} issues found
+              </p>
+            </div>
+            <Button asChild variant="secondary" size="sm">
+              <Link to={scanRun?.id ? `/scans/${scanRun.id}` : "/scans"}>Open scan report</Link>
+            </Button>
           </div>
           <div className="space-y-4">
             <ProgressBar value={scanProgress(scanRun)} />
             {scan.related?.length ? <ScanCoverageList rows={scan.related} scanStatus={scanRun?.status} /> : null}
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="secondary">
-                <Link to={scanRun?.id ? `/scans/${scanRun.id}` : "/scans"}>Open scan report</Link>
-              </Button>
-              <Button asChild variant="secondary"><Link to="/domain">View organic research</Link></Button>
-              <Button asChild variant="secondary"><Link to="/links">View links</Link></Button>
-            </div>
           </div>
         </section>
       )}
-      <div className="mb-6">
-        <SiteCommandCenter site={site} summary={summary} scanning={scanning} onScan={scanSite} />
+      <div className="mb-8">
+        <SiteCommandCenter summary={summary} />
       </div>
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]">
-        <ReportSection title="Scan history" description={`${formatNumber(scanLedgerRows.length)} saved scans in local SQLite.`}>
+      <div className="grid gap-x-8 gap-y-8 2xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]">
+        <ReportSection title="Scan history" meta={`${formatNumber(scanLedgerRows.length)} saved`}>
           {scanLedgerRows.length ? (
-            <div className="-mx-5 -mb-5">
-              <ScanTable rows={scanLedgerRows} showSite activeSiteId={site.id} onInspect={openScanReport} />
-            </div>
+            <ScanTable rows={scanLedgerRows} showSite activeSiteId={site.id} onInspect={openScanReport} />
           ) : (
             <EmptyState
               icon={FileSearch}
@@ -215,7 +243,7 @@ export function Overview({
             />
           )}
         </ReportSection>
-        <ReportSection title="Codex job history" description="Local AI work runs through the Codex CLI with medium reasoning.">
+        <ReportSection title="Codex jobs" description="Local AI work runs through the Codex CLI with medium reasoning.">
           {summary?.latestAiJobs?.length ? (
             <JobTable rows={summary.latestAiJobs} />
           ) : (
@@ -232,194 +260,153 @@ export function Overview({
   );
 }
 
+type ControlTileModel = {
+  key: string;
+  label: string;
+  to: string;
+  value: ReactNode;
+  status: string;
+  tone: ComponentProps<typeof StatusDot>["tone"];
+  tip?: ReactNode;
+};
+
 function SiteCommandCenter({
-  site,
   summary,
-  scanning,
-  onScan,
 }: {
-  site: Site;
   summary: any;
-  scanning: boolean;
-  onScan: () => void;
 }) {
   const latestScan = summary?.latestScans?.[0];
   const latestScanSummary = latestScan?.result?.summary || {};
   const latestScanSpeed = latestScan ? scanSpeedMetrics(latestScan) : null;
   const latestGscImport = summary?.latestGscImport;
-  const rows = [
-    {
-      key: "site",
-      area: "Active site",
-      status: site.domain || "Needs website address",
-      evidence: site.domain
-        ? `Scan plan: ${scanUrlShortDetail(site)} · starts at ${preferredScanUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
-        : "Add a site before running scans, rankings, Search Console imports, or AI work.",
-      action: site.domain ? (
-        <Button size="sm" onClick={onScan} disabled={scanning}>
-          <FileSearch /> {scanning ? "Starting" : "Scan website"}
-        </Button>
-      ) : (
-        <Button asChild size="sm"><Link to="/"><Plus /> Add site</Link></Button>
-      ),
-      secondary: site.domain ? (
-        <Button asChild size="sm" variant="outline"><Link to="/"><Pencil /> Edit site</Link></Button>
-      ) : null,
-    },
+  const brokenLinks = Number(latestScanSummary.brokenLinks || 0);
+  const tiles: ControlTileModel[] = [
     {
       key: "scan",
-      area: "Technical scan",
-      status: latestScan ? scanStatusLabel(latestScan.status) : "Needs scan",
-      evidence: latestScan
-        ? `${formatNumber(latestScan.pages_crawled)} pages · ${formatNumber(latestScan.issue_count)} issues · ${formatNumber(latestScanSummary.checkedLinks || 0)} links checked`
-        : "No crawl evidence saved yet.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/scans"><FileSearch /> Open site scans</Link></Button>,
-      secondary: latestScan ? (
-        <Button asChild size="sm" variant="outline">
-          <Link to={`/scans/${latestScan.id}`}><FileSearch /> Open scan report</Link>
-        </Button>
-      ) : null,
+      label: "Technical scan",
+      to: latestScan ? `/scans/${latestScan.id}` : "/scans",
+      value: latestScan ? formatNumber(latestScan.issue_count) : "—",
+      status: latestScan ? `${scanStatusLabel(latestScan.status)} · ${formatNumber(latestScan.pages_crawled)} pages` : "Needs scan",
+      tone: latestScan ? (latestScan.status === "failed" ? "bad" : "good") : "warn",
+      tip: latestScan
+        ? `Open issues found across ${formatNumber(latestScan.pages_crawled)} crawled pages, with ${formatNumber(latestScanSummary.checkedLinks || 0)} links checked. Opens the full scan report.`
+        : "No crawl evidence saved yet. Run a scan to build the technical report.",
     },
     {
       key: "speed",
-      area: "Page speed",
-      status: latestScanSpeed?.measuredPageLoads ? "Timing measured" : "Needs scan",
-      evidence: latestScanSpeed?.measuredPageLoads
-        ? `${formatNumber(latestScanSpeed.measuredPageLoads)} pages timed · average ${formatMs(latestScanSpeed.averagePageLoadMs)} · p95 ${formatMs(latestScanSpeed.p95PageLoadMs)} · ${formatNumber(latestScanSpeed.slowPages)} slow`
+      label: "Page speed",
+      to: latestScanSpeed?.measuredPageLoads && latestScan ? `/scans/${latestScan.id}?tab=speed` : "/scans",
+      value: latestScanSpeed?.measuredPageLoads ? formatMs(latestScanSpeed.averagePageLoadMs) : "—",
+      status: latestScanSpeed?.measuredPageLoads
+        ? `${formatNumber(latestScanSpeed.measuredPageLoads)} pages timed · ${formatNumber(latestScanSpeed.slowPages)} slow`
+        : "Needs scan",
+      tone: latestScanSpeed?.measuredPageLoads ? (latestScanSpeed.slowPages ? "warn" : "good") : "warn",
+      tip: latestScanSpeed?.measuredPageLoads
+        ? `Average response across timed pages. p95 ${formatMs(latestScanSpeed.p95PageLoadMs)} · slowest ${formatMs(latestScanSpeed.slowestPageLoadMs)}. Opens the speed report.`
         : "Run a site scan to record response timings for every crawled HTML page.",
-      action: latestScanSpeed?.measuredPageLoads ? (
-        <Button asChild size="sm" variant="secondary">
-          <Link to={`/scans/${latestScan.id}?tab=speed`}><Zap /> Open speed report</Link>
-        </Button>
-      ) : site.domain ? (
-        <Button size="sm" variant="secondary" onClick={onScan} disabled={scanning}>
-          <Zap /> {scanning ? "Starting" : "Scan website"}
-        </Button>
-      ) : (
-        <Button asChild size="sm" variant="secondary"><Link to="/"><Plus /> Add site</Link></Button>
-      ),
-      secondary: latestScan ? (
-        <Button asChild size="sm" variant="outline"><Link to="/scans"><FileSearch /> Open scan history</Link></Button>
-      ) : null,
-    },
-    {
-      key: "organic",
-      area: "Organic research",
-      status: summary?.savedKeywordCount ? "Keywords saved" : "Ready for research",
-      evidence: `${formatNumber(summary?.savedKeywordCount || 0)} saved keywords · local crawl pages feed this screen`,
-      action: <Button asChild size="sm" variant="secondary"><Link to="/domain"><Globe2 /> Open organic research</Link></Button>,
-      secondary: null,
     },
     {
       key: "links",
-      area: "Links",
-      status: latestScan ? "Local graph ready" : "Needs scan",
-      evidence: latestScan
-        ? `${formatNumber(latestScanSummary.linkTags || 0)} link tags · ${formatNumber(latestScanSummary.brokenLinks || 0)} broken`
+      label: "Links",
+      to: "/links",
+      value: latestScan ? formatNumber(latestScanSummary.linkTags || 0) : "—",
+      status: latestScan ? `${formatNumber(brokenLinks)} broken` : "Needs scan",
+      tone: latestScan ? (brokenLinks ? "bad" : "good") : "warn",
+      tip: latestScan
+        ? "Link tags found in the last crawl. Opens the local link graph."
         : "Run a site scan to build the local link graph.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/links"><Link2 /> Open local link graph</Link></Button>,
-      secondary: null,
+    },
+    {
+      key: "organic",
+      label: "Organic research",
+      to: "/domain",
+      value: formatNumber(summary?.savedKeywordCount || 0),
+      status: summary?.savedKeywordCount ? "keywords saved" : "ready for research",
+      tone: summary?.savedKeywordCount ? "good" : "outline",
+      tip: "Saved keywords in the local list. Local crawl pages feed the organic research screen.",
     },
     {
       key: "rank",
-      area: "Rank tracking",
-      status: summary?.trackerCount ? "Tracking keywords" : "Manual checks",
-      evidence: `${formatNumber(summary?.trackerCount || 0)} trackers · ${formatNumber(summary?.serpRunCount || 0)} SERP runs`,
-      action: <Button asChild size="sm" variant="secondary"><Link to="/rank"><Target /> Open rank tracking</Link></Button>,
-      secondary: null,
+      label: "Rank tracking",
+      to: "/rank",
+      value: formatNumber(summary?.trackerCount || 0),
+      status: `${formatNumber(summary?.serpRunCount || 0)} SERP runs`,
+      tone: summary?.trackerCount ? "good" : "outline",
+      tip: "Tracked keywords and saved SERP position checks for this site.",
     },
     {
       key: "gsc",
-      area: "Search Console",
-      status: summary?.gscImportCount ? "Local CSV imports" : "Ready for import",
-      evidence: summary?.gscImportCount
-        ? `${formatNumber(summary.gscImportCount)} CSV imports · latest has ${formatNumber(latestGscImport?.rowCount || 0)} rows and ${formatNumber(latestGscImport?.totals?.clicks || 0)} clicks`
+      label: "Search Console",
+      to: "/gsc",
+      value: formatNumber(summary?.gscImportCount || 0),
+      status: summary?.gscImportCount
+        ? `latest import: ${formatNumber(latestGscImport?.rowCount || 0)} rows`
+        : "ready for import",
+      tone: summary?.gscImportCount ? "good" : "outline",
+      tip: summary?.gscImportCount
+        ? `Local CSV imports. The latest has ${formatNumber(latestGscImport?.rowCount || 0)} rows and ${formatNumber(latestGscImport?.totals?.clicks || 0)} clicks.`
         : "Import a Search Console CSV locally, or connect Google for live performance and inspection.",
-      action: <Button asChild size="sm" variant="secondary"><Link to="/gsc"><BarChart3 /> Open Search Console</Link></Button>,
-      secondary: null,
     },
     {
       key: "ai",
-      area: "AI lab",
-      status: summary?.latestAiJobs?.length ? "Jobs saved" : "Ready for Codex",
-      evidence: `${formatNumber(summary?.latestAiJobs?.length || 0)} saved Codex jobs · runs locally with medium reasoning`,
-      action: <Button asChild size="sm" variant="secondary"><Link to="/ai"><Bot /> Open AI lab</Link></Button>,
-      secondary: null,
+      label: "AI lab",
+      to: "/ai",
+      value: formatNumber(summary?.latestAiJobs?.length || 0),
+      status: summary?.latestAiJobs?.length ? "jobs saved" : "ready for Codex",
+      tone: summary?.latestAiJobs?.length ? "good" : "outline",
+      tip: "Saved Codex jobs. Runs locally through the Codex CLI with medium reasoning.",
     },
   ];
 
-  const iconByKey: Record<string, any> = {
-    site: Globe2,
-    scan: FileSearch,
-    speed: Zap,
-    organic: Search,
-    links: Link2,
-    rank: Target,
-    gsc: BarChart3,
-    ai: Bot,
-  };
-
   return (
-    <section>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="eyebrow-muted">Site control</h2>
-        {site.domain ? <Badge variant="outline">{scanUrlShortDetail(site)}</Badge> : null}
-      </div>
-      <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border bg-card">
-        {rows.map((row) => {
-          const Icon = iconByKey[row.key] || Gauge;
-          return (
-            <div key={row.key} className="flex flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-accent/30 sm:flex-row sm:items-center sm:gap-4">
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/12">
-                  <Icon className="size-4" />
-                </span>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{row.area}</span>
-                    <Badge variant={siteCommandStatusVariant(row.status)}>{row.status}</Badge>
-                  </div>
-                  <p className="mt-0.5 truncate text-sm text-muted-foreground">{row.evidence}</p>
-                </div>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-                {row.action}
-                {row.secondary}
-              </div>
+    <section aria-label="Site control">
+      <h2 className="sr-only">Site control</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
+        {tiles.map((tile) => (
+          <Link
+            key={tile.key}
+            to={tile.to}
+            className="group min-w-0 rounded-2xl border border-border/70 bg-card px-4 py-4 transition-colors duration-150 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="eyebrow-muted truncate">{tile.label}</span>
+              <ArrowUpRight className="size-3.5 shrink-0 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
             </div>
-          );
-        })}
+            <div className="metric mt-2 text-[1.7rem] leading-none">{tile.value}</div>
+            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <StatusDot tone={tile.tone} />
+              {tile.tip ? <Hint tip={tile.tip} className="truncate">{tile.status}</Hint> : <span className="truncate">{tile.status}</span>}
+            </div>
+          </Link>
+        ))}
       </div>
     </section>
   );
 }
 
-function siteCommandStatusVariant(status: string): ComponentProps<typeof Badge>["variant"] {
-  return /^Needs/i.test(status) ? "warn" : "outline";
-}
-
 function ScanCoverageList({ rows, scanStatus }: { rows: any[]; scanStatus?: string }) {
   return (
-    <div className="divide-y rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
+    <div className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card/60">
       {rows.map((row) => {
         const status = row.key === "technical-scan" && scanStatus ? scanStatus : row.status;
-        const variant = status === "completed" || status === "queued" || status === "running" || status === "local" ? "good" : status === "needs-provider" ? "warn" : "outline";
+        const tone = status === "completed" || status === "queued" || status === "running" || status === "local" ? "good" : status === "needs-provider" ? "warn" : "outline";
         const actionLabel = row.key === "technical-scan"
           ? "Open live report"
           : row.key === "page-speed"
             ? "Open speed report"
             : `Open ${String(row.label || "").toLowerCase()}`;
         return (
-          <div key={row.key} className="grid gap-3 p-4 lg:grid-cols-[220px_1fr_auto] lg:items-center">
-            <div className="flex items-center gap-3">
-              <Badge variant={variant as any}>{scanStatusLabel(status)}</Badge>
-              <div className="font-medium">{row.label}</div>
+          <div key={row.key} className="grid gap-x-4 gap-y-1 px-4 py-2.5 lg:grid-cols-[200px_1fr_auto] lg:items-center">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <StatusDot tone={tone as any} />
+              {row.label}
+              <span className="font-normal text-muted-foreground">{scanStatusLabel(status)}</span>
             </div>
-            <p className="text-sm leading-6 text-muted-foreground">{row.message}</p>
+            <p className="min-w-0 truncate text-[13px] text-muted-foreground" title={row.message}>{row.message}</p>
             {row.route ? (
-              <Button asChild size="sm" variant="outline">
-                <Link to={row.route}>{actionLabel}</Link>
-              </Button>
+              <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" to={row.route}>
+                {actionLabel}
+              </Link>
             ) : null}
           </div>
         );
@@ -706,12 +693,12 @@ export function SitesManager({
   const banners = (
     <>
       {actionMessage ? (
-        <p className="mb-4 flex items-center gap-2 rounded-lg border border-good/20 bg-good-soft/60 px-3.5 py-2.5 text-sm text-good">
+        <p className="mb-4 flex items-center gap-2 rounded-lg bg-good-soft/60 px-3.5 py-2.5 text-sm text-good">
           <CheckCircle2 className="size-4 shrink-0" /> {actionMessage}
         </p>
       ) : null}
       {error && (
-        <p className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/30 bg-bad-soft/60 px-3.5 py-2.5 text-sm text-destructive">
+        <p className="mb-4 flex items-center gap-2 rounded-lg bg-bad-soft/60 px-3.5 py-2.5 text-sm text-destructive">
           <AlertTriangle className="size-4 shrink-0" /> {error}
         </p>
       )}
@@ -719,14 +706,11 @@ export function SitesManager({
   );
 
   const onboarding = (
-    <section className="rounded-2xl border border-dashed border-primary/40 bg-primary/[0.035] p-6 sm:p-9">
+    <section className="rounded-2xl border border-dashed border-primary/35 p-6 sm:p-9">
       <div className="mx-auto max-w-2xl text-center">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
-          <Globe2 className="size-6" />
-        </div>
-        <h2 className="page-title mt-4 text-2xl font-medium">Add your first website</h2>
+        <h2 className="page-title text-[1.9rem]">Add your first website</h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-          Save the address once. The technical scan runs immediately and everything — score, issues, speed, links — stays in local SQLite.
+          Save the address once. The scan runs immediately and everything — score, issues, speed, links — stays on this machine.
         </p>
       </div>
       <form className="mx-auto mt-6 max-w-2xl space-y-4" onSubmit={submit}>
@@ -779,59 +763,54 @@ export function SitesManager({
     return (
       <div
         key={site.id}
-        className={cn("group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/35", isActive ? "bg-primary/[0.045]" : "")}
+        className={cn("group flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-accent/35", isActive ? "bg-primary/[0.045]" : "")}
       >
         <button type="button" onClick={openWorkspace} className="flex min-w-0 flex-1 items-center gap-3 text-left" title={`Open ${site.name}`}>
           <SiteAvatar site={site} className="size-10 text-sm" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="truncate font-medium transition-colors group-hover:text-primary">{site.name}</span>
-              {isActive ? <Badge variant="good">Active</Badge> : null}
+              <span className="font-heading truncate text-[17px] transition-colors group-hover:text-primary">{site.name}</span>
+              {isActive ? <span className="inline-flex items-center gap-1.5 text-xs font-medium text-good"><StatusDot tone="good" /> Active</span> : null}
             </div>
-            <div className="truncate text-sm text-muted-foreground">{site.domain || "No website address"}</div>
+            <div className="mt-0.5 truncate text-sm text-muted-foreground">
+              {site.domain ? (
+                <Hint tip={`${crawlPreferenceLabel(site)} · ${scanUrlCountLabel(site)} · starts at ${preferredScanUrl(site)}`}>
+                  {site.domain}
+                </Hint>
+              ) : (
+                "No website address"
+              )}
+            </div>
           </div>
         </button>
 
-        {site.domain ? (
-          <div className="hidden min-w-0 max-w-[20rem] flex-1 lg:block">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline">{crawlPreferenceLabel(site)}</Badge>
-              <Badge variant="outline">{scanUrlCountLabel(site)}</Badge>
-            </div>
-            <div className="mt-1 truncate text-xs text-muted-foreground">{preferredScanUrl(site)}</div>
-          </div>
-        ) : null}
-
-        <div className="hidden items-center gap-3 xl:flex">
+        <div className="hidden items-baseline gap-3 md:flex">
           {scanned ? (
             <>
-              <Badge variant={scoreBadgeVariant(score)}>{formatNumber(score)} health</Badge>
+              <span className="metric text-2xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
               <span className="whitespace-nowrap text-xs text-muted-foreground">
                 <span className={sev.high ? "font-medium text-bad" : ""}>{formatNumber(sev.high)}</span> high ·{" "}
                 <span className={sev.medium ? "font-medium text-warn" : ""}>{formatNumber(sev.medium)}</span> med · {formatNumber(scan.pages_crawled)} pages
               </span>
             </>
           ) : (
-            <Badge variant="outline">Not scanned</Badge>
+            <span className="text-xs text-muted-foreground">Not scanned</span>
           )}
         </div>
 
-        {site.domain ? (
-          <Button size="sm" variant="outline" className="hidden sm:inline-flex" disabled={scanningSiteId === site.id} onClick={() => scanSite(site)}>
-            <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan"}
-          </Button>
-        ) : null}
-        <div className="flex items-center opacity-60 transition-opacity group-hover:opacity-100">
-          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
+        <div className="flex shrink-0 items-center gap-1">
+          {site.domain ? (
+            <Button size="sm" variant="outline" className="hidden sm:inline-flex" disabled={scanningSiteId === site.id} onClick={() => scanSite(site)}>
+              <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan"}
+            </Button>
+          ) : null}
+          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground/70 hover:text-foreground" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
             <Pencil />
           </Button>
-          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
+          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground/70 hover:text-destructive" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
             <Trash2 />
           </Button>
         </div>
-        <Button size="sm" variant="ghost" className="text-muted-foreground group-hover:text-foreground" onClick={openWorkspace}>
-          Open <ChevronRight />
-        </Button>
       </div>
     );
   }
@@ -964,24 +943,22 @@ export function SitesManager({
   if (variant === "home") {
     return (
       <>
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border/70 pb-4">
-          <div className="min-w-0">
-            <h1 className="page-title text-[1.7rem] leading-tight">Your sites</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {formatNumber(sites.length)} {sites.length === 1 ? "site" : "sites"} · open one to enter its workspace
-            </p>
-          </div>
-          {sites.length ? (
-            <Button onClick={() => setOpen(true)}>
-              <Plus /> Add site
-            </Button>
-          ) : null}
-        </div>
+        <PageHeader
+          title="Your sites"
+          meta={`${formatNumber(sites.length)} ${sites.length === 1 ? "site" : "sites"} · open one to enter its workspace`}
+          action={
+            sites.length ? (
+              <Button onClick={() => setOpen(true)}>
+                <Plus /> Add site
+              </Button>
+            ) : undefined
+          }
+        />
         {banners}
         {sites.length === 0 ? (
           onboarding
         ) : (
-          <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
+          <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border bg-card">
             {sites.map((site) => renderSiteRow(site))}
           </div>
         )}
@@ -994,7 +971,7 @@ export function SitesManager({
 
   return (
     <>
-      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04),0_10px_28px_-20px_rgb(38_32_20/0.2)]">
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-heading text-lg font-semibold">Sites</h2>

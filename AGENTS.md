@@ -53,8 +53,8 @@
 - Run `bun x tsc -p tsconfig.json` after backend TypeScript changes.
 - Run `bun x tsc -p web/tsconfig.json` after frontend TypeScript/TSX changes.
 - Run `bun run test:smoke` after route, API, app-shell, scan-report, or source-guard changes.
-- Run `bun run test:ui` after UI/navigation/workflow changes.
 - Run `bun run test:waka` after crawler, sitemap, resource, page-speed, scan scoring, or scan report changes.
+- There are intentionally no UI/browser tests: guards cover the SEO engine (API, crawler, scoring, data), not visual design.
 - Run `bun run build` before shipping frontend-impacting changes.
 
 ## Style Preferences

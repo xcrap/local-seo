@@ -1,8 +1,8 @@
-import { cloneElement, isValidElement, useId, type ComponentProps, type ReactElement, type ReactNode } from "react";
+import { cloneElement, isValidElement, useId, useMemo, useState, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Activity, BarChart3, Bot, Cable, CalendarDays, FileSearch, Gauge, Globe2, Link2, Plus, Search, Sparkles, TableProperties, Target, Zap } from "lucide-react";
+import { Activity, BarChart3, Bot, Cable, CalendarDays, FileSearch, Gauge, Globe2, Info, Link2, Plus, Search, Sparkles, TableProperties, Target, Zap } from "lucide-react";
 import type { Site } from "../api";
-import { Badge, Button, Calendar, Input, Label, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui";
+import { Badge, Button, Calendar, Input, Label, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export const navGroups: { label: string; items: { to: string; label: string; icon: any }[] }[] = [
@@ -162,7 +162,7 @@ export function KeywordToolDefaultsPanel({
   onLanguageCodeChange: (value: string) => void;
 }) {
   return (
-    <div className="rounded-md border bg-muted/15">
+    <div className="rounded-xl bg-muted/40">
       <Button
         type="button"
         variant="ghost"
@@ -307,7 +307,7 @@ export function ScanUrlPills({
         <span
           key={candidate}
           className={cn(
-            "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] px-2.5 py-1 text-xs font-medium",
+            "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-card px-2.5 py-1 text-xs font-medium",
             compact ? "px-2 py-0.5" : "",
           )}
         >
@@ -339,14 +339,11 @@ export function ScanPlanSummary({
 
 export function ScanPlanPreview({ site }: { site?: ScanUrlPlan | null }) {
   return (
-    <div className="rounded-md border bg-muted/20 p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-sm font-semibold">Scan plan preview</div>
-          <div className="mt-0.5 text-xs text-muted-foreground">The scan button will try these URLs in this order.</div>
-        </div>
-        <Badge variant="outline">{scanUrlCountLabel(site)}</Badge>
-      </div>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-muted/40 px-3.5 py-2.5">
+      <span className="eyebrow-muted inline-flex items-center gap-1.5">
+        Scan plan
+        <InfoTip>The scan tries these URLs in this order and starts from the first one that responds.</InfoTip>
+      </span>
       <ScanUrlPills site={site} compact />
     </div>
   );
@@ -415,6 +412,71 @@ export function Field({
   );
 }
 
+export function FilteredRows({
+  rows,
+  placeholder = "Filter rows…",
+  minRows = 6,
+  children,
+}: {
+  rows: any[];
+  placeholder?: string;
+  minRows?: number;
+  children: (rows: any[]) => ReactNode;
+}) {
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!trimmed) return rows;
+    return rows.filter((row) => JSON.stringify(row).toLowerCase().includes(trimmed));
+  }, [rows, trimmed]);
+  if (rows.length < minRows) return <>{children(rows)}</>;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          className="h-8 max-w-72 text-[13px]"
+        />
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {trimmed ? `${formatNumber(filtered.length)} of ${formatNumber(rows.length)}` : `${formatNumber(rows.length)} rows`}
+        </span>
+      </div>
+      {filtered.length ? children(filtered) : <EmptyState title="No matching rows" text="Nothing in this table matches the filter." />}
+    </div>
+  );
+}
+
+export function InfoTip({ children, label = "More detail" }: { children: ReactNode; label?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="inline-flex shrink-0 items-center text-muted-foreground/60 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-sm"
+        >
+          <Info className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{children}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function Hint({ tip, children, className }: { tip: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("has-tip", className)}>{children}</span>
+      </TooltipTrigger>
+      <TooltipContent>{tip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function SiteDomainField({
   label,
   value,
@@ -431,24 +493,27 @@ export function SiteDomainField({
   const usingSelectedSite = cleanSiteDomain(value) === cleanSiteDomain(siteDomain);
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Label>{label}</Label>
-        {siteDomain ? (
-          <div className="flex items-center gap-2">
-            <Badge variant={usingSelectedSite ? "good" : "outline"}>
-              {usingSelectedSite ? "Active site" : "Comparison domain"}
-            </Badge>
-            {!usingSelectedSite ? (
-              <Button type="button" size="sm" variant="ghost" onClick={() => onChange(siteDomain)}>
-                Use active site
-              </Button>
-            ) : null}
-          </div>
+      <div className="flex items-center justify-between gap-2">
+        <Label className="inline-flex items-center gap-1.5">
+          {label}
+          {hint ? <InfoTip label={`About ${label}`}>{hint}</InfoTip> : null}
+        </Label>
+        {siteDomain && !usingSelectedSite ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => onChange(siteDomain)}
+          >
+            Use active site
+          </Button>
         ) : null}
       </div>
       <Input aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} placeholder={siteDomain || "example.com"} />
-      {siteDomain ? <p className="text-xs text-muted-foreground">Active site domain: {siteDomain}</p> : null}
-      {hint ? <p className="text-xs leading-5 text-muted-foreground">{hint}</p> : null}
+      {siteDomain && !usingSelectedSite ? (
+        <p className="text-xs text-muted-foreground">Comparing against the active site, {siteDomain}.</p>
+      ) : null}
     </div>
   );
 }
@@ -507,15 +572,11 @@ export function DatePicker({
 export function EmptyState({ title, text, action, icon }: { title: string; text: string; action?: ReactNode; icon?: any }) {
   const Icon = icon;
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-border bg-muted/25 px-6 py-10 text-center">
-      {Icon ? (
-        <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
-          <Icon className="size-5" />
-        </div>
-      ) : null}
-      <p className="font-heading text-base font-semibold">{title}</p>
-      <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-muted-foreground">{text}</p>
-      {action ? <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div> : null}
+    <div className="flex flex-col items-center rounded-xl bg-muted/45 px-6 py-9 text-center">
+      {Icon ? <Icon className="mb-2.5 size-5 text-muted-foreground/50" /> : null}
+      <p className="font-heading text-base">{title}</p>
+      <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">{text}</p>
+      {action ? <div className="mt-4 flex flex-wrap justify-center gap-2">{action}</div> : null}
     </div>
   );
 }
@@ -537,43 +598,26 @@ export function StatsBand({
   items: StatItem[];
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-      {title || text ? (
-        <div className="border-b px-5 py-4">
-          {title ? <h2 className="text-lg font-semibold">{title}</h2> : null}
-          {text ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p> : null}
+    <section>
+      {title ? (
+        <div className="mb-3 flex items-center gap-2">
+          <h2 className="font-heading text-lg leading-tight">{title}</h2>
+          {text ? <InfoTip>{text}</InfoTip> : null}
         </div>
       ) : null}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Metric</TableHead>
-            <TableHead>Value</TableHead>
-            <TableHead>Evidence</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((item) => {
-            const Icon = item.icon;
-            return (
-              <TableRow key={item.title}>
-                <TableCell className="min-w-56">
-                  <div className="flex items-center gap-2 font-medium">
-                    {Icon ? <Icon className="size-4 text-muted-foreground" /> : null}
-                    {item.title}
-                  </div>
-                </TableCell>
-                <TableCell className="min-w-40">
-                  <span className="nums text-2xl font-semibold">{formatNumber(item.value)}</span>
-                </TableCell>
-                <TableCell className="min-w-80 text-sm leading-6 text-muted-foreground">
-                  {item.detail || "Measured from the saved run."}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(10.5rem,1fr))]">
+        {items.map((item) => (
+          <div key={item.title} className="min-w-0 rounded-xl bg-muted/55 px-4 py-3.5">
+            <div className="flex items-center gap-1.5">
+              <span className="eyebrow-muted truncate">{item.title}</span>
+              {item.detail ? <InfoTip label={`About ${item.title}`}>{item.detail}</InfoTip> : null}
+            </div>
+            <div className="metric mt-1.5 text-[1.7rem] leading-none">
+              {formatNumber(item.value)}
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -581,36 +625,39 @@ export function StatsBand({
 export function ReportSection({
   title,
   description,
+  meta,
   action,
   children,
 }: {
   title: string;
   description?: ReactNode;
+  meta?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04),0_10px_28px_-20px_rgb(38_32_20/0.18)]">
-      <div className="flex flex-col gap-3 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="font-heading text-lg font-semibold leading-tight">{title}</h2>
-          {description ? <div className="mt-1 text-sm leading-6 text-muted-foreground">{description}</div> : null}
+    <section className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 pt-4.5 pb-3.5">
+        <div className="flex min-w-0 items-baseline gap-2.5">
+          <h2 className="font-heading text-[15px] leading-tight">{title}</h2>
+          {description ? <InfoTip label={`About ${title}`}>{description}</InfoTip> : null}
+          {meta ? <span className="text-[13px] text-muted-foreground">{meta}</span> : null}
         </div>
-        {action ? <div className="flex shrink-0 flex-wrap gap-2">{action}</div> : null}
+        {action ? <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div> : null}
       </div>
-      <div className="p-5">{children}</div>
+      <div className="px-5 pb-5">{children}</div>
     </section>
   );
 }
 
 export function ProviderNotice({ title, text, source }: { title: string; text: string; source?: string }) {
   return (
-    <div className="rounded-xl border border-border bg-muted/25 p-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="rounded-lg border border-border/70 bg-muted/20 px-3.5 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         <Badge variant={sourceVariant(source) as any}>{sourceLabel(source)}</Badge>
         <span className="font-medium">{title}</span>
       </div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
+      <p className="mt-1 text-[13px] leading-5 text-muted-foreground">{text}</p>
     </div>
   );
 }
@@ -622,36 +669,37 @@ export type StatusEvidenceRow = {
   text: ReactNode;
 };
 
+export function StatusDot({ tone = "outline", className }: { tone?: StatusEvidenceRow["tone"]; className?: string }) {
+  const color =
+    tone === "good" ? "var(--good)" : tone === "warn" ? "var(--gold)" : tone === "bad" ? "var(--bad)" : "color-mix(in oklch, var(--muted-foreground) 45%, transparent)";
+  return <span aria-hidden className={cn("inline-block size-2 shrink-0 rounded-full", className)} style={{ backgroundColor: color }} />;
+}
+
 export function StatusEvidenceTable({ rows }: { rows: StatusEvidenceRow[] }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Area</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Evidence</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <div className="@container">
+      <div className="divide-y divide-border/60">
         {rows.map((row) => (
-          <TableRow key={row.title}>
-            <TableCell className="min-w-48 font-medium">{row.title}</TableCell>
-            <TableCell className="min-w-40">
-              <Badge variant={(row.tone || "outline") as any} className="max-w-xs break-all whitespace-normal text-left">
-                {row.status}
-              </Badge>
-            </TableCell>
-            <TableCell className="min-w-80 text-sm leading-6 text-muted-foreground">{row.text}</TableCell>
-          </TableRow>
+          <div
+            key={row.title}
+            className="grid gap-x-4 gap-y-1 py-2.5 @2xl:grid-cols-[minmax(10rem,14rem)_minmax(8rem,12rem)_1fr] @2xl:items-baseline"
+          >
+            <div className="text-sm font-medium">{row.title}</div>
+            <div className="flex items-center gap-2 text-sm">
+              <StatusDot tone={row.tone} />
+              <span className="min-w-0 break-words">{row.status}</span>
+            </div>
+            <div className="min-w-0 text-[13px] leading-5 text-muted-foreground">{row.text}</div>
+          </div>
         ))}
-      </TableBody>
-    </Table>
+      </div>
+    </div>
   );
 }
 
 export function JsonBlock({ value }: { value: unknown }) {
   return (
-    <pre className="max-h-[420px] overflow-auto rounded-md bg-secondary p-4 text-xs leading-relaxed text-secondary-foreground">
+    <pre className="max-h-[420px] overflow-auto rounded-xl bg-muted/50 p-4 text-xs leading-relaxed text-foreground/80">
       {JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -795,8 +843,8 @@ export function ProgressBar({ value, tone = "primary" }: { value: number; tone?:
 
 export function Tip({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-gold/30 bg-gold/[0.09] px-3 py-2 text-xs leading-5 text-gold-foreground">
-      <Sparkles className="mt-0.5 size-3.5 shrink-0 opacity-80" />
+    <div className="flex items-start gap-2 rounded-lg bg-gold/[0.12] px-3 py-2 text-xs leading-5 text-gold-foreground">
+      <Sparkles className="mt-0.5 size-3.5 shrink-0 opacity-70" />
       <span>{children}</span>
     </div>
   );
@@ -804,17 +852,22 @@ export function Tip({ children }: { children: ReactNode }) {
 
 export type MetricTileProps = { label: string; value: ReactNode; hint?: ReactNode; tone?: "default" | "good" | "warn" | "bad"; icon?: any };
 
-export function MetricTile({ label, value, hint, tone = "default", icon: Icon }: MetricTileProps) {
+export function MetricTile({ label, value, hint, tone = "default" }: MetricTileProps) {
   const valueColor =
     tone === "good" ? "text-good" : tone === "warn" ? "text-warn" : tone === "bad" ? "text-bad" : "text-foreground";
   return (
-    <div className="rounded-xl border border-border bg-card/60 p-4">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {Icon ? <Icon className="size-3.5" /> : null}
-        {label}
-      </div>
-      <div className={cn("metric mt-2 text-3xl", valueColor)}>{value}</div>
-      {hint ? <div className="mt-1 text-xs leading-5 text-muted-foreground">{hint}</div> : null}
+    <div className="min-w-0 rounded-xl bg-muted/55 px-4 py-3.5">
+      <div className="eyebrow-muted truncate">{label}</div>
+      <div className={cn("metric mt-1.5 text-[1.7rem] leading-none", valueColor)}>{value}</div>
+      {hint ? <div className="mt-1.5 truncate text-xs leading-5 text-muted-foreground">{hint}</div> : null}
+    </div>
+  );
+}
+
+export function MetricTileGrid({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(10.5rem,1fr))]", className)}>
+      {children}
     </div>
   );
 }
@@ -1087,22 +1140,24 @@ export function issueCategoryLabel(value: string) {
 }
 
 export function PageHeader({
-  eyebrow,
   title,
   description,
+  meta,
   action,
 }: {
-  eyebrow?: string;
   title: string;
   description?: string;
+  meta?: ReactNode;
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border/70 pb-4">
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
-        {eyebrow ? <div className="mb-1 text-xs font-semibold uppercase tracking-[0.28em] text-primary">{eyebrow}</div> : null}
-        <h1 className="page-title text-[1.6rem] leading-tight">{title}</h1>
-        {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
+        <div className="flex items-center gap-2.5">
+          <h1 className="page-title text-[1.9rem]">{title}</h1>
+          {description ? <InfoTip label={`About ${title}`}>{description}</InfoTip> : null}
+        </div>
+        {meta ? <div className="mt-1.5 text-sm text-muted-foreground">{meta}</div> : null}
       </div>
       {action ? <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div> : null}
     </div>
@@ -1121,7 +1176,7 @@ export function HistoryList({
   labelTitle?: string;
 }) {
   return (
-    <ReportSection title={title} description={`${formatNumber(rows.length)} saved local rows`}>
+    <ReportSection title={title} meta={`${formatNumber(rows.length)} saved`}>
       {rows.length ? <HistoryTable rows={rows} labelKey={labelKey} labelTitle={labelTitle} /> : <EmptyState title="No history" text="Runs are saved locally." />}
     </ReportSection>
   );
@@ -1331,7 +1386,7 @@ export function SiteAvatar({ site, className }: { site?: Site | null; className?
   return (
     <div
       className={cn(
-        "flex items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary ring-1 ring-inset ring-primary/15",
+        "font-heading flex items-center justify-center rounded-lg bg-primary/10 text-sm text-primary ring-1 ring-inset ring-primary/15",
         className,
       )}
     >

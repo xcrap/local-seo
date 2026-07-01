@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FileSearch, Globe2, Link2, Plus } from "lucide-react";
 import { api, type Site } from "../../api";
 import { Badge, Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
-import { EmptyState, Field, HistoryList, IndexabilityBadge, PageHeader, ProviderNotice, ReportSection, SiteDomainField, SourceBadge, StatusEvidenceTable, defaultEvidenceScan, domainKey, formatDate, formatMetricStatus, formatNumber, hasMetric, LengthBadge, ScanLinksTable, hasIndexabilityEvidence, metricValue, pageH1Status, pageIssueTypesCount, scanIsActive, scanIssueCount, scanStatusLabel, sourceLabel, sourceVariant, setSelectedScanId, sortScanRows } from "../shared";
+import { EmptyState, Field, FilteredRows, HistoryList, IndexabilityBadge, InfoTip, PageHeader, ProviderNotice, ReportSection, SiteDomainField, StatsBand, StatusDot, defaultEvidenceScan, domainKey, formatDate, formatNumber, LengthBadge, ScanLinksTable, hasIndexabilityEvidence, metricValue, pageH1Status, pageIssueTypesCount, scanIsActive, scanIssueCount, scanStatusLabel, sourceLabel, sourceVariant, setSelectedScanId, sortScanRows } from "../shared";
+
+function SourceMeta({ source, extra }: { source?: string; extra?: ReactNode }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <StatusDot tone={sourceVariant(source) as any} />
+      <span>{sourceLabel(source)}</span>
+      {extra}
+    </span>
+  );
+}
 
 export function DomainPage({ site }: { site: Site }) {
   const navigate = useNavigate();
@@ -24,6 +34,7 @@ export function DomainPage({ site }: { site: Site }) {
     () => scanRows.find((scan) => scan.id === selectedScanId) || defaultEvidenceScan(scanRows),
     [scanRows, selectedScanId],
   );
+  const organicImported = history.some((row) => row.source === "organic-import" && domainKey(row.domain) === domainKey(domain));
 
   useEffect(() => {
     setDomain(site.domain);
@@ -132,8 +143,8 @@ export function DomainPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Competitive" title="Organic research" description="Import ranked keywords and top pages for the active site or a competitor site." />
-      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
+      <PageHeader title="Organic research" description="Import ranked keywords and top pages for the active site or a competitor site." />
+      <section className="rounded-2xl border border-border/70 bg-card p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
           <SiteDomainField
             label="Research domain"
@@ -146,26 +157,27 @@ export function DomainPage({ site }: { site: Site }) {
             <Button disabled={loading || !domain.trim()}><Globe2 /> {loading ? "Loading" : "Load organic research"}</Button>
           </div>
         </form>
-        <div className="mt-4 rounded-md border bg-muted/20">
-          <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)_280px]">
-            <div className="border-b px-4 py-3 md:border-b-0 md:border-r">
-              <div className="text-sm font-medium">Organic CSV</div>
-              <Badge className="mt-2" variant={history.some((row) => row.source === "organic-import" && domainKey(row.domain) === domainKey(domain)) ? "good" : "outline"}>
-                {history.some((row) => row.source === "organic-import" && domainKey(row.domain) === domainKey(domain)) ? "Imported" : "CSV ready"}
-              </Badge>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-border/60 pt-4">
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-1.5 text-sm font-medium">
+              <span>Organic CSV</span>
+              <InfoTip label="About organic CSV imports">
+                Import real keyword, position, volume, traffic, difficulty, URL, page, and title columns. Rows are stored in SQLite and used by the tables below.
+              </InfoTip>
             </div>
-            <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
-              Import real keyword, position, volume, traffic, difficulty, URL, page, and title columns. Rows are stored in SQLite and used by the tables below.
-            </div>
-            <div className="px-4 py-3">
-              <Field label="Import organic CSV">
-                <Input type="file" accept=".csv,text/csv" onChange={importOrganicCsv} disabled={importing || !domain.trim()} />
-              </Field>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <StatusDot tone={organicImported ? "good" : "outline"} />
+              <span>{organicImported ? "Imported for this domain" : "No import for this domain yet"}</span>
             </div>
           </div>
+          <div className="w-full sm:w-80">
+            <Field label="Import organic CSV">
+              <Input type="file" accept=".csv,text/csv" onChange={importOrganicCsv} disabled={importing || !domain.trim()} />
+            </Field>
+          </div>
         </div>
-        {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
-        {message ? <p className="mt-3 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
+        {error ? <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
+        {message ? <p className="mt-3 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{message}</p> : null}
       </section>
       <div className="mt-6 space-y-6">
         <LocalOrganicEvidence
@@ -187,13 +199,13 @@ export function DomainPage({ site }: { site: Site }) {
             <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
           </TabsList>
           <TabsContent value="keywords">
-            <ReportSection title="Ranked keywords" description={keywords ? <SourceBadge source={keywords.source} /> : "Run an analysis to load rows."}>
-              {keywords?.keywords?.length ? <DomainKeywordsTable rows={keywords.keywords} /> : <EmptyState title="No keyword rows" text={keywords?.warning || "Analyze an organic research site to load ranked keyword data."} />}
+            <ReportSection title="Ranked keywords" meta={keywords ? <SourceMeta source={keywords.source} /> : undefined}>
+              {keywords?.keywords?.length ? <FilteredRows rows={keywords.keywords} placeholder="Filter keywords…">{(rows) => <DomainKeywordsTable rows={rows} />}</FilteredRows> : <EmptyState title="No keyword rows" text={keywords?.warning || "Analyze an organic research site to load ranked keyword data."} />}
             </ReportSection>
           </TabsContent>
           <TabsContent value="pages">
-            <ReportSection title="Top pages" description={pages ? <SourceBadge source={pages.source} /> : "Run an analysis to load rows."}>
-              {pages?.pages?.length ? <DomainPagesTable rows={pages.pages} /> : <EmptyState title="No page rows" text={pages?.warning || "Analyze an organic research site to load top page data."} />}
+            <ReportSection title="Top pages" meta={pages ? <SourceMeta source={pages.source} /> : undefined}>
+              {pages?.pages?.length ? <FilteredRows rows={pages.pages} placeholder="Filter pages…">{(rows) => <DomainPagesTable rows={rows} />}</FilteredRows> : <EmptyState title="No page rows" text={pages?.warning || "Analyze an organic research site to load top page data."} />}
             </ReportSection>
           </TabsContent>
           <TabsContent value="snapshot">
@@ -224,7 +236,7 @@ function ScanRunPicker({
       <Label>{label}</Label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Select value={selected?.id || ""} onValueChange={onScanChange}>
-          <SelectTrigger aria-label={label} className="min-w-0 flex-1">
+          <SelectTrigger aria-label={label} className="min-w-0 flex-1 [&_[data-slot=select-value]]:truncate">
             <SelectValue placeholder="Choose saved scan" />
           </SelectTrigger>
           <SelectContent>
@@ -272,19 +284,12 @@ function LocalOrganicEvidence({
   const missingDescriptionCount = pages.filter((page: any) => !page.description).length;
   const h1IssueCount = pages.reduce((total: number, page: any) => total + pageIssueTypesCount(page, ["h1-count", "h1-empty"]), 0);
   return (
-    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-      <div className="border-b px-5 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Local crawl pages</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Real page evidence from the saved scan shown below. No external keyword or traffic estimates are generated here.
-            </p>
-          </div>
-          <ScanRunPicker label="Saved scan for page evidence" scans={scans} selectedScanId={selectedScanId} onScanChange={onScanChange} />
-        </div>
-      </div>
-      <div className="space-y-4 p-5">
+    <ReportSection
+      title="Local crawl pages"
+      description="Real page evidence from the selected saved scan. No external keyword or traffic estimates are generated here."
+    >
+      <div className="space-y-4">
+        <ScanRunPicker label="Saved scan for page evidence" scans={scans} selectedScanId={selectedScanId} onScanChange={onScanChange} />
         {!scan ? (
           <EmptyState
             title="No local crawl yet"
@@ -305,27 +310,22 @@ function LocalOrganicEvidence({
           />
         ) : (
           <>
-            <div className="divide-y rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-              {[
-                ["Pages crawled", pages.length],
-                ["Indexable pages", indexableCount],
-                ["Indexability unknown", unknownIndexabilityCount],
-                ["Missing titles", missingTitleCount],
-                ["Missing descriptions", missingDescriptionCount],
-                ["H1 issues", h1IssueCount],
-                ["Total crawl issues", scan.issue_count],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-4 px-4 py-3">
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="nums text-xl font-semibold">{formatNumber(value)}</span>
-                </div>
-              ))}
-            </div>
-            {rows.length ? <LocalOrganicPagesTable rows={rows} /> : <EmptyState title="No page rows" text="This saved scan did not save page rows." />}
+            <StatsBand
+              items={[
+                { title: "Pages crawled", value: pages.length },
+                { title: "Indexable pages", value: indexableCount },
+                { title: "Indexability unknown", value: unknownIndexabilityCount, detail: "Pages without saved indexability evidence in this scan." },
+                { title: "Missing titles", value: missingTitleCount },
+                { title: "Missing descriptions", value: missingDescriptionCount },
+                { title: "H1 issues", value: h1IssueCount, detail: "Missing, empty, or repeated H1 headings across crawled pages." },
+                { title: "Crawl issues", value: scan.issue_count, detail: "All issues recorded by this saved scan." },
+              ]}
+            />
+            {rows.length ? <FilteredRows rows={rows} placeholder="Filter crawl pages…">{(filtered) => <LocalOrganicPagesTable rows={filtered} />}</FilteredRows> : <EmptyState title="No page rows" text="This saved scan did not save page rows." />}
           </>
         )}
       </div>
-    </section>
+    </ReportSection>
   );
 }
 
@@ -386,16 +386,21 @@ function OrganicSnapshot({ result, domain, keywordRows, pageRows }: { result: an
   return (
     <ReportSection
       title="Snapshot"
-      description={<><SourceBadge source={result.source} /> {result.createdAt ? <span className="ml-2">{formatDate(result.createdAt)}</span> : null}</>}
+      description="Saved organic research snapshot for the active site or competitor domain analyzed in this run."
+      meta={
+        <SourceMeta
+          source={result.source}
+          extra={<span>· {domain || result.domain || "-"}{result.createdAt ? ` · ${formatDate(result.createdAt)}` : ""}</span>}
+        />
+      }
     >
-      <StatusEvidenceTable
-        rows={[
-          { title: "Research site", status: domain || result.domain || "-", tone: "good", text: "The active site or competitor domain analyzed in this run." },
-          { title: "Keyword rows", status: formatNumber(keywordRows), tone: keywordRows ? "good" : "warn", text: "Rows returned by the real organic search dataset." },
-          { title: "Page rows", status: formatNumber(pageRows), tone: pageRows ? "good" : "warn", text: "Top pages returned for this domain." },
-          { title: "Organic keywords", status: formatMetricStatus(organicKeywords), tone: hasMetric(organicKeywords) ? "good" : "warn", text: "Metric from an imported organic dataset when available." },
-          { title: "Organic traffic", status: formatMetricStatus(organicTraffic), tone: hasMetric(organicTraffic) ? "good" : "warn", text: "External estimate from an imported organic dataset when available." },
-          { title: "Traffic value", status: formatMetricStatus(estimatedValue), tone: hasMetric(estimatedValue) ? "good" : "warn", text: "External estimate from an imported organic dataset when available." },
+      <StatsBand
+        items={[
+          { title: "Keyword rows", value: keywordRows, detail: "Rows returned by the real organic search dataset." },
+          { title: "Page rows", value: pageRows, detail: "Top pages returned for this domain." },
+          { title: "Organic keywords", value: organicKeywords, detail: "Metric from an imported organic dataset when available." },
+          { title: "Organic traffic", value: organicTraffic, detail: "External estimate from an imported organic dataset when available." },
+          { title: "Traffic value", value: estimatedValue, detail: "External estimate from an imported organic dataset when available." },
         ]}
       />
     </ReportSection>
@@ -591,8 +596,8 @@ export function LinksPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Authority" title="Links" description="Local crawl links come from saved scans. Web-wide backlink tables come from CSV imports saved in SQLite." />
-      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
+      <PageHeader title="Links" description="Local crawl links come from saved scans. Web-wide backlink tables come from CSV imports saved in SQLite." />
+      <section className="rounded-2xl border border-border/70 bg-card p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
           <SiteDomainField
             label="Web-wide backlink domain"
@@ -605,26 +610,31 @@ export function LinksPage({ site }: { site: Site }) {
             <Button disabled={loading || !domain.trim() || !backlinkIndexAvailable}><Link2 /> {loading ? "Checking" : backlinkIndexAvailable ? "Check imported backlinks" : "Import CSV first"}</Button>
           </div>
         </form>
-        <div className="mt-4 rounded-md border bg-muted/25">
-          <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)_260px]">
-            <div className="border-b px-4 py-3 md:border-b-0 md:border-r">
-              <div className="text-sm font-medium">Web-wide backlink index</div>
-              <Badge className="mt-2" variant={backlinkIndexAvailable ? "good" : "warn"}>{backlinkIndexAvailable ? "Imported" : "Needs CSV"}</Badge>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-border/60 pt-4">
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-1.5 text-sm font-medium">
+              <span>Web-wide backlink index</span>
+              <InfoTip label="About backlink CSV imports">
+                Import a backlink CSV with source URL, linked URL, referring domain, anchor, follow/nofollow, and status columns. No web-wide backlinks are generated locally.
+              </InfoTip>
             </div>
-            <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
-              {backlinkIndexAvailable
-                ? `${formatNumber(matchingImport.rowCount || matchingImport.row_count || 0)} real rows from ${matchingImport.sourceName || matchingImport.source_name || "backlink CSV"} are available for ${domainKey(domain)}.`
-                : "Import a backlink CSV with source URL, linked URL, referring domain, anchor, follow/nofollow, and status columns. No web-wide backlinks are generated locally."}
-            </div>
-            <div className="px-4 py-3">
-              <Field label="Import backlink CSV">
-                <Input type="file" accept=".csv,text/csv" onChange={importBacklinkCsv} disabled={importing || !domain.trim()} />
-              </Field>
+            <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <StatusDot tone={backlinkIndexAvailable ? "good" : "warn"} />
+              <span className="min-w-0">
+                {backlinkIndexAvailable
+                  ? `${formatNumber(matchingImport.rowCount || matchingImport.row_count || 0)} real rows from ${matchingImport.sourceName || matchingImport.source_name || "backlink CSV"} for ${domainKey(domain)}`
+                  : "Needs CSV"}
+              </span>
             </div>
           </div>
+          <div className="w-full sm:w-80">
+            <Field label="Import backlink CSV">
+              <Input type="file" accept=".csv,text/csv" onChange={importBacklinkCsv} disabled={importing || !domain.trim()} />
+            </Field>
+          </div>
         </div>
-        {importMessage ? <p className="mt-3 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{importMessage}</p> : null}
-        {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
+        {importMessage ? <p className="mt-3 rounded-lg bg-primary/[0.07] px-3.5 py-2.5 text-sm text-primary">{importMessage}</p> : null}
+        {error ? <p className="mt-3 rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
       </section>
       <div className="mt-6 space-y-6">
         <LocalLinkEvidence
@@ -647,8 +657,8 @@ export function LinksPage({ site }: { site: Site }) {
             <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
           </TabsList>
           <TabsContent value="backlinks">
-            <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Import a backlink CSV, then run this table."}>
-              {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title="No web-wide backlink index" text={profile?.warning || "Import a backlink CSV above to populate this table. Local scans do not invent web-wide backlinks."} />}
+            <ReportSection title="External backlinks" meta={profile ? <SourceMeta source={profile.source} /> : undefined}>
+              {profile?.tab === "backlinks" && profile.rows?.length ? <FilteredRows rows={profile.rows} placeholder="Filter backlinks…">{(rows) => <BacklinksRowsTable rows={rows} />}</FilteredRows> : <EmptyState title="No web-wide backlink index" text={profile?.warning || "Import a backlink CSV above to populate this table. Local scans do not invent web-wide backlinks."} />}
             </ReportSection>
           </TabsContent>
           <TabsContent value="domains">
@@ -694,23 +704,18 @@ function LocalLinkEvidence({
   const pages = result.pages || [];
   const checkedByUrl = new Map(checkedLinks.map((link: any) => [link.url, link]));
   const externalLinks = linkInventory.filter((link: any) => link.type === "external");
+  const internalLinks = linkInventory.filter((link: any) => link.type === "internal");
   const brokenLinks = checkedLinks.filter((link: any) => !link.ok);
+  const noInlinkPages = pages.filter((page: any) => Number(page.internalInlinks || 0) === 0);
   const pageRows = [...pages]
     .sort((a, b) => Number(b.internalInlinks || 0) - Number(a.internalInlinks || 0));
   return (
-    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-      <div className="border-b px-5 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Local link graph</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Real internal links, external links, and failing URLs from the saved scan shown below.
-            </p>
-          </div>
-          <ScanRunPicker label="Saved scan for link evidence" scans={scans} selectedScanId={selectedScanId} onScanChange={onScanChange} />
-        </div>
-      </div>
-      <div className="space-y-4 p-5">
+    <ReportSection
+      title="Local link graph"
+      description="Real internal links, external links, and failing URLs from the selected saved scan."
+    >
+      <div className="space-y-4">
+        <ScanRunPicker label="Saved scan for link evidence" scans={scans} selectedScanId={selectedScanId} onScanChange={onScanChange} />
         {!scan ? (
           <EmptyState
             title="No local link graph yet"
@@ -731,21 +736,16 @@ function LocalLinkEvidence({
           />
         ) : (
           <>
-            <div className="divide-y rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
-              {[
-                ["Link tags found", linkInventory.length],
-                ["External links found", linkInventory.filter((link: any) => link.type === "external").length],
-                ["Checked links", checkedLinks.length],
-                ["Broken links", checkedLinks.filter((link: any) => !link.ok).length],
-                ["Pages with no inlinks", pages.filter((page: any) => Number(page.internalInlinks || 0) === 0).length],
-                ["Internal links found", linkInventory.filter((link: any) => link.type === "internal").length],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-4 px-4 py-3">
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="nums text-xl font-semibold">{formatNumber(value)}</span>
-                </div>
-              ))}
-            </div>
+            <StatsBand
+              items={[
+                { title: "Link tags", value: linkInventory.length, detail: "Link tags found in crawled HTML." },
+                { title: "Internal links", value: internalLinks.length },
+                { title: "External links", value: externalLinks.length },
+                { title: "Checked links", value: checkedLinks.length, detail: "Unique link URLs the scan requested and verified." },
+                { title: "Broken links", value: brokenLinks.length },
+                { title: "No inlinks", value: noInlinkPages.length, detail: "Pages with zero internal inlinks in this crawl." },
+              ]}
+            />
             <Tabs defaultValue="external">
               <TabsList>
                 <TabsTrigger value="external">External links</TabsTrigger>
@@ -753,19 +753,19 @@ function LocalLinkEvidence({
                 <TabsTrigger value="internal">Internal graph</TabsTrigger>
               </TabsList>
               <TabsContent value="external">
-                {externalLinks.length ? <LocalExternalLinksTable rows={externalLinks} checkedByUrl={checkedByUrl} /> : <EmptyState title="No external links" text="This saved scan did not find external links." />}
+                {externalLinks.length ? <FilteredRows rows={externalLinks} placeholder="Filter external links…">{(rows) => <LocalExternalLinksTable rows={rows} checkedByUrl={checkedByUrl} />}</FilteredRows> : <EmptyState title="No external links" text="This saved scan did not find external links." />}
               </TabsContent>
               <TabsContent value="broken">
                 {brokenLinks.length ? <ScanLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="This saved scan did not find failing link URLs." />}
               </TabsContent>
               <TabsContent value="internal">
-                {pageRows.length ? <LocalInternalGraphTable rows={pageRows} /> : <EmptyState title="No internal graph" text="This saved scan did not save page link rows." />}
+                {pageRows.length ? <FilteredRows rows={pageRows} placeholder="Filter pages…">{(rows) => <LocalInternalGraphTable rows={rows} />}</FilteredRows> : <EmptyState title="No internal graph" text="This saved scan did not save page link rows." />}
               </TabsContent>
             </Tabs>
           </>
         )}
       </div>
-    </section>
+    </ReportSection>
   );
 }
 
@@ -850,16 +850,25 @@ function BacklinkSnapshot({ result, domain, rows, tab }: { result: any; domain: 
   return (
     <ReportSection
       title="Snapshot"
-      description={<><SourceBadge source={result.source} /> {result.createdAt ? <span className="ml-2">{formatDate(result.createdAt)}</span> : null}</>}
+      description="Saved backlink snapshot for the domain checked in this run. Snapshots are stored locally in SQLite."
+      meta={
+        <SourceMeta
+          source={result.source}
+          extra={
+            <>
+              <span>· {domain || result.domain || "-"}{result.createdAt ? ` · ${formatDate(result.createdAt)}` : ""}</span>
+              {result.warning ? <InfoTip label="Snapshot warning">{result.warning}</InfoTip> : null}
+            </>
+          }
+        />
+      }
     >
-      <StatusEvidenceTable
-        rows={[
-          { title: "Backlink domain", status: domain || result.domain || "-", tone: "good", text: "The domain or URL checked in this run." },
-          { title: "Visible rows", status: formatNumber(rows), tone: rows ? "good" : "warn", text: `Rows currently loaded in the ${tab} tab.` },
-          { title: "Backlinks", status: formatMetricStatus(backlinks), tone: hasMetric(backlinks) ? "good" : "warn", text: "Total backlinks from the imported rows." },
-          { title: "Referring domains", status: formatMetricStatus(referringDomains), tone: hasMetric(referringDomains) ? "good" : "warn", text: "Unique linking domains from the imported rows." },
-          { title: "Dofollow %", status: formatMetricStatus(dofollowRatio), tone: hasMetric(dofollowRatio) ? "good" : "warn", text: "Dofollow ratio computed from the imported rows." },
-          { title: "Source", status: sourceLabel(result.source), tone: sourceVariant(result.source) as any, text: result.warning || "Snapshot saved locally in SQLite." },
+      <StatsBand
+        items={[
+          { title: "Visible rows", value: rows, detail: `Rows currently loaded in the ${tab} tab.` },
+          { title: "Backlinks", value: backlinks, detail: "Total backlinks from the imported rows." },
+          { title: "Referring domains", value: referringDomains, detail: "Unique linking domains from the imported rows." },
+          { title: "Dofollow %", value: dofollowRatio, detail: "Dofollow ratio computed from the imported rows." },
         ]}
       />
     </ReportSection>
