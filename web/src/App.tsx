@@ -1930,6 +1930,7 @@ function SitesPage({
   const [actionMessage, setActionMessage] = useState(takeSiteActionMessage);
   const [scanningSiteId, setScanningSiteId] = useState("");
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
+  const [deletingSiteId, setDeletingSiteId] = useState("");
   const navigate = useNavigate();
 
   function showActionMessage(message: string, persistForRemount = false) {
@@ -2038,6 +2039,7 @@ function SitesPage({
   async function deleteSite(site: Site) {
     setError("");
     clearActionMessage();
+    setDeletingSiteId(site.id);
     try {
       const message = `${cleanSiteDomain(site.domain) || site.name || "Site"} deleted locally.`;
       if (site.id === activeSiteId) stashSiteActionMessage(message);
@@ -2048,6 +2050,8 @@ function SitesPage({
     } catch (err) {
       sessionStorage.removeItem(siteActionMessageStorageKey);
       setError(err instanceof Error ? err.message : "Could not delete site");
+    } finally {
+      setDeletingSiteId("");
     }
   }
 
@@ -2327,9 +2331,9 @@ function SitesPage({
           </AlertDialogHeader>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={() => deleting && deleteSite(deleting)}>
-              Delete site
+            <AlertDialogCancel disabled={Boolean(deletingSiteId)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" disabled={Boolean(deletingSiteId)} onClick={() => deleting && deleteSite(deleting)}>
+              {deletingSiteId ? "Deleting site" : "Delete site"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -620,6 +620,15 @@ try {
       await page.goto(`${webUrl}${route}`, { waitUntil: "networkidle" });
       await assertNoHorizontalOverflow(page, `Mobile ${label}`);
     }
+    await page.goto(`${webUrl}/sites`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: /Delete second.test/i }).click();
+    await page.getByRole("heading", { name: /^Delete site\?$/ }).waitFor();
+    await page.getByText(/saved scans, keywords, trackers, Search Console imports, and local history/i).waitFor();
+    await page.getByRole("button", { name: /^Delete site$/ }).click();
+    await page.getByText("second.test deleted locally.").waitFor();
+    if (await page.getByRole("button", { name: /Delete second.test/i }).count()) {
+      throw new Error("Deleted site still appears in the Sites UI.");
+    }
   } finally {
     await browser.close();
   }

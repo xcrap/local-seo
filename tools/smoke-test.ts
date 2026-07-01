@@ -531,6 +531,9 @@ try {
   if (!webAppClient.includes("saved locally.") || !webAppClient.includes("updated locally.") || !webAppClient.includes("deleted locally.")) {
     throw new Error("Saved-site create, edit, and delete actions should show explicit local confirmations.");
   }
+  if (!webAppClient.includes("Deleting site") || !webAppClient.includes("deletingSiteId")) {
+    throw new Error("Delete-site confirmation should show progress and prevent duplicate destructive submits.");
+  }
   if (!webAppClient.includes('siteActions(site, "mobile")')) {
     throw new Error("Saved-site rows should expose scan, edit, and delete actions in the mobile layout.");
   }
