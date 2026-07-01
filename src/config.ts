@@ -9,7 +9,6 @@ type ConfigRow = {
 
 const SECRET_KEYS = new Set([
   "seo_metrics_api_key",
-  "dataforseo_api_key",
   "google_client_secret",
   "mcp_token",
 ]);
@@ -31,16 +30,11 @@ export function getConfigValue(key: string): string {
   const envKey = key.toUpperCase();
   const envValue =
     process.env[envKey] ||
-    (key === "seo_metrics_api_key" ? process.env.SEO_METRICS_API_KEY || process.env.DATAFORSEO_API_KEY : undefined) ||
-    (key === "dataforseo_api_key" ? process.env.SEO_METRICS_API_KEY || process.env.DATAFORSEO_API_KEY : undefined) ||
+    (key === "seo_metrics_api_key" ? process.env.SEO_METRICS_API_KEY : undefined) ||
     (key === "google_client_id" ? process.env.GOOGLE_CLIENT_ID : undefined) ||
     (key === "google_client_secret" ? process.env.GOOGLE_CLIENT_SECRET : undefined) ||
     (key === "mcp_token" ? process.env.MCP_TOKEN : undefined);
   if (envValue) return envValue.trim();
-  if (key === "seo_metrics_api_key") {
-    const row = get<ConfigRow>("SELECT * FROM app_config WHERE key IN ('seo_metrics_api_key', 'dataforseo_api_key') AND value <> '' ORDER BY key = 'seo_metrics_api_key' DESC LIMIT 1");
-    return row?.value?.trim() || "";
-  }
   const row = get<ConfigRow>("SELECT * FROM app_config WHERE key = ?", [key]);
   return row?.value?.trim() || "";
 }

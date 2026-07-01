@@ -104,7 +104,6 @@ const api = Bun.spawn([process.execPath, "src/index.ts"], {
     PORT: String(apiPort),
     DB_PATH: path.join(tempDir, "ui.sqlite"),
     AUTH_SESSION_SECRET: "ui-smoke-secret-000000000000000000000",
-    DATAFORSEO_API_KEY: "",
     SEO_METRICS_API_KEY: "",
   },
 });

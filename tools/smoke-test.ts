@@ -7,7 +7,6 @@ import { randomUUID } from "node:crypto";
 const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
 process.env.DB_PATH = path.join(tempDir, "scope.sqlite");
-process.env.DATAFORSEO_API_KEY = "";
 process.env.SEO_METRICS_API_KEY = "";
 process.env.CODEX_MODEL = "";
 process.env.CODEX_REASONING_EFFORT = "";
@@ -579,7 +578,6 @@ try {
   const rejectedSecretConfig = await requestFailure("/api/config", {
     method: "PUT",
     body: JSON.stringify({
-      dataforseo_api_key: "should-not-save-here",
       seo_metrics_api_key: "should-not-save-here",
     }),
   });
