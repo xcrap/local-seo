@@ -1145,6 +1145,60 @@ function mapDomainRankedKeyword(item: any, target: string) {
   };
 }
 
+function localAuditPagesForDomain(siteId: string, domain: string, page: number, pageSize: number, search: string) {
+  const scope = `https://${domain}`;
+  const audits = all<any>(
+    `
+    SELECT * FROM audits
+    WHERE site_id = ? AND status = 'completed' AND result_json IS NOT NULL
+    ORDER BY updated_at DESC, created_at DESC
+    LIMIT 10
+    `,
+    [siteId],
+  );
+
+  for (const audit of audits) {
+    const result = jsonParse<any>(audit.result_json, null);
+    const pages = Array.isArray(result?.pages) ? result.pages : [];
+    const rows = pages
+      .filter((row: any) => sameSiteUrl(String(row.finalUrl || row.url || ""), scope))
+      .map((row: any) => {
+        const pageUrl = String(row.finalUrl || row.url || "");
+        return {
+          page: pageUrl,
+          relativePath: relativePath(pageUrl),
+          organicTraffic: null,
+          keywords: null,
+          title: String(row.title || ""),
+          issues: Array.isArray(row.issues) ? row.issues.length : 0,
+          source: "local-audit",
+          auditId: audit.id,
+          auditedAt: audit.updated_at || audit.created_at,
+        };
+      });
+    if (!rows.length) continue;
+
+    const filtered = search
+      ? rows.filter((row: any) =>
+        `${row.page} ${row.relativePath || ""} ${row.title || ""}`.toLowerCase().includes(search),
+      )
+      : rows;
+    const offset = (page - 1) * pageSize;
+    return {
+      domain,
+      page,
+      pageSize,
+      totalCount: filtered.length,
+      hasMore: offset + pageSize < filtered.length,
+      pages: filtered.slice(offset, offset + pageSize),
+      fetchedAt: nowIso(),
+      warning: "Showing real pages from the latest local audit. Traffic and keyword counts stay unavailable without a connected organic dataset.",
+    };
+  }
+
+  return null;
+}
+
 export async function getDomainKeywordSuggestions(input: {
   siteId: string;
   domain?: string;
@@ -1316,6 +1370,12 @@ export async function getDomainPagesPage(input: {
   }
 
   const search = String(input.search || "").trim().toLowerCase();
+  if (source === "provider-not-configured" && sameSiteUrl(`https://${target}`, `https://${site.domain}`)) {
+    const localPages = localAuditPagesForDomain(site.id, target, page, pageSize, search);
+    if (localPages) {
+      return { source: "local-audit", ...localPages };
+    }
+  }
   if (search) {
     result.pages = result.pages.filter((row: any) => String(row.page).toLowerCase().includes(search));
   }

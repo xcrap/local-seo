@@ -679,6 +679,17 @@ try {
   ) {
     throw new Error(`Fixture audit speed summary does not match page-level response timings: ${JSON.stringify(fixtureSummary)}`);
   }
+  const localOrganicPages = await request("/api/domain/pages", {
+    method: "POST",
+    body: JSON.stringify({ siteId: localProject.id, domain: `localhost:${fixtureServer.port}`, pageSize: 10 }),
+  });
+  if (
+    localOrganicPages.source !== "local-audit" ||
+    localOrganicPages.pages?.length !== fixturePages.length ||
+    localOrganicPages.pages.some((row: any) => row.organicTraffic !== null || row.keywords !== null)
+  ) {
+    throw new Error(`Organic top pages should fall back to real local audit rows without generated metrics: ${JSON.stringify(localOrganicPages)}`);
+  }
   const emptyEvidenceAudit = await request("/api/audits", {
     method: "POST",
     body: JSON.stringify({ siteId: localProject.id, url: emptyEvidenceUrl }),

@@ -763,6 +763,7 @@ function sourceLabel(source?: string) {
     "duckduckgo-suggest": "DuckDuckGo suggest",
     duckduckgo: "DuckDuckGo",
     searxng: "SearXNG",
+    "local-audit": "Local audit",
     "web-search": "Web search",
     codex: "Local Codex",
     "search-error": "Search error",
@@ -778,6 +779,7 @@ function sourceVariant(source?: string) {
     source === "duckduckgo" ||
     source === "duckduckgo-suggest" ||
     source === "searxng" ||
+    source === "local-audit" ||
     source === "web-search" ||
     source === "codex" ||
     source?.startsWith("openserp:")
@@ -3204,13 +3206,26 @@ function DomainKeywordsTable({ rows }: { rows: any[] }) {
 function DomainPagesTable({ rows }: { rows: any[] }) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>Page</TableHead><TableHead>Traffic</TableHead><TableHead>Keywords</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>Page</TableHead><TableHead>Traffic</TableHead><TableHead>Keywords</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.page}>
-            <TableCell className="max-w-xl truncate font-medium">{row.relativePath || row.page}</TableCell>
+            <TableCell className="max-w-xl">
+              <div className="truncate font-medium">{row.relativePath || row.page}</div>
+              {row.title ? <div className="mt-1 truncate text-xs text-muted-foreground">{row.title}</div> : null}
+            </TableCell>
             <TableCell className="nums">{formatNumber(row.organicTraffic)}</TableCell>
             <TableCell className="nums">{formatNumber(row.keywords)}</TableCell>
+            <TableCell className="min-w-56">
+              {row.source === "local-audit" ? (
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="good">crawl evidence</Badge>
+                  <Badge variant={row.issues ? "warn" : "outline"}>{formatNumber(row.issues || 0)} issues</Badge>
+                </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">Connected organic dataset</span>
+              )}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
