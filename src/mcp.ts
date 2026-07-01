@@ -330,7 +330,7 @@ const tools = [
   },
   {
     name: "prompt_explorer",
-    description: "Run one prompt across AI answer models and inspect brand mentions/citations.",
+    description: "Run a prompt through local Codex, or through connected AI visibility answer models when configured.",
     inputSchema: {
       type: "object",
       properties: {
@@ -429,7 +429,7 @@ async function callTool(name: string, args: any) {
   };
   switch (name) {
     case "whoami":
-      return { server: "local-seo", mode: "local-sqlite", cloudflare: false };
+      return { server: "local-seo", mode: "local-sqlite", hosting: "local" };
     case "list_sites":
       return listSites();
     case "create_site":

@@ -320,6 +320,10 @@ try {
   if (apiServerSource.includes('"/api/projects')) {
     throw new Error("Public API routes should expose /api/sites only, not legacy /api/projects aliases.");
   }
+  const mcpSource = await readFile(path.join(rootDir, "src/mcp.ts"), "utf8");
+  if (mcpSource.includes("cloudflare:")) {
+    throw new Error("Runtime MCP responses should not keep Cloudflare fields.");
+  }
   if (/domainOrUrl|body\.domain\s*\|\|\s*body\.url/.test(apiServerSource)) {
     throw new Error("Domain APIs should require domain explicitly instead of keeping old domainOrUrl/url aliases.");
   }
@@ -1283,6 +1287,16 @@ try {
     method: "POST",
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
   });
+  const mcpWhoami = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({ jsonrpc: "2.0", id: 150, method: "tools/call", params: { name: "whoami", arguments: {} } }),
+  });
+  if (
+    mcpWhoami.result?.structuredContent?.hosting !== "local" ||
+    "cloudflare" in (mcpWhoami.result?.structuredContent || {})
+  ) {
+    throw new Error(`MCP whoami should identify local hosting without Cloudflare fields: ${JSON.stringify(mcpWhoami)}`);
+  }
   const toolNames = new Set((mcp.result?.tools || []).map((tool: any) => tool.name));
   if (
     !dashboardWithGsc.activeSite ||
