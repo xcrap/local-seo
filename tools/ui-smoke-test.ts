@@ -249,7 +249,16 @@ try {
 
     await page.goto(webUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByText("Scan plan").first().waitFor();
+    const visibleOverviewScanPlan = await page.getByText("Scan plan", { exact: true }).evaluateAll((nodes) =>
+      nodes.some((node) => {
+        const element = node as HTMLElement;
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }),
+    );
+    if (!visibleOverviewScanPlan) {
+      throw new Error("Overview should show visible scan-plan evidence.");
+    }
     await page.getByText(/2 crawl URLs/i).first().waitFor();
     await page.getByText(fixtureUrl).first().waitFor();
     await page.getByRole("combobox").first().click();
@@ -540,6 +549,22 @@ try {
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${webUrl}/sites`, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
+    await page.getByRole("button", { name: /Scan second.test/i }).waitFor();
+    await page.getByRole("button", { name: /Edit second.test/i }).waitFor();
+    await page.getByRole("button", { name: /Delete second.test/i }).waitFor();
+    const visibleSitesScanPlan = await page.getByText("Scan plan", { exact: true }).evaluateAll((nodes) =>
+      nodes.some((node) => {
+        const element = node as HTMLElement;
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }),
+    );
+    if (!visibleSitesScanPlan) {
+      throw new Error("Mobile Sites rows should show the scan plan without relying on hidden desktop table headers.");
+    }
+    await assertNoHorizontalOverflow(page, "Mobile sites with saved rows");
     for (const [label, route] of [
       ["overview", "/"],
       ["sites", "/sites"],

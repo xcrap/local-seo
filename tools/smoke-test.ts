@@ -516,6 +516,9 @@ try {
   if (!webAppClient.includes("<Pencil /> Edit") || !webAppClient.includes("<Trash2 /> Delete") || !webAppClient.includes('"Scan site"')) {
     throw new Error("Saved-site table actions should be visible text buttons for scan, edit, and delete.");
   }
+  if (!webAppClient.includes('siteActions(site, "mobile")')) {
+    throw new Error("Saved-site rows should expose scan, edit, and delete actions in the mobile layout.");
+  }
   for (const explicitDashboardAction of ["Open organic", "Open links", "Open ranks", "Open Search Console", "Open AI lab"]) {
     if (!webAppClient.includes(explicitDashboardAction)) {
       throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);

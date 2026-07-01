@@ -2032,6 +2032,38 @@ function SitesPage({
     crawl_protocol: editForm.crawl_protocol,
     crawl_host: editForm.crawl_host,
   };
+  function siteActions(site: Site, layout: "mobile" | "desktop" = "desktop") {
+    const mobile = layout === "mobile";
+    const buttonClass = mobile ? "h-11 min-w-32 flex-1 sm:flex-none" : undefined;
+    return (
+      <div className={cn("flex flex-wrap gap-2", mobile ? "" : "justify-end")}>
+        {activeSiteId !== site.id ? (
+          <Button size={mobile ? "default" : "sm"} variant="secondary" className={buttonClass} onClick={() => selectSite(site.id)}>
+            Select site
+          </Button>
+        ) : null}
+        {site.domain ? (
+          <Button
+            size={mobile ? "default" : "sm"}
+            variant="outline"
+            className={buttonClass}
+            aria-label={`Scan ${site.name}`}
+            title={`Scan ${site.domain}`}
+            disabled={scanningSiteId === site.id}
+            onClick={() => scanSite(site)}
+          >
+            <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan site"}
+          </Button>
+        ) : null}
+        <Button size={mobile ? "default" : "sm"} variant="outline" className={buttonClass} aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
+          <Pencil /> Edit
+        </Button>
+        <Button size={mobile ? "default" : "sm"} variant="destructive" className={buttonClass} aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
+          <Trash2 /> Delete
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -2139,61 +2171,58 @@ function SitesPage({
         </section>
       ) : (
         <section className="rounded-md border bg-background">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Site</TableHead>
-                <TableHead>Scan plan</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sites.map((site) => (
-                <TableRow key={site.id} className={activeSiteId === site.id ? "bg-accent/35" : ""}>
-                  <TableCell className="min-w-64">
-                    <div className="font-medium">{site.name}</div>
-                    <div className="text-xs text-muted-foreground">{site.domain || "Add a website address"}</div>
-                  </TableCell>
-                  <TableCell className="min-w-56">
-                    <ScanPlanSummary site={site} compact />
-                  </TableCell>
-                  <TableCell className="max-w-md">
-                    <div className="line-clamp-2 text-sm text-muted-foreground">{site.notes || "No notes yet."}</div>
-                  </TableCell>
-                  <TableCell>{activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {activeSiteId !== site.id ? (
-                        <Button size="sm" variant="secondary" onClick={() => selectSite(site.id)}>
-                          Select site
-                        </Button>
-                      ) : null}
-                      {site.domain ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          aria-label={`Scan ${site.name}`}
-                          title={`Scan ${site.domain}`}
-                          disabled={scanningSiteId === site.id}
-                          onClick={() => scanSite(site)}
-                        >
-                          <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan site"}
-                        </Button>
-                      ) : null}
-                      <Button size="sm" variant="outline" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
-                        <Pencil /> Edit
-                      </Button>
-                      <Button size="sm" variant="destructive" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
-                        <Trash2 /> Delete
-                      </Button>
-                    </div>
-                  </TableCell>
+          <div className="divide-y md:hidden">
+            {sites.map((site) => (
+              <div key={site.id} className={cn("space-y-4 p-4", activeSiteId === site.id ? "bg-accent/35" : "")}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="break-words text-base font-semibold">{site.name}</div>
+                    <div className="mt-1 break-all text-sm text-muted-foreground">{site.domain || "Add a website address"}</div>
+                  </div>
+                  {activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}
+                </div>
+                <div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Scan plan</div>
+                  <ScanPlanSummary site={site} compact />
+                </div>
+                {site.notes ? (
+                  <p className="text-sm leading-6 text-muted-foreground">{site.notes}</p>
+                ) : null}
+                {siteActions(site, "mobile")}
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Site</TableHead>
+                  <TableHead>Scan plan</TableHead>
+                  <TableHead>Notes</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {sites.map((site) => (
+                  <TableRow key={site.id} className={activeSiteId === site.id ? "bg-accent/35" : ""}>
+                    <TableCell className="min-w-64">
+                      <div className="font-medium">{site.name}</div>
+                      <div className="text-xs text-muted-foreground">{site.domain || "Add a website address"}</div>
+                    </TableCell>
+                    <TableCell className="min-w-56">
+                      <ScanPlanSummary site={site} compact />
+                    </TableCell>
+                    <TableCell className="max-w-md">
+                      <div className="line-clamp-2 text-sm text-muted-foreground">{site.notes || "No notes yet."}</div>
+                    </TableCell>
+                    <TableCell>{activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}</TableCell>
+                    <TableCell>{siteActions(site)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </section>
       )}
       <Dialog open={Boolean(editing)} onOpenChange={(nextOpen) => !nextOpen && setEditing(null)}>
