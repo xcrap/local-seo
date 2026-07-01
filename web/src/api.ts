@@ -118,6 +118,8 @@ export const api = {
   backlinkSnapshots: (siteId: string) => request<any[]>(`/api/sites/${siteId}/backlink-snapshots`),
   backlinksProfile: (body: any) =>
     request<any>("/api/backlinks/profile", { method: "POST", body: JSON.stringify(body) }),
+  importBacklinks: (body: any) =>
+    request<any>("/api/backlinks/import", { method: "POST", body: JSON.stringify(body) }),
   brandLookupRuns: (siteId: string) => request<any[]>(`/api/sites/${siteId}/brand-lookup`),
   brandLookup: (body: any) =>
     request<any>("/api/brand-lookup", { method: "POST", body: JSON.stringify(body) }),

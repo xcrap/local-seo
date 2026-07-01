@@ -13,6 +13,7 @@ import {
   domainOverview,
   getScan,
   getSite,
+  importBacklinksCsv,
   listRankTrackers,
   listSites,
   listSavedKeywords,
@@ -244,6 +245,20 @@ const tools = [
     },
   },
   {
+    name: "import_backlinks",
+    description: "Import real backlink CSV rows into local SQLite for a saved site.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...siteIdInput,
+        domain: { type: "string" },
+        sourceName: { type: "string" },
+        csv: { type: "string" },
+      },
+      required: ["siteId", "csv"],
+    },
+  },
+  {
     name: "get_rank_tracker",
     description: "Get rank tracking configs, keywords, latest snapshots, runs, and trend for a site or tracker.",
     inputSchema: {
@@ -460,6 +475,8 @@ async function callTool(name: string, args: any) {
       return backlinksOverview(withDomainInput(args));
     case "get_backlinks_profile":
       return getBacklinksProfile(withDomainInput(args));
+    case "import_backlinks":
+      return importBacklinksCsv(withDomainInput(args));
     case "get_rank_tracker": {
       const trackers = listRankTrackers(args.siteId);
       return args.trackerId ? trackers.find((tracker) => tracker.id === args.trackerId) || null : trackers;

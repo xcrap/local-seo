@@ -284,6 +284,10 @@ function cleanSiteDomain(domain?: string) {
   return String(domain || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
 }
 
+function domainKey(domain?: string) {
+  return cleanSiteDomain(domain).replace(/^www\./i, "").toLowerCase();
+}
+
 function hostFromUrl(value?: string) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -776,6 +780,7 @@ function sourceLabel(source?: string) {
     duckduckgo: "DuckDuckGo",
     searxng: "SearXNG",
     "local-scan": "Local scan",
+    "backlink-import": "Backlink import",
     "web-search": "Web search",
     codex: "Local Codex",
     "search-error": "Search error",
@@ -791,6 +796,7 @@ function sourceVariant(source?: string) {
     source === "duckduckgo-suggest" ||
     source === "searxng" ||
     source === "local-scan" ||
+    source === "backlink-import" ||
     source === "web-search" ||
     source === "codex" ||
     source?.startsWith("openserp:")
@@ -3413,9 +3419,15 @@ function LinksPage({ site }: { site: Site }) {
   const [history, setHistory] = useState<any[]>([]);
   const [tab, setTab] = useState("backlinks");
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
-  const backlinkIndexAvailable = false;
+  const matchingImport = useMemo(
+    () => history.find((row) => domainKey(row.domain) === domainKey(domain)) || null,
+    [history, domain],
+  );
+  const backlinkIndexAvailable = Boolean(matchingImport);
   const selectedScan = useMemo(
     () => scanRows.find((scan) => scan.id === selectedScanId) || defaultEvidenceScan(scanRows),
     [scanRows, selectedScanId],
@@ -3449,7 +3461,7 @@ function LinksPage({ site }: { site: Site }) {
     if (!backlinkIndexAvailable) {
       setOverview(null);
       setProfile(null);
-      setError("Web-wide backlink rows are not generated locally. Use the local link graph from a saved scan until a real backlink import is available.");
+      setError("Import a backlink CSV for this domain before running web-wide backlink tables. Local scan links are available below.");
       return;
     }
     setLoading(true);
@@ -3473,6 +3485,38 @@ function LinksPage({ site }: { site: Site }) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     await run();
+  }
+
+  async function importBacklinkCsv(event: FormEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setError("");
+    setImportMessage("");
+    try {
+      const csv = await file.text();
+      const imported = await api.importBacklinks({
+        siteId: site.id,
+        domain,
+        sourceName: file.name,
+        csv,
+      });
+      await loadHistory();
+      setImportMessage(`Imported ${formatNumber(imported.rowCount || imported.row_count || 0)} backlink rows from ${file.name}.`);
+      const body = { siteId: site.id, domain, tab, pageSize: 50 };
+      const [overviewData, profileData] = await Promise.all([
+        api.backlinksOverview(body),
+        api.backlinksProfile(body),
+      ]);
+      setOverview(overviewData);
+      setProfile(profileData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not import backlink CSV");
+    } finally {
+      input.value = "";
+      setImporting(false);
+    }
   }
 
   async function changeTab(value: string) {
@@ -3504,7 +3548,7 @@ function LinksPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Authority" title="Links" description="Local crawl links are available from saved scans. Web-wide backlinks require a real imported index; no rows are generated locally." />
+      <PageHeader eyebrow="Authority" title="Links" description="Local crawl links come from saved scans. Web-wide backlink tables come from CSV imports saved in SQLite." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
           <SiteTargetField
@@ -3515,20 +3559,28 @@ function LinksPage({ site }: { site: Site }) {
             onChange={setDomain}
           />
           <div className="flex items-end">
-            <Button disabled={loading || !domain.trim() || !backlinkIndexAvailable}><Link2 /> {loading ? "Checking" : "Backlink import unavailable"}</Button>
+            <Button disabled={loading || !domain.trim() || !backlinkIndexAvailable}><Link2 /> {loading ? "Checking" : backlinkIndexAvailable ? "Check imported backlinks" : "Import CSV first"}</Button>
           </div>
         </form>
         <div className="mt-4 rounded-md border bg-muted/25">
-          <div className="grid gap-0 md:grid-cols-[220px_1fr]">
+          <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)_260px]">
             <div className="border-b px-4 py-3 md:border-b-0 md:border-r">
               <div className="text-sm font-medium">Web-wide backlink index</div>
-              <Badge className="mt-2" variant="warn">Import unavailable</Badge>
+              <Badge className="mt-2" variant={backlinkIndexAvailable ? "good" : "warn"}>{backlinkIndexAvailable ? "Imported" : "Needs CSV"}</Badge>
             </div>
-            <div className="px-4 py-3 text-sm leading-6 text-muted-foreground">
-              No web-wide backlink rows are generated locally. The usable data on this screen is the saved-scan link graph below.
+            <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
+              {backlinkIndexAvailable
+                ? `${formatNumber(matchingImport.rowCount || matchingImport.row_count || 0)} real rows from ${matchingImport.sourceName || matchingImport.source_name || "backlink CSV"} are available for ${domainKey(domain)}.`
+                : "Import a backlink CSV with source URL, target URL, referring domain, anchor, follow/nofollow, and status columns. No web-wide backlinks are generated locally."}
+            </div>
+            <div className="px-4 py-3">
+              <Field label="Import backlink CSV">
+                <Input type="file" accept=".csv,text/csv" onChange={importBacklinkCsv} disabled={importing || !domain.trim()} />
+              </Field>
             </div>
           </div>
         </div>
+        {importMessage ? <p className="mt-3 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{importMessage}</p> : null}
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       </section>
       <div className="mt-6 space-y-6">
@@ -3552,8 +3604,8 @@ function LinksPage({ site }: { site: Site }) {
             <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
           </TabsList>
           <TabsContent value="backlinks">
-            <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Import a real backlink index before running this check."}>
-              {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title="No web-wide backlink index" text={profile?.warning || "Local scans do not invent web-wide backlinks. Use the local link graph above until real backlink import exists."} />}
+            <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Import a backlink CSV, then run this table."}>
+              {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title="No web-wide backlink index" text={profile?.warning || "Import a backlink CSV above to populate this table. Local scans do not invent web-wide backlinks."} />}
             </ReportSection>
           </TabsContent>
           <TabsContent value="domains">
@@ -3567,10 +3619,10 @@ function LinksPage({ site }: { site: Site }) {
             </ReportSection>
           </TabsContent>
           <TabsContent value="snapshot">
-            {overview ? <BacklinkSnapshot result={overview} domain={domain} rows={profile?.rows?.length || 0} tab={profile?.tab || tab} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first backlink snapshot." />}
+            {overview ? <BacklinkSnapshot result={overview} domain={domain} rows={profile?.rows?.length || 0} tab={profile?.tab || tab} /> : <EmptyState title="No snapshot" text="Import a backlink CSV and run an analysis to save the first backlink snapshot." />}
           </TabsContent>
         </Tabs>
-        <HistoryList title="External backlink history" rows={history} labelKey="domain" labelTitle="Backlink domain" />
+        <HistoryList title="Backlink imports" rows={history} labelKey="domain" labelTitle="Backlink domain" />
       </div>
     </>
   );
@@ -3643,6 +3695,7 @@ function LocalLinkEvidence({
                 ["Checked links", checkedLinks.length],
                 ["Broken links", checkedLinks.filter((link: any) => !link.ok).length],
                 ["Pages with no inlinks", pages.filter((page: any) => Number(page.internalInlinks || 0) === 0).length],
+                ["Internal links found", linkInventory.filter((link: any) => link.type === "internal").length],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-4 px-4 py-3">
                   <span className="text-sm font-medium">{label}</span>
@@ -3760,9 +3813,9 @@ function BacklinkSnapshot({ result, domain, rows, tab }: { result: any; domain: 
         rows={[
           { title: "Backlink domain", status: domain || result.domain || "-", tone: "good", text: "The domain or URL checked in this run." },
           { title: "Visible rows", status: formatNumber(rows), tone: rows ? "good" : "warn", text: `Rows currently loaded in the ${tab} tab.` },
-          { title: "Backlinks", status: formatMetricStatus(backlinks), tone: hasMetric(backlinks) ? "good" : "warn", text: "Total backlinks from the connected index." },
-          { title: "Referring domains", status: formatMetricStatus(referringDomains), tone: hasMetric(referringDomains) ? "good" : "warn", text: "Unique linking domains from the connected index." },
-          { title: "Dofollow %", status: formatMetricStatus(dofollowRatio), tone: hasMetric(dofollowRatio) ? "good" : "warn", text: "Dofollow ratio reported by the connected index." },
+          { title: "Backlinks", status: formatMetricStatus(backlinks), tone: hasMetric(backlinks) ? "good" : "warn", text: "Total backlinks from the imported rows." },
+          { title: "Referring domains", status: formatMetricStatus(referringDomains), tone: hasMetric(referringDomains) ? "good" : "warn", text: "Unique linking domains from the imported rows." },
+          { title: "Dofollow %", status: formatMetricStatus(dofollowRatio), tone: hasMetric(dofollowRatio) ? "good" : "warn", text: "Dofollow ratio computed from the imported rows." },
           { title: "Source", status: sourceLabel(result.source), tone: sourceVariant(result.source) as any, text: result.warning || "Snapshot saved locally in SQLite." },
         ]}
       />
@@ -7255,7 +7308,7 @@ function SettingsPage() {
               { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless real metrics are imported later." },
               { title: "SERP and rank checks", status: serpProviderStatus(config), tone: "good", text: "Uses local/self-hosted OpenSERP or SearXNG when configured, otherwise live DuckDuckGo results. The source is shown on each report." },
               { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally. Google connection is optional for live performance and URL inspection." },
-              { title: "Backlink index", status: "Import unavailable", tone: "warn", text: "No generated backlink rows are shown. Web-wide backlink rows require a real imported index." },
+              { title: "Backlink index", status: "CSV import ready", tone: "good", text: "Import backlink CSVs on the Links page. No generated backlink rows are shown." },
               { title: "MCP endpoint", status: "Local", tone: "good", text: "The local JSON-RPC endpoint is available from the MCP screen." },
             ]}
           />

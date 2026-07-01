@@ -392,8 +392,23 @@ try {
       throw new Error(`Local link graph should use the full desktop width, got ${localLinkGraphBox?.width}.`);
     }
     await page.getByText("Web-wide backlink index", { exact: true }).waitFor();
-    await page.getByRole("button", { name: /Backlink import unavailable/i }).waitFor();
-    await page.getByText("No web-wide backlink rows are generated locally").waitFor();
+    await page.getByRole("button", { name: /Import CSV first/i }).waitFor();
+    await page.getByText("Needs CSV").waitFor();
+    await page.getByLabel("Import backlink CSV").waitFor();
+    const backlinkCsvPath = path.join(tempDir, "backlinks-ui.csv");
+    await writeFile(
+      backlinkCsvPath,
+      [
+        "source_url,target_url,referring_domain,anchor,follow,status,domain_rating",
+        `https://ref.example/link,${fixtureUrl}/page,ref.example,Fixture,true,200,30`,
+        `https://other.example/link,${fixtureUrl}/page,other.example,Fixture,nofollow,200,20`,
+      ].join("\n"),
+    );
+    await page.getByLabel("Import backlink CSV").setInputFiles(backlinkCsvPath);
+    await page.getByText(/Imported 2 backlink rows/i).waitFor();
+    await page.getByRole("button", { name: /Check imported backlinks/i }).click();
+    await page.getByRole("cell", { name: /ref\.example/i }).waitFor();
+    await capture(page, "links");
     await page.goto(`${webUrl}/backlinks`, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /^Page not found$/ }).waitFor();
     await page.getByRole("link", { name: /^Open overview$/ }).click();

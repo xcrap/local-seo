@@ -52,6 +52,7 @@ import {
   getRankTrackerTrend,
   getSerpAnalysis,
   getSite,
+  importBacklinksCsv,
   listBacklinkSnapshots,
   listAllScans,
   listScans,
@@ -460,6 +461,10 @@ app.get(
 app.post(
   "/api/backlinks/profile",
   safe(async (c) => c.json(await getBacklinksProfile((await readDomainScopedJson(c)) as any))),
+);
+app.post(
+  "/api/backlinks/import",
+  safe(async (c) => c.json(importBacklinksCsv((await readDomainScopedJson(c)) as any))),
 );
 app.get(
   "/api/sites/:id/brand-lookup",

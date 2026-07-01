@@ -258,7 +258,7 @@ try {
     if (tables.has("audits")) {
       throw new Error("Fresh SQLite schema should use scans, not audits.");
     }
-    for (const table of ["saved_keywords", "scans", "gsc_imports", "domain_snapshots", "backlink_snapshots", "serp_runs"]) {
+    for (const table of ["saved_keywords", "scans", "gsc_imports", "domain_snapshots", "backlink_snapshots", "backlink_imports", "serp_runs"]) {
       const columns = schemaDb.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((row) => row.name);
       if (!columns.includes("site_id")) {
         throw new Error(`Fresh SQLite table ${table} should reference site_id.`);
@@ -988,6 +988,62 @@ try {
   if (backlinkOverview.source === "provider-not-configured" && /DataForSEO/i.test(String(backlinkOverview.providerRequired || ""))) {
     throw new Error(`Missing backlink provider response should be vendor-neutral: ${JSON.stringify(backlinkOverview)}`);
   }
+  const backlinkImport = await request("/api/backlinks/import", {
+    method: "POST",
+    body: JSON.stringify({
+      siteId: site.id,
+      domain: "example.com",
+      sourceName: "smoke-backlinks.csv",
+      csv: [
+        "source_url,target_url,referring_domain,anchor,follow,status,domain_rating,spam_score,first_seen",
+        "https://ref.example/a,https://example.com/page,ref.example,Example,true,200,42,2,2026-01-01",
+        "https://blog.ref/b,https://example.com/page,nofollow.example,Brand,nofollow,404,12,10,2026-01-02",
+        "https://ref.example/c,https://example.com/other,ref.example,Other,dofollow,200,50,1,2026-01-03",
+      ].join("\n"),
+    }),
+  });
+  if (backlinkImport.source !== "backlink-import" || backlinkImport.rowCount !== 3 || backlinkImport.summary?.referringDomains !== 2) {
+    throw new Error(`Backlink CSV import did not save real local rows: ${JSON.stringify(backlinkImport)}`);
+  }
+  const importedBacklinkOverview = await request("/api/backlinks/overview", {
+    method: "POST",
+    body: JSON.stringify({ siteId: site.id, domain: "example.com" }),
+  });
+  if (
+    importedBacklinkOverview.source !== "backlink-import" ||
+    importedBacklinkOverview.backlinks !== 3 ||
+    importedBacklinkOverview.referringDomains !== 2 ||
+    importedBacklinkOverview.dofollowRatio !== 67
+  ) {
+    throw new Error(`Backlink overview should read imported CSV rows: ${JSON.stringify(importedBacklinkOverview)}`);
+  }
+  const importedBacklinkRows = await request("/api/backlinks/profile", {
+    method: "POST",
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", tab: "backlinks", pageSize: 10 }),
+  });
+  if (importedBacklinkRows.source !== "backlink-import" || importedBacklinkRows.rows?.length !== 3 || importedBacklinkRows.totalCount !== 3) {
+    throw new Error(`Backlink rows should come from imported CSV rows: ${JSON.stringify(importedBacklinkRows)}`);
+  }
+  const importedReferringDomains = await request("/api/backlinks/profile", {
+    method: "POST",
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", tab: "domains", pageSize: 10 }),
+  });
+  if (
+    importedReferringDomains.rows?.length !== 2 ||
+    !importedReferringDomains.rows.some((row: any) => row.domain === "ref.example" && row.backlinks === 2)
+  ) {
+    throw new Error(`Referring-domain rows should aggregate imported CSV rows: ${JSON.stringify(importedReferringDomains)}`);
+  }
+  const importedLinkedPages = await request("/api/backlinks/profile", {
+    method: "POST",
+    body: JSON.stringify({ siteId: site.id, domain: "example.com", tab: "pages", pageSize: 10 }),
+  });
+  if (
+    importedLinkedPages.rows?.length !== 2 ||
+    !importedLinkedPages.rows.some((row: any) => row.page === "https://example.com/page" && row.backlinks === 2 && row.brokenBacklinks === 1)
+  ) {
+    throw new Error(`Top linked pages should aggregate imported CSV rows: ${JSON.stringify(importedLinkedPages)}`);
+  }
   const deleteTarget = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Delete Me", domain: "delete-me.example" }),
@@ -1417,6 +1473,7 @@ try {
     !toolNames.has("scan_site") ||
     !toolNames.has("get_scan") ||
     !toolNames.has("get_backlinks_profile") ||
+    !toolNames.has("import_backlinks") ||
     !toolNames.has("inspect_urls")
   ) {
     throw new Error("Smoke assertions failed.");
@@ -1463,6 +1520,10 @@ try {
       throw new Error(`MCP ${name} should require ${requiredInput}.`);
     }
   }
+  const importBacklinksTool = (mcp.result?.tools || []).find((row: any) => row.name === "import_backlinks");
+  if (!importBacklinksTool?.inputSchema?.required?.includes("siteId") || !importBacklinksTool?.inputSchema?.required?.includes("csv")) {
+    throw new Error("MCP import_backlinks should require siteId and csv.");
+  }
   const mcpDomainOverview = await request("/mcp", {
     method: "POST",
     body: JSON.stringify({
@@ -1481,6 +1542,33 @@ try {
     "target" in (mcpDomainOverview.result?.structuredContent || {})
   ) {
     throw new Error(`MCP get_domain_overview should accept and return domain fields: ${JSON.stringify(mcpDomainOverview)}`);
+  }
+  const mcpBacklinkImport = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 203,
+      method: "tools/call",
+      params: {
+        name: "import_backlinks",
+        arguments: {
+          siteId: site.id,
+          domain: "example.com",
+          sourceName: "mcp-backlinks.csv",
+          csv: [
+            "source_url,target_url,referring_domain,anchor,follow,status",
+            "https://mcp-ref.example/link,https://example.com/mcp,mcp-ref.example,MCP,true,200",
+          ].join("\n"),
+        },
+      },
+    }),
+  });
+  if (
+    mcpBacklinkImport.error ||
+    mcpBacklinkImport.result?.structuredContent?.source !== "backlink-import" ||
+    mcpBacklinkImport.result?.structuredContent?.rowCount !== 1
+  ) {
+    throw new Error(`MCP import_backlinks should save real imported rows: ${JSON.stringify(mcpBacklinkImport)}`);
   }
   const mcpSerpAnalysis = await request("/mcp", {
     method: "POST",

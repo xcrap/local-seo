@@ -24,7 +24,7 @@ data connectors only when you configure them.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
 - **Organic research:** local scan pages for the active site. Ranked keywords and traffic estimates are not generated locally.
-- **Links and backlinks:** local crawl link graph from scans. Web-wide backlink overview, backlink rows, referring domains, and top linked pages require a real imported backlink index and are not generated locally.
+- **Links and backlinks:** local crawl link graph from scans, plus backlink CSV import for web-wide backlink rows, referring domains, and top linked pages. Backlinks are never generated locally.
 - **Site scans:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, page response timing, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
 - **Brand lookup:** real web-search evidence without generated answer-model claims.
 - **Prompt explorer:** local Codex jobs saved in SQLite.
@@ -65,11 +65,12 @@ domain.
 
 SERP and rank checks can use self-hosted OpenSERP, self-hosted SearXNG, or the
 built-in DuckDuckGo fallback. External SEO metrics are never generated locally.
-Backlink indexes, Google keyword volumes, CPC, keyword difficulty, and
-third-party traffic estimates require future import support or a deliberately
-built adapter. Local scans still feed technical pages, internal/external links,
-images, assets, sitemap, robots, and response timing into reports. The app shows
-unavailable states instead of invented rows.
+Google keyword volumes, CPC, keyword difficulty, and third-party traffic
+estimates require future import support or a deliberately built adapter.
+Backlink tables can be populated from real CSV imports on the Links page. Local
+scans still feed technical pages, internal/external links, images, assets,
+sitemap, robots, and response timing into reports. The app shows unavailable
+states instead of invented rows.
 
 This app is local-first. Hosted product concerns such as billing, teams/orgs,
 hosted auth, queues, and hosted cron workflows are not part of this fresh local

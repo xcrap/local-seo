@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import Papa from "papaparse";
 import { XMLParser } from "fast-xml-parser";
 import { createHash, randomUUID } from "node:crypto";
 import { parse as parseDomain } from "tldts";
@@ -1101,6 +1102,17 @@ export async function backlinksOverview(input: { siteId: string; domain?: string
   if (!site) throw new Error("Site not found.");
   const domain = normalizeDomain(input.domain || site.domain);
   if (!domain) throw new Error("Domain is required.");
+  const imported = latestBacklinkImport(site.id, domain);
+  if (imported) {
+    return {
+      source: "backlink-import",
+      domain,
+      ...imported.summary,
+      importId: imported.id,
+      sourceName: imported.sourceName,
+      createdAt: imported.createdAt,
+    };
+  }
   return emptyProviderResult("Backlink index data", {
     domain,
     backlinks: null,
@@ -1140,14 +1152,348 @@ export async function getBacklinksProfile(input: {
     warning: providerRequiredMessage("Backlink index data"),
   };
 
+  const imported = latestBacklinkImport(site.id, domain);
+  if (imported) {
+    const importedRows = imported.rows as ImportedBacklinkRow[];
+    const rows: any[] =
+      tab === "domains"
+        ? backlinkDomainRows(importedRows)
+        : tab === "pages"
+          ? backlinkPageRows(importedRows)
+          : [...importedRows].sort((a, b) => Number(b.rank || 0) - Number(a.rank || 0));
+    const pageRows = paginateRows(rows, page, pageSize);
+    source = "backlink-import";
+    result = {
+      ...pageRows,
+      page,
+      pageSize,
+      fetchedAt: nowIso(),
+      importId: imported.id,
+      sourceName: imported.sourceName,
+    };
+  }
+
   return { source, domain, tab, ...result };
 }
 
 export function listBacklinkSnapshots(siteId: string) {
-  return all<any>(
+  const snapshots = all<any>(
     "SELECT * FROM backlink_snapshots WHERE site_id = ? ORDER BY created_at DESC",
     [siteId],
   ).map(publicDomainSnapshotRow);
+  return [...listBacklinkImports(siteId), ...snapshots].sort(
+    (a, b) => new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime(),
+  );
+}
+
+type ImportedBacklinkRow = {
+  domainFrom: string;
+  urlFrom: string;
+  urlTo: string;
+  anchor: string;
+  itemType: string;
+  isDofollow: boolean | null;
+  relAttributes: string[];
+  rank: number | null;
+  domainFromRank: number | null;
+  pageFromRank: number | null;
+  spamScore: number | null;
+  firstSeen: string | null;
+  lastSeen: string | null;
+  isLost: boolean;
+  isBroken: boolean;
+  linksCount: number | null;
+};
+
+function normalizeCsvHeader(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function normalizedCsvRow(row: Record<string, unknown>) {
+  const normalized = new Map<string, unknown>();
+  for (const [key, value] of Object.entries(row)) {
+    normalized.set(normalizeCsvHeader(key), value);
+  }
+  return normalized;
+}
+
+function csvField(row: Map<string, unknown>, aliases: string[]) {
+  for (const alias of aliases) {
+    const value = row.get(normalizeCsvHeader(alias));
+    const text = cleanText(String(value ?? ""));
+    if (text) return text;
+  }
+  return "";
+}
+
+function csvNumber(row: Map<string, unknown>, aliases: string[]) {
+  const value = csvField(row, aliases);
+  if (!value) return null;
+  const match = value.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const number = Number(match[0]);
+  return Number.isFinite(number) ? number : null;
+}
+
+function csvBoolean(row: Map<string, unknown>, aliases: string[]) {
+  const value = csvField(row, aliases).toLowerCase();
+  if (!value) return null;
+  if (/(nofollow|false|no|lost|removed|0)\b/.test(value)) return false;
+  if (/(dofollow|follow|true|yes|live|active|1)\b/.test(value)) return true;
+  return null;
+}
+
+function backlinkDomainFromRow(row: Map<string, unknown>, urlFrom: string) {
+  const domain = csvField(row, [
+    "domain_from",
+    "domain from",
+    "source_domain",
+    "source domain",
+    "referring_domain",
+    "referring domain",
+    "linking_domain",
+    "linking domain",
+  ]);
+  return normalizeDomain(domain || urlFrom);
+}
+
+function normalizeImportedBacklinkRow(raw: Record<string, unknown>, fallbackDomain: string): ImportedBacklinkRow | null {
+  const row = normalizedCsvRow(raw);
+  const urlFrom =
+    csvField(row, [
+      "url_from",
+      "url from",
+      "source_url",
+      "source url",
+      "source page",
+      "referring page",
+      "referring url",
+      "backlink url",
+      "from",
+    ]) || "";
+  const domainFrom = backlinkDomainFromRow(row, urlFrom);
+  if (!urlFrom && !domainFrom) return null;
+  const urlTo =
+    csvField(row, [
+      "url_to",
+      "url to",
+      "target_url",
+      "target url",
+      "target",
+      "destination_url",
+      "destination url",
+      "linked_url",
+      "linked url",
+      "landing page",
+      "to",
+    ]) || `https://${fallbackDomain}`;
+  const relAttributes = parseList(csvField(row, ["rel", "rel attributes", "attributes", "link rel"]));
+  const relText = relAttributes.join(" ").toLowerCase();
+  const isDofollow = relText.includes("nofollow") ? false : csvBoolean(row, ["dofollow", "follow", "type", "link type"]);
+  const status = csvField(row, ["status", "link status", "http status"]).toLowerCase();
+  const statusCode = csvNumber(row, ["status", "link status", "http status"]);
+  return {
+    domainFrom,
+    urlFrom: urlFrom || `https://${domainFrom}`,
+    urlTo,
+    anchor: csvField(row, ["anchor", "anchor text", "text", "link text"]),
+    itemType: csvField(row, ["item type", "item_type", "type", "link type"]) || "link",
+    isDofollow,
+    relAttributes,
+    rank: csvNumber(row, ["rank", "domain rank", "domain rating", "dr", "authority", "page rank"]),
+    domainFromRank: csvNumber(row, ["domain_from_rank", "domain from rank", "domain rank", "domain rating", "dr"]),
+    pageFromRank: csvNumber(row, ["page_from_rank", "page from rank", "url rating", "ur", "page rank"]),
+    spamScore: csvNumber(row, ["spam score", "spam_score", "toxicity", "toxic score"]),
+    firstSeen: csvField(row, ["first seen", "first_seen", "first found", "date first seen"]) || null,
+    lastSeen: csvField(row, ["last seen", "last_seen", "last found", "date last seen"]) || null,
+    isLost: /(lost|removed|deleted|missing)/.test(status),
+    isBroken: Boolean((statusCode && statusCode >= 400) || /(broken|error|404|5\d\d)/.test(status)),
+    linksCount: csvNumber(row, ["links count", "links_count", "count"]) || 1,
+  };
+}
+
+function parseBacklinkCsv(csv: string) {
+  const parsed = Papa.parse<Record<string, unknown>>(csv, {
+    header: true,
+    skipEmptyLines: true,
+  });
+  if (parsed.errors.length) {
+    const firstError = parsed.errors[0];
+    throw new Error(`Backlink CSV could not be parsed: ${firstError.message}`);
+  }
+  return parsed.data.filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+}
+
+function backlinkSummary(rows: ImportedBacklinkRow[]) {
+  const referringDomains = new Set(rows.map((row) => row.domainFrom).filter(Boolean));
+  const dofollowRows = rows.filter((row) => row.isDofollow === true).length;
+  const anchorCounts = new Map<string, number>();
+  for (const row of rows) {
+    const anchor = row.anchor || "(empty anchor)";
+    anchorCounts.set(anchor, (anchorCounts.get(anchor) || 0) + 1);
+  }
+  return {
+    backlinks: rows.length,
+    referringDomains: referringDomains.size,
+    dofollowRatio: rows.length ? Math.round((dofollowRows / rows.length) * 100) : null,
+    topAnchors: [...anchorCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([anchor, count]) => ({ anchor, count })),
+    lostBacklinks: rows.filter((row) => row.isLost).length,
+    brokenBacklinks: rows.filter((row) => row.isBroken).length,
+    prospects: [],
+  };
+}
+
+function mapBacklinkImport(row: any) {
+  const rows = jsonParse<ImportedBacklinkRow[]>(row.rows_json, []);
+  const summary = jsonParse<Record<string, unknown>>(row.summary_json, {});
+  return {
+    id: row.id,
+    siteId: row.site_id,
+    domain: row.domain,
+    source: "backlink-import",
+    sourceName: row.source_name,
+    source_name: row.source_name,
+    rowCount: row.row_count,
+    row_count: row.row_count,
+    summary,
+    rows,
+    createdAt: row.created_at,
+    created_at: row.created_at,
+  };
+}
+
+function latestBacklinkImport(siteId: string, domain: string) {
+  const row = get<any>(
+    "SELECT * FROM backlink_imports WHERE site_id = ? AND domain = ? ORDER BY created_at DESC LIMIT 1",
+    [siteId, domain],
+  );
+  return row ? mapBacklinkImport(row) : null;
+}
+
+export function listBacklinkImports(siteId: string) {
+  return all<any>(
+    "SELECT * FROM backlink_imports WHERE site_id = ? ORDER BY created_at DESC",
+    [siteId],
+  ).map(mapBacklinkImport);
+}
+
+export function importBacklinksCsv(input: {
+  siteId?: string;
+  domain?: string;
+  sourceName?: string;
+  csv?: string;
+  rows?: Record<string, unknown>[];
+}) {
+  const site = getSite(String(input.siteId || ""));
+  if (!site) throw new Error("Site not found.");
+  const domain = normalizeDomain(input.domain || site.domain);
+  if (!domain) throw new Error("Domain is required.");
+  const rawRows = input.csv ? parseBacklinkCsv(input.csv) : input.rows || [];
+  const rows = rawRows
+    .map((row) => normalizeImportedBacklinkRow(row, domain))
+    .filter((row): row is ImportedBacklinkRow => Boolean(row))
+    .filter((row) => !row.urlTo || sameSiteUrl(row.urlTo, `https://${domain}`));
+  if (!rows.length) {
+    throw new Error("Import file has no backlink rows for this domain.");
+  }
+  const summary = backlinkSummary(rows);
+  const id = randomUUID();
+  run(
+    `
+    INSERT INTO backlink_imports
+      (id, site_id, domain, source_name, row_count, summary_json, rows_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      id,
+      site.id,
+      domain,
+      String(input.sourceName || "Backlink CSV").slice(0, 160),
+      rows.length,
+      JSON.stringify(summary),
+      JSON.stringify(rows),
+    ],
+  );
+  return mapBacklinkImport(get<any>("SELECT * FROM backlink_imports WHERE id = ?", [id]));
+}
+
+function paginateRows<T>(rows: T[], page: number, pageSize: number) {
+  const totalCount = rows.length;
+  const start = (page - 1) * pageSize;
+  return {
+    rows: rows.slice(start, start + pageSize),
+    totalCount,
+    hasMore: start + pageSize < totalCount,
+  };
+}
+
+function backlinkDomainRows(rows: ImportedBacklinkRow[]) {
+  const byDomain = new Map<string, any>();
+  for (const row of rows) {
+    if (!row.domainFrom) continue;
+    const entry = byDomain.get(row.domainFrom) || {
+      domain: row.domainFrom,
+      backlinks: 0,
+      referringPageSet: new Set<string>(),
+      rank: null,
+      spamScore: null,
+      firstSeen: row.firstSeen,
+      brokenBacklinks: 0,
+      brokenPageSet: new Set<string>(),
+    };
+    entry.backlinks += 1;
+    entry.referringPageSet.add(row.urlFrom);
+    entry.rank = Math.max(Number(entry.rank || 0), Number(row.domainFromRank || row.rank || 0)) || null;
+    entry.spamScore = Math.max(Number(entry.spamScore || 0), Number(row.spamScore || 0)) || null;
+    if (row.isBroken) {
+      entry.brokenBacklinks += 1;
+      entry.brokenPageSet.add(row.urlTo);
+    }
+    byDomain.set(row.domainFrom, entry);
+  }
+  return [...byDomain.values()]
+    .map((row) => ({
+      domain: row.domain,
+      backlinks: row.backlinks,
+      referringPages: row.referringPageSet.size,
+      rank: row.rank,
+      spamScore: row.spamScore,
+      firstSeen: row.firstSeen,
+      brokenBacklinks: row.brokenBacklinks,
+      brokenPages: row.brokenPageSet.size,
+    }))
+    .sort((a, b) => b.backlinks - a.backlinks);
+}
+
+function backlinkPageRows(rows: ImportedBacklinkRow[]) {
+  const byPage = new Map<string, any>();
+  for (const row of rows) {
+    const page = row.urlTo || "/";
+    const entry = byPage.get(page) || {
+      page,
+      backlinks: 0,
+      domainSet: new Set<string>(),
+      rank: null,
+      brokenBacklinks: 0,
+    };
+    entry.backlinks += 1;
+    if (row.domainFrom) entry.domainSet.add(row.domainFrom);
+    entry.rank = Math.max(Number(entry.rank || 0), Number(row.rank || row.pageFromRank || 0)) || null;
+    if (row.isBroken) entry.brokenBacklinks += 1;
+    byPage.set(page, entry);
+  }
+  return [...byPage.values()]
+    .map((row) => ({
+      page: row.page,
+      backlinks: row.backlinks,
+      referringDomains: row.domainSet.size,
+      rank: row.rank,
+      brokenBacklinks: row.brokenBacklinks,
+    }))
+    .sort((a, b) => b.backlinks - a.backlinks);
 }
 
 function publicScanRow(row: any) {
