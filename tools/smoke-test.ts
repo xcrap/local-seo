@@ -517,6 +517,13 @@ try {
   if (!webAppClient.includes("<Trash2 /> Delete scan")) {
     throw new Error("Scan history deletion should be a visible Delete scan button, not an icon-only control.");
   }
+  if (
+    webAppClient.includes("row.metrics.averagePageLoadMs > 0") ||
+    webAppClient.includes("page.loadMs ?") ||
+    webAppClient.includes("if (!previous || !Number.isFinite(previous))")
+  ) {
+    throw new Error("Page speed evidence should treat 0 ms as a valid measured response time.");
+  }
   if (!webAppClient.includes("<TableHead>URL</TableHead>") || !webAppClient.includes("<TableHead>Window</TableHead>")) {
     throw new Error("Audit link tables should label URL columns and HTML target-window attributes clearly.");
   }

@@ -375,6 +375,16 @@ try {
     await page.getByRole("columnheader", { name: /^P95$/ }).waitFor();
     await page.getByRole("heading", { name: /^All scan history$/ }).waitFor();
     await page.getByRole("button", { name: /Delete scan/i }).first().waitFor();
+    const scanHistoryTable = page.locator("section", { hasText: "All scan history" }).locator("table").first();
+    const scanHistoryBox = await scanHistoryTable.boundingBox();
+    const scanHistoryViewport = page.viewportSize();
+    if (
+      !scanHistoryBox ||
+      !scanHistoryViewport ||
+      scanHistoryBox.x + scanHistoryBox.width > scanHistoryViewport.width
+    ) {
+      throw new Error(`Scan history table should fit the viewport, got ${JSON.stringify(scanHistoryBox)} in ${JSON.stringify(scanHistoryViewport)}.`);
+    }
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
     await page.getByRole("heading", { name: /^Delete scans for this site\?$/ }).waitFor();
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();

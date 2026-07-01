@@ -1010,19 +1010,19 @@ function auditSpeedHistoryRows(audits: any[]) {
   return sortAuditRows(audits)
     .filter((audit) => audit.status === "completed")
     .map((audit) => ({ audit, metrics: auditSpeedMetrics(audit) }))
-    .filter((row) => row.metrics.measuredPageLoads > 0 && row.metrics.averagePageLoadMs > 0);
+    .filter((row) => row.metrics.measuredPageLoads > 0);
 }
 
 function speedDeltaLabel(current: number, previous?: number) {
-  if (!previous || !Number.isFinite(previous)) return "first measured scan";
-  const delta = Math.round(current - previous);
+  if (!Number.isFinite(Number(previous))) return "first measured scan";
+  const delta = Math.round(Number(current) - Number(previous));
   if (delta === 0) return "unchanged";
   return delta < 0 ? `${formatMs(Math.abs(delta))} faster` : `${formatMs(delta)} slower`;
 }
 
 function speedDeltaVariant(current: number, previous?: number) {
-  if (!previous || !Number.isFinite(previous)) return "outline";
-  const delta = current - previous;
+  if (!Number.isFinite(Number(previous))) return "outline";
+  const delta = Number(current) - Number(previous);
   if (delta <= -100) return "good";
   if (delta >= 250) return "warn";
   return "outline";
@@ -4543,73 +4543,88 @@ function AuditTable({
 }) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>Run</TableHead>{showSite ? <TableHead>Site</TableHead> : null}<TableHead>Status</TableHead><TableHead>Progress</TableHead><TableHead>Score</TableHead><TableHead>Issues</TableHead><TableHead>Pages</TableHead>{(onInspect || onDelete) && <TableHead></TableHead>}</TableRow></TableHeader>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Scan</TableHead>
+          {showSite ? <TableHead>Site</TableHead> : null}
+          <TableHead>Result</TableHead>
+          <TableHead>Evidence</TableHead>
+          {(onInspect || onDelete) && <TableHead className="text-right">Actions</TableHead>}
+        </TableRow>
+      </TableHeader>
       <TableBody>
-        {rows.map((row) => (
-          <TableRow
-            key={row.id}
-            className={cn(onInspect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
-            onClick={() => onInspect?.(row.id, row)}
-          >
-            <TableCell className="max-w-md">
-              <div className="truncate font-medium">{row.url}</div>
-              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
-              </div>
-            </TableCell>
-            {showSite ? (
-              <TableCell className="min-w-44">
-                <div className="font-medium">{auditSiteName(row)}</div>
-                <div className="mt-1 break-all text-xs text-muted-foreground">{auditSiteDetail(row)}</div>
-              </TableCell>
-            ) : null}
-            <TableCell><Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge></TableCell>
-            <TableCell className="min-w-36">
-              <div className="space-y-1">
-                <ProgressBar value={auditProgress(row)} />
-                <div className="text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
-              </div>
-            </TableCell>
-            <TableCell className="nums font-medium">{row.status === "completed" ? row.score : "-"}</TableCell>
-            <TableCell>
-              <div className="flex flex-wrap gap-1">
-                <Badge variant={auditSeverityCounts(row).high ? "bad" : "outline"}>{auditSeverityCounts(row).high} high</Badge>
-                <Badge variant={auditSeverityCounts(row).medium ? "warn" : "outline"}>{auditSeverityCounts(row).medium} med</Badge>
-                <Badge variant="outline">{auditSeverityCounts(row).low} low</Badge>
-              </div>
-            </TableCell>
-            <TableCell className="nums">{row.pages_crawled}</TableCell>
-            {(onInspect || onDelete) && (
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
-                  {onInspect && (
-                    <Button size="sm" variant="outline" asChild>
-                      <Link
-                        to={`/audits/${row.id}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (row.site_id) setSelectedAuditId(row.site_id, row.id);
-                        }}
-                      >
-                        <FileSearch /> Open report
-                      </Link>
-                    </Button>
-                  )}
-                  {onDelete && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      aria-label={`Delete scan report for ${row.url}`}
-                      onClick={(event) => { event.stopPropagation(); onDelete(row.id, row); }}
-                    >
-                      <Trash2 /> Delete scan
-                    </Button>
-                  )}
+        {rows.map((row) => {
+          const counts = auditSeverityCounts(row);
+          return (
+            <TableRow
+              key={row.id}
+              className={cn(onInspect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
+              onClick={() => onInspect?.(row.id, row)}
+            >
+              <TableCell className="max-w-lg">
+                <div className="break-all font-medium">{row.url}</div>
+                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="size-3" /> {formatDate(row.created_at || row.updated_at)}
                 </div>
               </TableCell>
-            )}
-          </TableRow>
-        ))}
+              {showSite ? (
+                <TableCell className="min-w-48">
+                  <div className="font-medium">{auditSiteName(row)}</div>
+                  <div className="mt-1 break-all text-xs text-muted-foreground">{auditSiteDetail(row)}</div>
+                </TableCell>
+              ) : null}
+              <TableCell className="min-w-48">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge>
+                  <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
+                </div>
+                <div className="mt-2 max-w-52">
+                  <ProgressBar value={auditProgress(row)} />
+                  <div className="mt-1 text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
+                </div>
+              </TableCell>
+              <TableCell className="min-w-72">
+                <div className="text-sm text-muted-foreground">
+                  {formatNumber(row.pages_crawled)} pages crawled
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <Badge variant={counts.high ? "bad" : "outline"}>{counts.high} high</Badge>
+                  <Badge variant={counts.medium ? "warn" : "outline"}>{counts.medium} med</Badge>
+                  <Badge variant="outline">{counts.low} low</Badge>
+                </div>
+              </TableCell>
+              {(onInspect || onDelete) && (
+                <TableCell className="min-w-64 text-right">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {onInspect && (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link
+                          to={`/audits/${row.id}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (row.site_id) setSelectedAuditId(row.site_id, row.id);
+                          }}
+                        >
+                          <FileSearch /> Open report
+                        </Link>
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        aria-label={`Delete scan report for ${row.url}`}
+                        onClick={(event) => { event.stopPropagation(); onDelete(row.id, row); }}
+                      >
+                        <Trash2 /> Delete scan
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              )}
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );
@@ -5962,7 +5977,7 @@ function AuditPagesTable({ rows }: { rows: any[] }) {
             <TableCell className="nums">{textLength(page.title, page.titleLength)}</TableCell>
             <TableCell className="nums">{textLength(page.description, page.descriptionLength)}</TableCell>
             <TableCell className="nums">{pageH1Count(page)} / {page.h2Count || 0}</TableCell>
-            <TableCell className="nums">{page.loadMs ? `${formatNumber(page.loadMs)} ms` : "-"}</TableCell>
+            <TableCell className="nums">{formatMs(page.loadMs)}</TableCell>
             <TableCell className="nums">{formatNumber((page.internalLinks || 0) + (page.externalLinks || 0))}</TableCell>
             <TableCell className="nums">{page.images || 0}</TableCell>
             <TableCell className="nums">{formatNumber(page.wordCount)}</TableCell>
