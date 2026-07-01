@@ -303,6 +303,9 @@ try {
   if (!webAppClient.includes("Every saved scan is still listed below")) {
     throw new Error("Audit page should explain that all saved scans remain visible in the local ledger.");
   }
+  if (!webAppClient.includes("Could not load local sites") || !webAppClient.includes("Your SQLite data was not cleared")) {
+    throw new Error("Site loading failures should be visible instead of rendering an empty site list that looks like data loss.");
+  }
   if (!webAppClient.includes("Saved scan for page evidence") || !webAppClient.includes("Saved scan for link evidence")) {
     throw new Error("Organic and Links pages should expose saved scan selectors instead of hiding older scans behind latest-only evidence.");
   }

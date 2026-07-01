@@ -1022,6 +1022,8 @@ function WorkspaceShell() {
   const [activeProjectId, setActiveProjectId] = useState(
     localStorage.getItem(activeSiteStorageKey) || localStorage.getItem(legacyProjectStorageKey) || "",
   );
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState("");
   const [shellScanning, setShellScanning] = useState(false);
   const [shellScanError, setShellScanError] = useState("");
   const navigate = useNavigate();
@@ -1031,19 +1033,28 @@ function WorkspaceShell() {
   );
 
   async function loadProjects() {
-    const rows = await api.projects();
-    setProjects(rows);
-    if (rows.length === 0) {
-      setActiveProjectId("");
-      localStorage.removeItem(activeSiteStorageKey);
-      localStorage.removeItem(legacyProjectStorageKey);
-      return;
-    }
-    if (rows.length > 0 && !rows.some((project) => project.id === activeProjectId)) {
-      const nextActive = rows[0];
-      setActiveProjectId(nextActive.id);
-      localStorage.setItem(activeSiteStorageKey, nextActive.id);
-      localStorage.removeItem(legacyProjectStorageKey);
+    if (!projects.length) setProjectsLoading(true);
+    setProjectsError("");
+    try {
+      const rows = await api.projects();
+      setProjects(rows);
+      if (rows.length === 0) {
+        setActiveProjectId("");
+        localStorage.removeItem(activeSiteStorageKey);
+        localStorage.removeItem(legacyProjectStorageKey);
+        return;
+      }
+      if (rows.length > 0 && !rows.some((project) => project.id === activeProjectId)) {
+        const nextActive = rows[0];
+        setActiveProjectId(nextActive.id);
+        localStorage.setItem(activeSiteStorageKey, nextActive.id);
+        localStorage.removeItem(legacyProjectStorageKey);
+      }
+    } catch (err) {
+      setProjectsError(err instanceof Error ? err.message : "Could not load local sites");
+      throw err;
+    } finally {
+      setProjectsLoading(false);
     }
   }
 
@@ -1181,7 +1192,21 @@ function WorkspaceShell() {
 
         <main className="relative z-10 px-4 py-6 lg:ml-64 lg:px-8 lg:py-8">
           <div className="mx-auto w-full max-w-[1800px]">
-            {activeProject ? (
+            {projectsError ? (
+              <EmptyState
+                title="Could not load local sites"
+                text={`${projectsError}. Your SQLite data was not cleared; the app could not read it from the local API.`}
+                action={
+                  <Button type="button" onClick={() => loadProjects().catch(console.error)}>
+                    <RefreshCw /> Retry
+                  </Button>
+                }
+              />
+            ) : projectsLoading ? (
+              <div className="flex min-h-[50vh] items-center justify-center">
+                <Badge>Loading local SQLite sites</Badge>
+              </div>
+            ) : activeProject ? (
               <Routes key={activeProject.id}>
                 <Route path="/" element={<Overview project={activeProject} reloadProjects={loadProjects} selectProject={selectProject} />} />
                 <Route path="/sites" element={<ProjectsPage projects={projects} reloadProjects={loadProjects} activeProjectId={activeProject.id} selectProject={selectProject} />} />
