@@ -1,4 +1,4 @@
-import { get, run } from "./db";
+import { dbPath, get, run } from "./db";
 
 type ConfigRow = {
   key: string;
@@ -45,7 +45,7 @@ export function setConfigValue(key: string, value: string) {
   );
 }
 
-export function listPublicConfig() {
+export function listPublicConfig(): Record<string, string | boolean | number> {
   const keys = [
     "dataforseo_api_key",
     "google_client_id",
@@ -67,12 +67,19 @@ export function listPublicConfig() {
     "default_crawl_protocol",
     "default_crawl_host",
   ]);
-  return Object.fromEntries(
+  const config: Record<string, string | boolean> = Object.fromEntries(
     keys.map((key) => {
       const value = appPreferenceKeys.has(key) ? getStoredConfigValue(key) : getConfigValue(key);
       return [key, SECRET_KEYS.has(key) ? Boolean(value) : value];
     }),
   );
+  return {
+    ...config,
+    local_db_path: dbPath,
+    local_site_count: get<{ count: number }>("SELECT count(*) AS count FROM projects")?.count || 0,
+    local_audit_count: get<{ count: number }>("SELECT count(*) AS count FROM audits")?.count || 0,
+    local_gsc_import_count: get<{ count: number }>("SELECT count(*) AS count FROM gsc_imports")?.count || 0,
+  };
 }
 
 export function codexModel() {

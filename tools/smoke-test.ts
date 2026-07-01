@@ -428,6 +428,13 @@ try {
   ) {
     throw new Error(`New site did not use app defaults: ${JSON.stringify(defaultsProject)}`);
   }
+  const localConfigStatus = await request("/api/config");
+  if (
+    localConfigStatus.local_db_path !== path.resolve(serverDbPath) ||
+    Number(localConfigStatus.local_site_count || 0) < 3
+  ) {
+    throw new Error(`Config should expose the local SQLite source of truth and counts: ${JSON.stringify(localConfigStatus)}`);
+  }
   const siteScan = await request(`/api/sites/${project.id}/scan`, { method: "POST" });
   if (!siteScan.audit?.id) throw new Error("Site scan did not return an audit.");
   if (!Array.isArray(siteScan.candidateUrls) || !siteScan.candidateUrls.includes("https://example.com")) {

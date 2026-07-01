@@ -350,6 +350,7 @@ try {
     await page.getByRole("heading", { name: /^App settings$/ }).waitFor();
     await page.getByRole("heading", { name: /^Data sources$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
+    await page.getByRole("row", { name: /Local SQLite database.*Source of truth/i }).waitFor();
     if (await page.getByText(/API key|ENV|Environment variables/i).count()) {
       throw new Error("Settings page exposes secret/env configuration copy.");
     }

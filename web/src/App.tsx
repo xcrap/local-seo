@@ -6590,6 +6590,16 @@ function SettingsPage() {
         <ReportSection title="Data sources" description="What the app can run locally now and what needs a real connected source.">
           <StatusEvidenceTable
             rows={[
+              {
+                title: "Local SQLite database",
+                status: "Source of truth",
+                tone: "good",
+                text: (
+                  <span className="break-all">
+                    {config.local_db_path || "Database path unavailable"} · {formatNumber(config.local_site_count || 0)} sites · {formatNumber(config.local_audit_count || 0)} scans · {formatNumber(config.local_gsc_import_count || 0)} Search Console imports
+                  </span>
+                ),
+              },
               { title: "Technical audits", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
               { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless a metrics source is connected." },
               { title: "SERP and rank checks", status: config.openserp_url ? "OpenSERP" : "DuckDuckGo", tone: "good", text: "Uses OpenSERP when available, otherwise live DuckDuckGo results. The source is shown on each report." },

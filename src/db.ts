@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import dotenv from "dotenv";
 
 const runtimeDbPath = process.env.DB_PATH;
@@ -13,6 +13,7 @@ if (runtimeDbPath) {
 }
 
 const DB_PATH = process.env.DB_PATH || "./data/local-seo.sqlite";
+export const dbPath = resolve(DB_PATH);
 const MIGRATIONS_TABLE = "schema_migrations";
 
 if (!existsSync(dirname(DB_PATH))) {
