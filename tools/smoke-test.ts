@@ -272,6 +272,14 @@ try {
   if (/from the latest (site|local) audit|The latest audit did not/i.test(webAppClient)) {
     throw new Error("Audit-derived evidence pages should not present local crawl data as latest-only.");
   }
+  for (const legacyTargetLabel of ["Organic target", "External backlink target", "Analyze target", "Custom target"]) {
+    if (webAppClient.includes(legacyTargetLabel)) {
+      throw new Error(`Organic and Links pages should use selected-site/competitor wording, not "${legacyTargetLabel}".`);
+    }
+  }
+  if (!webAppClient.includes("Organic research site") || !webAppClient.includes("Backlink index site")) {
+    throw new Error("Organic and Links pages should label their domain inputs as site-specific controls.");
+  }
   if (webAppClient.includes("rows.slice(0, 350)") || webAppClient.includes("Showing {formatNumber(visible.length)}")) {
     throw new Error("Audit evidence tables should not silently cap local link or image inventory rows.");
   }

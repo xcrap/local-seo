@@ -238,7 +238,8 @@ try {
     await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
     await page.getByLabel("Saved scan for page evidence").waitFor();
     await page.getByText(/saved scans? available for this site/i).first().waitFor();
-    await page.getByRole("button", { name: /^Analyze target$/ }).click();
+    await page.getByLabel("Organic research site").waitFor();
+    await page.getByRole("button", { name: /^Analyze organic site$/ }).click();
     await page.getByText("External ranked-keyword dataset unavailable").waitFor();
     await page.getByRole("tab", { name: /^Snapshot$/ }).click();
     await page.getByRole("heading", { name: /^Snapshot$/ }).waitFor();
@@ -386,13 +387,13 @@ try {
       addSiteDialog.getByRole("button", { name: /^Save site only$/ }).click(),
     ]);
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
-    await page.getByLabel("Organic target").waitFor();
-    if (await page.getByLabel("Organic target").inputValue() !== "second.test") {
+    await page.getByLabel("Organic research site").waitFor();
+    if (await page.getByLabel("Organic research site").inputValue() !== "second.test") {
       throw new Error("Organic research target did not follow the newly selected site.");
     }
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
-    await page.getByLabel("External backlink target").waitFor();
-    if (await page.getByLabel("External backlink target").inputValue() !== "second.test") {
+    await page.getByLabel("Backlink index site").waitFor();
+    if (await page.getByLabel("Backlink index site").inputValue() !== "second.test") {
       throw new Error("Links target did not follow the newly selected site.");
     }
   } finally {

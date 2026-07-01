@@ -391,11 +391,13 @@ function SiteTargetField({
   label,
   value,
   siteDomain,
+  hint,
   onChange,
 }: {
   label: string;
   value: string;
   siteDomain: string;
+  hint?: string;
   onChange: (value: string) => void;
 }) {
   const usingSelectedSite = cleanSiteDomain(value) === cleanSiteDomain(siteDomain);
@@ -406,11 +408,11 @@ function SiteTargetField({
         {siteDomain ? (
           <div className="flex items-center gap-2">
             <Badge variant={usingSelectedSite ? "good" : "outline"}>
-              {usingSelectedSite ? "Selected site" : "Custom target"}
+              {usingSelectedSite ? "Selected site" : "Competitor/custom site"}
             </Badge>
             {!usingSelectedSite ? (
               <Button type="button" size="sm" variant="ghost" onClick={() => onChange(siteDomain)}>
-                Use {siteDomain}
+                Use selected site
               </Button>
             ) : null}
           </div>
@@ -418,6 +420,7 @@ function SiteTargetField({
       </div>
       <Input aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} placeholder={siteDomain || "example.com"} />
       {siteDomain ? <p className="text-xs text-muted-foreground">Selected site: {siteDomain}</p> : null}
+      {hint ? <p className="text-xs leading-5 text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -2747,12 +2750,18 @@ function DomainPage({ project }: { project: Project }) {
 
   return (
     <>
-      <PageHeader eyebrow="Competitive" title="Organic research" description="Ranked keywords and top pages for the selected site or a competitor target." />
+      <PageHeader eyebrow="Competitive" title="Organic research" description="Ranked keywords and top pages for the selected site or a competitor site." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
-          <SiteTargetField label="Organic target" value={target} siteDomain={project.domain} onChange={setTarget} />
+          <SiteTargetField
+            label="Organic research site"
+            value={target}
+            siteDomain={project.domain}
+            hint="Use the selected site or enter a competitor domain. Local crawl evidence below comes from saved audits."
+            onChange={setTarget}
+          />
           <div className="flex items-end">
-            <Button disabled={loading || !target.trim()}><Globe2 /> {loading ? "Analyzing" : "Analyze target"}</Button>
+            <Button disabled={loading || !target.trim()}><Globe2 /> {loading ? "Analyzing" : "Analyze organic site"}</Button>
           </div>
         </form>
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
@@ -2791,12 +2800,12 @@ function DomainPage({ project }: { project: Project }) {
             </TabsList>
             <TabsContent value="keywords">
               <ReportSection title="Ranked keywords" description={keywords ? <SourceBadge source={keywords.source} /> : "Run an analysis to load rows."}>
-                {keywords?.keywords?.length ? <DomainKeywordsTable rows={keywords.keywords} /> : <EmptyState title="No keyword rows" text={keywords?.warning || "Analyze a target domain to load ranked keyword data."} />}
+                {keywords?.keywords?.length ? <DomainKeywordsTable rows={keywords.keywords} /> : <EmptyState title="No keyword rows" text={keywords?.warning || "Analyze an organic research site to load ranked keyword data."} />}
               </ReportSection>
             </TabsContent>
             <TabsContent value="pages">
               <ReportSection title="Top pages" description={pages ? <SourceBadge source={pages.source} /> : "Run an analysis to load rows."}>
-                {pages?.pages?.length ? <DomainPagesTable rows={pages.pages} /> : <EmptyState title="No page rows" text={pages?.warning || "Analyze a target domain to load top page data."} />}
+                {pages?.pages?.length ? <DomainPagesTable rows={pages.pages} /> : <EmptyState title="No page rows" text={pages?.warning || "Analyze an organic research site to load top page data."} />}
               </ReportSection>
             </TabsContent>
             <TabsContent value="snapshot">
@@ -3150,7 +3159,13 @@ function BacklinksPage({ project }: { project: Project }) {
       <PageHeader eyebrow="Authority" title="Links" description="Local crawl links are available from audits. Web-wide backlinks are shown only when a real backlink index is connected." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
-          <SiteTargetField label="External backlink target" value={target} siteDomain={project.domain} onChange={setTarget} />
+          <SiteTargetField
+            label="Backlink index site"
+            value={target}
+            siteDomain={project.domain}
+            hint="Use the selected site or enter a competitor domain. Local link evidence below comes from saved audits."
+            onChange={setTarget}
+          />
           <div className="flex items-end">
             <Button disabled={loading || !target.trim() || !backlinkIndexConnected}><Link2 /> {loading ? "Checking" : backlinkIndexConnected ? "Check backlink index" : "Backlink index not connected"}</Button>
           </div>
