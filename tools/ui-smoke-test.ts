@@ -236,6 +236,8 @@ try {
 
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
+    await page.getByLabel("Saved scan for page evidence").waitFor();
+    await page.getByText(/saved scans? available for this site/i).first().waitFor();
     await page.getByRole("button", { name: /^Analyze target$/ }).click();
     await page.getByText("External ranked-keyword dataset unavailable").waitFor();
     await page.getByRole("tab", { name: /^Snapshot$/ }).click();
@@ -252,6 +254,8 @@ try {
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
     await page.getByRole("heading", { name: /^Links$/ }).waitFor();
     await page.getByRole("heading", { name: /^Local link graph$/ }).waitFor();
+    await page.getByLabel("Saved scan for link evidence").waitFor();
+    await page.getByText(/saved scans? available for this site/i).first().waitFor();
     await page.getByText("External backlink index", { exact: true }).waitFor();
     await page.getByRole("button", { name: /Backlink index not connected/i }).waitFor();
     await page.getByText("No web-wide backlink rows are generated locally").waitFor();

@@ -266,6 +266,12 @@ try {
   if (!webAppClient.includes("Every saved scan is still listed below")) {
     throw new Error("Audit page should explain that all saved scans remain visible in the local ledger.");
   }
+  if (!webAppClient.includes("Saved scan for page evidence") || !webAppClient.includes("Saved scan for link evidence")) {
+    throw new Error("Organic and Links pages should expose saved scan selectors instead of hiding older scans behind latest-only evidence.");
+  }
+  if (/from the latest (site|local) audit|The latest audit did not/i.test(webAppClient)) {
+    throw new Error("Audit-derived evidence pages should not present local crawl data as latest-only.");
+  }
   if (webAppClient.includes("rows.slice(0, 350)") || webAppClient.includes("Showing {formatNumber(visible.length)}")) {
     throw new Error("Audit evidence tables should not silently cap local link or image inventory rows.");
   }

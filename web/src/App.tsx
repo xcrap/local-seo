@@ -888,6 +888,11 @@ function latestCompletedAudit(rows: any[]) {
   return (rows || []).find((audit) => audit?.status === "completed" && audit?.result) || null;
 }
 
+function defaultEvidenceAudit(rows: any[]) {
+  const sorted = sortAuditRows(rows || []);
+  return latestCompletedAudit(sorted) || sorted[0] || null;
+}
+
 function auditIssueCount(row: any) {
   return Number(row?.issues?.length || 0);
 }
@@ -2659,12 +2664,17 @@ function DomainPage({ project }: { project: Project }) {
   const [overview, setOverview] = useState<any>(null);
   const [keywords, setKeywords] = useState<any>(null);
   const [pages, setPages] = useState<any>(null);
-  const [latestAudit, setLatestAudit] = useState<any>(null);
+  const [auditRows, setAuditRows] = useState<any[]>([]);
+  const [selectedAuditId, setSelectedAuditIdState] = useState("");
   const [history, setHistory] = useState<any[]>([]);
   const [tab, setTab] = useState("keywords");
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
+  const selectedAudit = useMemo(
+    () => auditRows.find((audit) => audit.id === selectedAuditId) || defaultEvidenceAudit(auditRows),
+    [auditRows, selectedAuditId],
+  );
 
   useEffect(() => {
     setTarget(project.domain);
@@ -2680,7 +2690,12 @@ function DomainPage({ project }: { project: Project }) {
       api.audits(project.id),
     ]);
     setHistory(snapshots);
-    setLatestAudit(latestCompletedAudit(audits));
+    const rows = sortAuditRows(audits);
+    setAuditRows(rows);
+    setSelectedAuditIdState((currentId) => {
+      if (currentId && rows.some((audit) => audit.id === currentId)) return currentId;
+      return defaultEvidenceAudit(rows)?.id || "";
+    });
   }
   useEffect(() => {
     loadHistory().catch(console.error);
@@ -2744,7 +2759,15 @@ function DomainPage({ project }: { project: Project }) {
       </section>
       <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_460px]">
         <div className="space-y-6">
-          <LocalOrganicEvidence audit={latestAudit} siteDomain={project.domain} onScan={scanSite} scanning={scanning} />
+          <LocalOrganicEvidence
+            audit={selectedAudit}
+            audits={auditRows}
+            selectedAuditId={selectedAudit?.id || ""}
+            onAuditChange={setSelectedAuditIdState}
+            siteDomain={project.domain}
+            onScan={scanSite}
+            scanning={scanning}
+          />
           {overview?.warning ? (
             <ProviderNotice title="External ranked-keyword dataset unavailable" text={overview.warning} source={overview.source} />
           ) : null}
@@ -2787,13 +2810,59 @@ function DomainPage({ project }: { project: Project }) {
   );
 }
 
+function AuditRunPicker({
+  label,
+  audits,
+  selectedAuditId,
+  onAuditChange,
+}: {
+  label: string;
+  audits: any[];
+  selectedAuditId: string;
+  onAuditChange: (auditId: string) => void;
+}) {
+  if (!audits.length) return null;
+  const selected = audits.find((audit) => audit.id === selectedAuditId) || audits[0];
+  return (
+    <div className="w-full space-y-2 lg:w-[440px]">
+      <Label>{label}</Label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Select value={selected?.id || ""} onValueChange={onAuditChange}>
+          <SelectTrigger aria-label={label} className="min-w-0 flex-1">
+            <SelectValue placeholder="Choose saved scan" />
+          </SelectTrigger>
+          <SelectContent>
+            {audits.map((audit) => (
+              <SelectItem key={audit.id} value={audit.id}>
+                {formatDate(audit.created_at || audit.updated_at)} · {scanStatusLabel(audit.status)} · {formatNumber(audit.pages_crawled || 0)} pages · {audit.url}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button asChild variant="outline">
+          <Link to={`/audits/${selected.id}`}><FileSearch /> Open report</Link>
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {formatNumber(audits.length)} saved scan{audits.length === 1 ? "" : "s"} available for this site.
+      </p>
+    </div>
+  );
+}
+
 function LocalOrganicEvidence({
   audit,
+  audits,
+  selectedAuditId,
+  onAuditChange,
   siteDomain,
   onScan,
   scanning,
 }: {
   audit: any;
+  audits: any[];
+  selectedAuditId: string;
+  onAuditChange: (auditId: string) => void;
   siteDomain: string;
   onScan: () => void;
   scanning: boolean;
@@ -2813,10 +2882,10 @@ function LocalOrganicEvidence({
           <div>
             <h2 className="text-lg font-semibold">Local crawl pages</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Real page evidence from the latest site audit. No external keyword or traffic estimates are generated here.
+              Real page evidence from the selected saved audit. No external keyword or traffic estimates are generated here.
             </p>
           </div>
-          {audit ? <Badge variant="good">{formatDate(audit.created_at)}</Badge> : null}
+          <AuditRunPicker label="Saved scan for page evidence" audits={audits} selectedAuditId={selectedAuditId} onAuditChange={onAuditChange} />
         </div>
       </div>
       <div className="space-y-4 p-5">
@@ -2831,6 +2900,12 @@ function LocalOrganicEvidence({
             ) : (
               <Button asChild variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
             )}
+          />
+        ) : !audit.result ? (
+          <EmptyState
+            title={auditIsActive(audit) ? "Selected scan is still running" : "Selected scan has no crawl evidence"}
+            text={auditIsActive(audit) ? "Open the scan report to watch progress. Evidence appears here after crawl data is saved." : audit.error || "This saved scan did not include crawl rows."}
+            action={<Button asChild variant="secondary"><Link to={`/audits/${audit.id}`}><FileSearch /> Open scan report</Link></Button>}
           />
         ) : (
           <>
@@ -2850,7 +2925,7 @@ function LocalOrganicEvidence({
                 </div>
               ))}
             </div>
-            {rows.length ? <LocalOrganicPagesTable rows={rows} /> : <EmptyState title="No page rows" text="The latest audit did not save page rows." />}
+            {rows.length ? <LocalOrganicPagesTable rows={rows} /> : <EmptyState title="No page rows" text="The selected scan did not save page rows." />}
           </>
         )}
       </div>
@@ -2974,13 +3049,18 @@ function BacklinksPage({ project }: { project: Project }) {
   const [overview, setOverview] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
-  const [latestAudit, setLatestAudit] = useState<any>(null);
+  const [auditRows, setAuditRows] = useState<any[]>([]);
+  const [selectedAuditId, setSelectedAuditIdState] = useState("");
   const [history, setHistory] = useState<any[]>([]);
   const [tab, setTab] = useState("backlinks");
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
   const backlinkIndexConnected = Boolean(config?.dataforseo_api_key);
+  const selectedAudit = useMemo(
+    () => auditRows.find((audit) => audit.id === selectedAuditId) || defaultEvidenceAudit(auditRows),
+    [auditRows, selectedAuditId],
+  );
 
   useEffect(() => {
     setTarget(project.domain);
@@ -2996,7 +3076,12 @@ function BacklinksPage({ project }: { project: Project }) {
       api.config(),
     ]);
     setHistory(snapshots);
-    setLatestAudit(latestCompletedAudit(audits));
+    const rows = sortAuditRows(audits);
+    setAuditRows(rows);
+    setSelectedAuditIdState((currentId) => {
+      if (currentId && rows.some((audit) => audit.id === currentId)) return currentId;
+      return defaultEvidenceAudit(rows)?.id || "";
+    });
     setConfig(appConfig);
   }
   useEffect(() => {
@@ -3007,7 +3092,7 @@ function BacklinksPage({ project }: { project: Project }) {
     if (!backlinkIndexConnected) {
       setOverview(null);
       setProfile(null);
-      setError("A web-wide backlink index is not connected. Use the local link graph from the latest audit, or connect a real backlink index before running this analysis.");
+      setError("A web-wide backlink index is not connected. Use the local link graph from a saved audit, or connect a real backlink index before running this analysis.");
       return;
     }
     setLoading(true);
@@ -3090,7 +3175,15 @@ function BacklinksPage({ project }: { project: Project }) {
       </section>
       <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_460px]">
         <div className="space-y-6">
-          <LocalLinkEvidence audit={latestAudit} siteDomain={project.domain} onScan={scanSite} scanning={scanning} />
+          <LocalLinkEvidence
+            audit={selectedAudit}
+            audits={auditRows}
+            selectedAuditId={selectedAudit?.id || ""}
+            onAuditChange={setSelectedAuditIdState}
+            siteDomain={project.domain}
+            onScan={scanSite}
+            scanning={scanning}
+          />
           {overview?.warning ? (
             <ProviderNotice title="External backlink index unavailable" text={overview.warning} source={overview.source} />
           ) : null}
@@ -3140,11 +3233,17 @@ function BacklinksPage({ project }: { project: Project }) {
 
 function LocalLinkEvidence({
   audit,
+  audits,
+  selectedAuditId,
+  onAuditChange,
   siteDomain,
   onScan,
   scanning,
 }: {
   audit: any;
+  audits: any[];
+  selectedAuditId: string;
+  onAuditChange: (auditId: string) => void;
   siteDomain: string;
   onScan: () => void;
   scanning: boolean;
@@ -3165,10 +3264,10 @@ function LocalLinkEvidence({
           <div>
             <h2 className="text-lg font-semibold">Local link graph</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Real internal links, external links, and failing targets from the latest local audit.
+              Real internal links, external links, and failing targets from the selected saved audit.
             </p>
           </div>
-          {audit ? <Badge variant="good">{formatDate(audit.created_at)}</Badge> : null}
+          <AuditRunPicker label="Saved scan for link evidence" audits={audits} selectedAuditId={selectedAuditId} onAuditChange={onAuditChange} />
         </div>
       </div>
       <div className="space-y-4 p-5">
@@ -3183,6 +3282,12 @@ function LocalLinkEvidence({
             ) : (
               <Button asChild variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
             )}
+          />
+        ) : !audit.result ? (
+          <EmptyState
+            title={auditIsActive(audit) ? "Selected scan is still running" : "Selected scan has no link evidence"}
+            text={auditIsActive(audit) ? "Open the scan report to watch progress. Link evidence appears here after crawl data is saved." : audit.error || "This saved scan did not include link rows."}
+            action={<Button asChild variant="secondary"><Link to={`/audits/${audit.id}`}><FileSearch /> Open scan report</Link></Button>}
           />
         ) : (
           <>
@@ -3207,13 +3312,13 @@ function LocalLinkEvidence({
                 <TabsTrigger value="internal">Internal graph</TabsTrigger>
               </TabsList>
               <TabsContent value="external">
-                {externalLinks.length ? <LocalExternalLinksTable rows={externalLinks} checkedByUrl={checkedByUrl} /> : <EmptyState title="No external links" text="The latest audit did not find external links." />}
+                {externalLinks.length ? <LocalExternalLinksTable rows={externalLinks} checkedByUrl={checkedByUrl} /> : <EmptyState title="No external links" text="The selected scan did not find external links." />}
               </TabsContent>
               <TabsContent value="broken">
-                {brokenLinks.length ? <AuditLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="The latest audit did not find failing link targets." />}
+                {brokenLinks.length ? <AuditLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="The selected scan did not find failing link targets." />}
               </TabsContent>
               <TabsContent value="internal">
-                {pageRows.length ? <LocalInternalGraphTable rows={pageRows} /> : <EmptyState title="No internal graph" text="The latest audit did not save page link rows." />}
+                {pageRows.length ? <LocalInternalGraphTable rows={pageRows} /> : <EmptyState title="No internal graph" text="The selected scan did not save page link rows." />}
               </TabsContent>
             </Tabs>
           </>
