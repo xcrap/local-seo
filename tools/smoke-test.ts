@@ -363,6 +363,9 @@ try {
   ) {
     throw new Error("Metric summaries should render as readable evidence tables instead of mini card grids.");
   }
+  if (webAppClient.includes("Clear selected site")) {
+    throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",

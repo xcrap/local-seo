@@ -313,9 +313,9 @@ try {
 
     await page.getByRole("navigation").getByRole("link", { name: /^Audits$/ }).click();
     await page.getByRole("heading", { name: /^All scan history$/ }).waitFor();
-    await page.getByRole("button", { name: /^Clear selected site$/ }).click();
-    await page.getByRole("heading", { name: /^Clear selected site scans\?$/ }).waitFor();
-    await page.getByRole("button", { name: /^Clear selected site$/ }).click();
+    await page.getByRole("button", { name: /^Delete selected-site scans$/ }).click();
+    await page.getByRole("heading", { name: /^Delete selected-site scans\?$/ }).waitFor();
+    await page.getByRole("button", { name: /^Delete selected-site scans$/ }).click();
     await page.getByText("No scan report yet").waitFor();
     await page.getByRole("button", { name: /^Scan site now$/ }).first().waitFor();
     await page.getByText("No audits yet").waitFor();

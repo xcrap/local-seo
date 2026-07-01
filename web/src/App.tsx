@@ -4145,7 +4145,7 @@ function AuditsPage({ project }: { project: Project }) {
                 onClick={() => setConfirmClearAudits(true)}
                 disabled={clearingAudits}
               >
-                <Trash2 /> Clear selected site
+                <Trash2 /> Delete selected-site scans
               </Button>
             ) : null}
           </div>
@@ -4187,16 +4187,16 @@ function AuditsPage({ project }: { project: Project }) {
       <AlertDialog open={confirmClearAudits} onOpenChange={setConfirmClearAudits}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear selected site scans?</AlertDialogTitle>
+            <AlertDialogTitle>Delete selected-site scans?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes all saved scan reports for {project.domain || project.name} from local SQLite. The saved site, keywords, rankings, and settings stay in place.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={clearingAudits}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={clearingAudits}>Keep scans</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={clearHistory} disabled={clearingAudits}>
-              {clearingAudits ? "Clearing" : "Clear selected site"}
+              {clearingAudits ? "Deleting scans" : "Delete selected-site scans"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
