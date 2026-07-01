@@ -314,6 +314,10 @@ try {
     }
   }
   const readmeSource = await readFile(path.join(rootDir, "README.md"), "utf8");
+  const viteConfigSource = await readFile(path.join(rootDir, "web/vite.config.ts"), "utf8");
+  if (!viteConfigSource.includes('"^/mcp$"') || viteConfigSource.includes('"/mcp":')) {
+    throw new Error("Vite should proxy the JSON-RPC /mcp endpoint exactly so MCP UI routes can refresh.");
+  }
   if (/target domain|target ownership|crawl target preferences/i.test(readmeSource)) {
     throw new Error("README should explain active-site/comparison-site workflows with clear site and crawl URL wording.");
   }
@@ -383,6 +387,12 @@ try {
   }
   if (!webAppClient.includes('path="/links"') || !webAppClient.includes('to="/links"')) {
     throw new Error("The React app should expose Links at /links.");
+  }
+  if (!webAppClient.includes('path="/mcp-tools"') || !webAppClient.includes('to: "/mcp-tools"')) {
+    throw new Error("The MCP screen should use /mcp-tools so it does not conflict with the JSON-RPC /mcp endpoint.");
+  }
+  if (webAppClient.includes('path="/mcp"') || webAppClient.includes('to: "/mcp"')) {
+    throw new Error("The React app should not use /mcp as a UI route because /mcp is the JSON-RPC endpoint.");
   }
   if (webAppClient.includes('path="/backlinks"') || webAppClient.includes('to="/backlinks"')) {
     throw new Error("The React app should not keep a /backlinks UI route or redirect.");

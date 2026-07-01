@@ -22,7 +22,7 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true
       },
-      "/mcp": {
+      "^/mcp$": {
         target: apiTarget,
         changeOrigin: true
       }

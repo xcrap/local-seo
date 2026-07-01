@@ -406,6 +406,11 @@ try {
     await page.getByRole("row", { name: /analyze_serp.*domain/i }).waitFor();
     await page.getByRole("row", { name: /get_domain_overview.*domain/i }).waitFor();
     await page.getByRole("row", { name: /get_backlinks_profile.*domain/i }).waitFor();
+    await page.goto(`${webUrl}/mcp-tools`, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: /^MCP$/ }).waitFor();
+    if (page.url().endsWith("/mcp")) {
+      throw new Error("MCP UI should not use the JSON-RPC endpoint route.");
+    }
 
     await page.getByRole("navigation").getByRole("link", { name: /^AI lab$/ }).click();
     await page.getByRole("heading", { name: /^AI lab$/ }).waitFor();

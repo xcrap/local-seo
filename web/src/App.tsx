@@ -100,7 +100,7 @@ const nav = [
   { to: "/audits", label: "Audits", icon: FileSearch },
   { to: "/gsc", label: "Search Console", icon: BarChart3 },
   { to: "/ai", label: "AI lab", icon: Bot },
-  { to: "/mcp", label: "MCP", icon: Cable },
+  { to: "/mcp-tools", label: "MCP", icon: Cable },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -1391,7 +1391,7 @@ function AppShell() {
                 <Route path="/audits/:auditId" element={<AuditReportRoute />} />
                 <Route path="/gsc" element={<GscPage site={activeSite} />} />
                 <Route path="/ai" element={<AiPage site={activeSite} />} />
-                <Route path="/mcp" element={<McpPage />} />
+                <Route path="/mcp-tools" element={<McpPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
