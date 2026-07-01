@@ -247,7 +247,7 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
         scanError={shellScanError}
         onNavigate={(path) => navigate(path)}
       />
-      <main className="relative z-10 px-4 py-6 lg:ml-[264px] lg:px-9 lg:py-8">
+      <main className="relative z-10 px-4 py-6 lg:ml-66 lg:px-9 lg:py-8">
         <div className="mx-auto w-full max-w-[1640px]">
           <Routes key={activeSite?.id || "no-site"}>
             <Route path="/overview" element={requireSite(activeSite ? <Overview site={activeSite} reloadSites={loadSites} selectSite={selectSite} /> : null)} />
@@ -276,7 +276,7 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/25">
-        <Activity className="size-[18px]" />
+        <Activity className="size-4.5" />
       </div>
       {!compact ? (
         <div className="leading-tight">
@@ -336,7 +336,7 @@ type SidebarProps = {
 
 function WorkspaceSidebar({ sites, activeSite, onSelect, onScan, scanning, scanError }: SidebarProps) {
   return (
-    <aside className="fixed bottom-0 left-0 top-14 z-20 hidden w-[264px] flex-col overflow-hidden border-r border-border/70 bg-surface/85 backdrop-blur lg:flex">
+    <aside className="fixed bottom-0 left-0 top-14 z-20 hidden w-66 flex-col overflow-hidden border-r border-border/70 bg-surface/85 backdrop-blur lg:flex">
       <div className="px-3 pt-4">
         <div className="rounded-xl border border-border/80 bg-card p-3 shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
           <div className="flex items-center gap-2.5">
