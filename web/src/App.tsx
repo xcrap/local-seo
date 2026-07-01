@@ -1931,6 +1931,7 @@ function SitesPage({
   const [scanningSiteId, setScanningSiteId] = useState("");
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
   const [deletingSiteId, setDeletingSiteId] = useState("");
+  const [editingSiteId, setEditingSiteId] = useState("");
   const navigate = useNavigate();
 
   function showActionMessage(message: string, persistForRemount = false) {
@@ -2026,6 +2027,7 @@ function SitesPage({
     event.preventDefault();
     if (!editing) return;
     setError("");
+    setEditingSiteId(editing.id);
     try {
       const updated = await api.updateSite(editing.id, editForm);
       setEditing(null);
@@ -2033,6 +2035,8 @@ function SitesPage({
       showActionMessage(`${cleanSiteDomain(updated.domain) || updated.name || "Site"} updated locally.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update site");
+    } finally {
+      setEditingSiteId("");
     }
   }
 
@@ -2317,7 +2321,9 @@ function SitesPage({
             <ScanPlanPreview site={editScanPlan} />
             <Field label="Notes"><Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></Field>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit"><Pencil /> Save changes</Button>
+            <Button type="submit" disabled={Boolean(editingSiteId)}>
+              <Pencil /> {editingSiteId ? "Saving changes" : "Save changes"}
+            </Button>
           </form>
         </DialogContent>
       </Dialog>

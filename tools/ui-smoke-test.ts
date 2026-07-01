@@ -575,6 +575,13 @@ try {
       addSiteDialog.getByRole("button", { name: /^Save site only$/ }).click(),
     ]);
     await page.getByText("second.test saved locally.").waitFor();
+    await page.getByRole("button", { name: /Edit second.test/i }).click();
+    await page.getByRole("heading", { name: /^Edit site$/ }).waitFor();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("/api/sites/") && response.request().method() === "PUT"),
+      page.getByRole("button", { name: /^Save changes$/ }).click(),
+    ]);
+    await page.getByText("second.test updated locally.").waitFor();
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByLabel("Organic research site").waitFor();
     if (await page.getByLabel("Organic research site").inputValue() !== "second.test") {
