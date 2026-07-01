@@ -990,6 +990,42 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
   };
 }
 
+function auditSpeedMetrics(audit: any) {
+  const result = audit?.result || {};
+  const coverage = auditCoverageMetrics(audit, result, result.summary || {});
+  return {
+    measuredPageLoads: Number(coverage.measuredPageLoads || 0),
+    averagePageLoadMs: Number(coverage.averagePageLoadMs || 0),
+    medianPageLoadMs: Number(coverage.medianPageLoadMs || 0),
+    p95PageLoadMs: Number(coverage.p95PageLoadMs || 0),
+    slowestPageLoadMs: Number(coverage.slowestPageLoadMs || 0),
+    slowPages: Number(coverage.slowPages || 0),
+    verySlowPages: Number(coverage.verySlowPages || 0),
+  };
+}
+
+function auditSpeedHistoryRows(audits: any[]) {
+  return sortAuditRows(audits)
+    .filter((audit) => audit.status === "completed")
+    .map((audit) => ({ audit, metrics: auditSpeedMetrics(audit) }))
+    .filter((row) => row.metrics.measuredPageLoads > 0 && row.metrics.averagePageLoadMs > 0);
+}
+
+function speedDeltaLabel(current: number, previous?: number) {
+  if (!previous || !Number.isFinite(previous)) return "first measured scan";
+  const delta = Math.round(current - previous);
+  if (delta === 0) return "unchanged";
+  return delta < 0 ? `${formatMs(Math.abs(delta))} faster` : `${formatMs(delta)} slower`;
+}
+
+function speedDeltaVariant(current: number, previous?: number) {
+  if (!previous || !Number.isFinite(previous)) return "outline";
+  const delta = current - previous;
+  if (delta <= -100) return "good";
+  if (delta >= 250) return "warn";
+  return "outline";
+}
+
 function issueTypeCount(issues: any[], type: string) {
   return issues.filter((issue) => issue.type === type).length;
 }
@@ -4215,6 +4251,7 @@ function AuditsPage({ site }: { site: Site }) {
       </section>
       <div className="mt-6 space-y-6">
         {activeAudit ? <ActiveScanBanner audit={activeAudit} /> : null}
+        <AuditSpeedHistoryPanel audits={audits} />
         <section className="space-y-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -4340,6 +4377,83 @@ function ActiveScanBanner({ audit }: { audit: any }) {
           <Link to={`/audits/${audit.id}`}><FileSearch /> Open live report</Link>
         </Button>
       </div>
+    </section>
+  );
+}
+
+function AuditSpeedHistoryPanel({ audits }: { audits: any[] }) {
+  const rows = auditSpeedHistoryRows(audits);
+  const latest = rows[0];
+  const previous = rows[1];
+  return (
+    <section className="rounded-md border bg-background">
+      <div className="flex flex-col gap-3 border-b px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Page speed tracking</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Saved response timings from completed local scans for this site.
+          </p>
+        </div>
+        {latest ? (
+          <div className="flex flex-wrap gap-2">
+            <Badge variant={speedVariant(latest.metrics.averagePageLoadMs) as any}>Latest avg {formatMs(latest.metrics.averagePageLoadMs)}</Badge>
+            <Badge variant={speedDeltaVariant(latest.metrics.averagePageLoadMs, previous?.metrics.averagePageLoadMs) as any}>
+              {speedDeltaLabel(latest.metrics.averagePageLoadMs, previous?.metrics.averagePageLoadMs)}
+            </Badge>
+          </div>
+        ) : null}
+      </div>
+      {rows.length ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Scan</TableHead>
+              <TableHead>Average</TableHead>
+              <TableHead>Median</TableHead>
+              <TableHead>P95</TableHead>
+              <TableHead>Slowest page</TableHead>
+              <TableHead>Timed pages</TableHead>
+              <TableHead>Slow pages</TableHead>
+              <TableHead>Change</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row, index) => {
+              const previousRow = rows[index + 1];
+              return (
+                <TableRow key={row.audit.id}>
+                  <TableCell className="max-w-md">
+                    <div className="truncate font-medium">{row.audit.url}</div>
+                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="size-3" /> {formatDate(row.audit.created_at || row.audit.updated_at)}
+                    </div>
+                  </TableCell>
+                  <TableCell><Badge variant={speedVariant(row.metrics.averagePageLoadMs) as any}>{formatMs(row.metrics.averagePageLoadMs)}</Badge></TableCell>
+                  <TableCell className="nums">{formatMs(row.metrics.medianPageLoadMs)}</TableCell>
+                  <TableCell className="nums">{formatMs(row.metrics.p95PageLoadMs)}</TableCell>
+                  <TableCell className="nums">{formatMs(row.metrics.slowestPageLoadMs)}</TableCell>
+                  <TableCell className="nums">{formatNumber(row.metrics.measuredPageLoads)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant={row.metrics.slowPages ? "warn" : "outline"}>{formatNumber(row.metrics.slowPages)} slow</Badge>
+                      <Badge variant={row.metrics.verySlowPages ? "bad" : "outline"}>{formatNumber(row.metrics.verySlowPages)} very slow</Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={speedDeltaVariant(row.metrics.averagePageLoadMs, previousRow?.metrics.averagePageLoadMs) as any}>
+                      {speedDeltaLabel(row.metrics.averagePageLoadMs, previousRow?.metrics.averagePageLoadMs)}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      ) : (
+        <div className="p-5">
+          <EmptyState title="No page speed history yet" text="Run a completed local scan to record response timing for each crawled HTML page." />
+        </div>
+      )}
     </section>
   );
 }

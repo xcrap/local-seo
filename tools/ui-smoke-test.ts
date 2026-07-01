@@ -341,6 +341,9 @@ try {
     await page.keyboard.press("Escape");
 
     await page.getByRole("navigation").getByRole("link", { name: /^Audits$/ }).click();
+    await page.getByRole("heading", { name: /^Page speed tracking$/ }).waitFor();
+    await page.getByText(/Latest avg .*ms/i).waitFor();
+    await page.getByRole("columnheader", { name: /^P95$/ }).waitFor();
     await page.getByRole("heading", { name: /^All scan history$/ }).waitFor();
     await page.getByRole("button", { name: /Delete scan/i }).first().waitFor();
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
