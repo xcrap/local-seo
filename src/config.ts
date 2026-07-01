@@ -13,6 +13,19 @@ const SECRET_KEYS = new Set([
   "mcp_token",
 ]);
 
+const APP_PREFERENCE_KEYS = new Set([
+  "codex_model",
+  "codex_reasoning_effort",
+  "default_location_code",
+  "default_language_code",
+  "default_crawl_protocol",
+  "default_crawl_host",
+]);
+
+export function isAppPreferenceKey(key: string) {
+  return APP_PREFERENCE_KEYS.has(key);
+}
+
 export function getConfigValue(key: string): string {
   const envKey = key.toUpperCase();
   const envValue =
@@ -60,17 +73,9 @@ export function listPublicConfig(): Record<string, string | boolean | number> {
     "default_crawl_protocol",
     "default_crawl_host",
   ];
-  const appPreferenceKeys = new Set([
-    "codex_model",
-    "codex_reasoning_effort",
-    "default_location_code",
-    "default_language_code",
-    "default_crawl_protocol",
-    "default_crawl_host",
-  ]);
   const config: Record<string, string | boolean> = Object.fromEntries(
     keys.map((key) => {
-      const value = appPreferenceKeys.has(key) ? getStoredConfigValue(key) : getConfigValue(key);
+      const value = isAppPreferenceKey(key) ? getStoredConfigValue(key) : getConfigValue(key);
       return [key, SECRET_KEYS.has(key) ? Boolean(value) : value];
     }),
   );

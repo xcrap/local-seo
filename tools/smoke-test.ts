@@ -553,6 +553,13 @@ try {
       default_crawl_host: "www",
     }),
   });
+  const rejectedSecretConfig = await requestFailure("/api/config", {
+    method: "PUT",
+    body: JSON.stringify({ dataforseo_api_key: "should-not-save-here" }),
+  });
+  if (!/App settings cannot save/i.test(String(rejectedSecretConfig.data?.error || ""))) {
+    throw new Error(`App settings API should reject secret/data-source keys: ${JSON.stringify(rejectedSecretConfig)}`);
+  }
   const defaultsProject = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Configured Defaults", domain: "defaults.example" }),

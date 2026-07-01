@@ -14,7 +14,7 @@ import {
   verifyPassword,
   verifySessionToken,
 } from "./auth";
-import { listPublicConfig, setConfigValue } from "./config";
+import { isAppPreferenceKey, listPublicConfig, setConfigValue } from "./config";
 import { createAiJob, getAiJob, listAiJobs, listAiPrompts, saveAiPrompt } from "./codex";
 import {
   createGscAuthUrl,
@@ -245,6 +245,15 @@ app.put(
   "/api/config",
   safe(async (c) => {
     const body = await readJson(c);
+    const unsupportedKeys = Object.keys(body).filter((key) => !isAppPreferenceKey(key));
+    if (unsupportedKeys.length) {
+      return c.json(
+        {
+          error: `App settings cannot save data-source credentials or environment keys: ${unsupportedKeys.join(", ")}.`,
+        },
+        400,
+      );
+    }
     for (const [key, value] of Object.entries(body)) {
       setConfigValue(key, String(value ?? ""));
     }
