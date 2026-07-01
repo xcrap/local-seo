@@ -89,15 +89,6 @@ const isDev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT || 3031);
 const authConfig = getAuthConfig();
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-    },
-  });
-}
-
 async function readJson(c: any) {
   return (await c.req.json().catch(() => ({}))) as Record<string, any>;
 }

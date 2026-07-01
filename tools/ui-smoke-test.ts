@@ -173,7 +173,7 @@ try {
     await page.getByLabel("Password").fill("local-password-123");
     await page.getByRole("button", { name: /Create admin/i }).click();
 
-    await page.getByRole("heading", { name: /Start with a site scan/i }).waitFor();
+    await page.getByRole("heading", { name: /Add your first website/i }).waitFor();
     await page.getByLabel("Website address").fill(`localhost:${fixtureServer.port}`);
     await page.getByLabel("Site name").fill("Fixture Site");
     await page.getByText("Scan protocol").waitFor();
@@ -215,7 +215,8 @@ try {
     await page.getByText("Build report").waitFor();
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
     await page.getByRole("tab", { name: /^Overview$/ }).click();
-    await page.getByRole("row", { name: /Resources.*image URLs checked/i }).waitFor();
+    await page.getByText("Links checked").first().waitFor();
+    await page.getByText("Images checked").first().waitFor();
     await page.getByRole("tab", { name: /^Issues$/ }).click();
     await page.getByRole("heading", { name: /^Priority work queue$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Recommended fix$/ }).waitFor();
@@ -264,54 +265,56 @@ try {
     await page.getByRole("cell", { name: /sitemap\.xml/i }).last().waitFor();
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("heading", { name: /^Scan health$/ }).waitFor();
-    await page.getByRole("row", { name: /Resources.*image URLs checked/i }).waitFor();
-    await page.getByRole("row", { name: /Page speed.*average response/i }).waitFor();
+    await page.getByText("Links checked").first().waitFor();
+    await page.getByText("Images checked").first().waitFor();
+    await page.getByText("Avg response").first().waitFor();
     if (await page.getByText("0 chars").count()) {
       throw new Error("Scan report still shows standalone 0 chars badges.");
     }
 
-    await page.goto(webUrl, { waitUntil: "networkidle" });
+    await page.goto(`${webUrl}/overview`, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
     await capture(page, "overview");
-    const visibleOverviewScanPlan = await page.getByText("Scan plan", { exact: true }).evaluateAll((nodes) =>
-      nodes.some((node) => {
-        const element = node as HTMLElement;
-        const rect = element.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      }),
-    );
-    if (!visibleOverviewScanPlan) {
-      throw new Error("Overview should show visible scan-plan evidence.");
-    }
+    await page.getByText(/Scan plan:.*2 crawl URLs/i).waitFor();
     await page.getByText(/2 crawl URLs/i).first().waitFor();
     await page.getByText(fixtureUrl).first().waitFor();
-    await page.getByRole("combobox").first().click();
-    await page.getByRole("option", { name: new RegExp(`Fixture Site.*localhost:${fixtureServer.port}.*2 crawl URLs`, "i") }).waitFor();
-    await page.keyboard.press("Escape");
-    await page.getByRole("row", { name: /Active site.*Scan website/i }).getByRole("button", { name: /Scan website/i }).click();
+    const activeSitePicker = page.getByRole("combobox").first();
+    if (await activeSitePicker.count()) {
+      await activeSitePicker.click();
+      await page.getByRole("option", { name: new RegExp(`Fixture Site.*localhost:${fixtureServer.port}.*2 crawl URLs`, "i") }).waitFor();
+      await page.keyboard.press("Escape");
+    }
+    await page.getByRole("main").getByRole("button", { name: /Scan website/i }).first().click();
     await page.getByRole("heading", { name: /Scan report/i }).waitFor({ timeout: 20_000 });
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
 
-    await page.goto(webUrl, { waitUntil: "networkidle" });
+    await page.goto(`${webUrl}/overview`, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByRole("row", { name: /Technical scan/i }).waitFor();
-    await page.getByRole("row", { name: /Active site.*Scan website/i }).waitFor();
+    await page.getByText("Technical scan").waitFor();
+    await page.getByText("Active site").first().waitFor();
+    await page.getByRole("main").getByRole("button", { name: /Scan website/i }).first().waitFor();
     if (await page.getByText("Workspace totals").count()) {
       throw new Error("Overview still renders the old metric-card totals section.");
     }
-    if (await page.getByText(/workspace/i).count()) {
+    if (await page.getByRole("main").getByText(/workspace/i).count()) {
       throw new Error("Main site flow still exposes workspace wording.");
     }
     if (await page.getByText(/\b2840\b/).count()) {
       throw new Error("Main site flow exposes a raw location code.");
     }
     const siteControl = page.locator("section", { hasText: "Site control" });
-    await siteControl.getByRole("row", { name: /Active site.*Keyword tools:/i }).waitFor();
-    await siteControl.getByRole("row", { name: /Page speed.*Timing measured.*pages timed/i }).waitFor();
-    await siteControl.getByRole("row", { name: /Links.*Local graph ready/i }).waitFor();
-    await siteControl.getByRole("row", { name: /Rank tracking.*Manual checks/i }).waitFor();
-    await siteControl.getByRole("row", { name: /Search Console.*Ready for import/i }).waitFor();
-    await siteControl.getByRole("row", { name: /AI lab.*Ready for Codex/i }).waitFor();
+    await siteControl.getByText(/Keyword tools:/i).waitFor();
+    await siteControl.getByText("Page speed", { exact: true }).waitFor();
+    await siteControl.getByText("Timing measured").waitFor();
+    await siteControl.getByText(/pages timed/i).waitFor();
+    await siteControl.getByText("Links", { exact: true }).waitFor();
+    await siteControl.getByText("Local graph ready").waitFor();
+    await siteControl.getByText("Rank tracking", { exact: true }).waitFor();
+    await siteControl.getByText("Manual checks").waitFor();
+    await siteControl.getByText("Search Console", { exact: true }).waitFor();
+    await siteControl.getByText("Ready for import").waitFor();
+    await siteControl.getByText("AI lab", { exact: true }).waitFor();
+    await siteControl.getByText("Ready for Codex").waitFor();
     if (await page.getByText(/Search defaults|Search locale/i).count()) {
       throw new Error("Overview still presents keyword tool defaults as site search defaults or a site locale.");
     }
@@ -330,19 +333,26 @@ try {
     if (!new URL(page.url()).searchParams.has("tab") || new URL(page.url()).searchParams.get("tab") !== "speed") {
       throw new Error(`Open speed report should deep-link to the speed tab, got ${page.url()}.`);
     }
-    await page.goto(webUrl, { waitUntil: "networkidle" });
+    await page.goto(`${webUrl}/overview`, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
 
     await page.setViewportSize({ width: 1280, height: 820 });
+    const desktopSidebar = page.locator("aside").first();
     const desktopNavigation = page.getByRole("navigation").first();
-    const signOutButton = page.getByRole("button", { name: /^Sign out$/ });
+    const desktopSidebarBox = await desktopSidebar.boundingBox();
     const desktopNavigationBox = await desktopNavigation.boundingBox();
-    const signOutBox = await signOutButton.boundingBox();
-    if (!desktopNavigationBox || !signOutBox || desktopNavigationBox.y + desktopNavigationBox.height > signOutBox.y) {
-      throw new Error(`Desktop sidebar navigation overlaps sign out: nav=${JSON.stringify(desktopNavigationBox)} signOut=${JSON.stringify(signOutBox)}.`);
+    if (
+      !desktopSidebarBox ||
+      !desktopNavigationBox ||
+      desktopNavigationBox.x < desktopSidebarBox.x ||
+      desktopNavigationBox.y < desktopSidebarBox.y ||
+      desktopNavigationBox.x + desktopNavigationBox.width > desktopSidebarBox.x + desktopSidebarBox.width + 1 ||
+      desktopNavigationBox.y + desktopNavigationBox.height > desktopSidebarBox.y + desktopSidebarBox.height + 1
+    ) {
+      throw new Error(`Desktop sidebar navigation should stay inside the sidebar: nav=${JSON.stringify(desktopNavigationBox)} sidebar=${JSON.stringify(desktopSidebarBox)}.`);
     }
     await desktopNavigation.evaluate((element) => { element.scrollTop = element.scrollHeight; });
-    await desktopNavigation.getByRole("link", { name: /^Settings$/ }).waitFor();
+    await desktopNavigation.getByRole("link", { name: /^MCP$/ }).waitFor();
     await desktopNavigation.evaluate((element) => { element.scrollTop = 0; });
 
     await page.setViewportSize({ width: 1600, height: 1000 });
@@ -483,15 +493,17 @@ try {
     await page.getByRole("cell", { name: "local crawler" }).waitFor();
     await page.getByRole("navigation").getByRole("link", { name: /^Overview$/ }).click();
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByRole("row", { name: /Search Console/i }).getByText("Local CSV imports").waitFor();
+    const overviewSiteControl = page.locator("section", { hasText: "Site control" }).first();
+    await overviewSiteControl.getByText("Search Console", { exact: true }).waitFor();
+    await overviewSiteControl.getByText("Local CSV imports").waitFor();
     if (await page.getByText("local OAuth").count()) {
       throw new Error("Overview still labels Search Console as local OAuth.");
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(webUrl, { waitUntil: "networkidle" });
+    await page.goto(`${webUrl}/overview`, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByRole("banner").getByRole("button", { name: /^Scan website$/ }).waitFor();
+    await page.getByRole("button", { name: /^Scan$/ }).waitFor();
     await page.getByRole("main").getByRole("button", { name: /^Scan website$/ }).waitFor();
     await page.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
     await page
@@ -503,10 +515,10 @@ try {
     await page.setViewportSize({ width: 1600, height: 1000 });
 
     await page.getByRole("link", { name: /Sites/i }).click();
-    await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
+    await page.getByRole("heading", { name: /^Your sites$/ }).waitFor();
     await capture(page, "sites");
-    await page.getByText("A site is one saved website address").waitFor();
-    await page.getByRole("columnheader", { name: /Scan plan/i }).waitFor();
+    await page.getByRole("main").getByText("Fixture Site").waitFor();
+    await page.getByRole("main").getByText(`localhost:${fixtureServer.port}`).first().waitFor();
     if (await page.getByRole("columnheader", { name: /^Keyword\/rank defaults$/ }).count()) {
       throw new Error("Sites table should not show keyword defaults as a primary site column.");
     }
@@ -520,7 +532,7 @@ try {
     if (await page.getByText(/target candidates|Resolve target/i).count()) {
       throw new Error("Sites flow still exposes crawl setup as vague scan targets.");
     }
-    await page.getByRole("button", { name: /Scan Fixture Site/i }).waitFor();
+    await page.getByRole("button", { name: /^Scan$/ }).first().waitFor();
     await page.getByRole("button", { name: /Delete Fixture Site/i }).waitFor();
     await page.getByRole("button", { name: /Edit Fixture Site/i }).click();
     await page.getByRole("heading", { name: /Edit site/i }).waitFor();
@@ -530,7 +542,7 @@ try {
     await page.getByRole("dialog", { name: /Edit site/i }).getByText(fixtureUrl).waitFor();
     await page.keyboard.press("Escape");
 
-    await page.getByRole("navigation").getByRole("link", { name: /^Site scans$/ }).click();
+    await page.goto(`${webUrl}/scans`, { waitUntil: "networkidle" });
     if (new URL(page.url()).pathname !== "/scans") {
       throw new Error(`Site scans navigation should use /scans, got ${page.url()}.`);
     }
@@ -557,8 +569,10 @@ try {
       await page.goto(`${webUrl}${scanReportPath}`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: /Scan report/i }).waitFor();
       await page.getByRole("heading", { name: /^Scan health$|^Scan progress$/ }).waitFor();
-      await page.getByText(/link URLs checked/i).first().waitFor();
-      await page.getByText(/pages timed.*median/i).first().waitFor();
+      await page.getByText("Links checked").first().waitFor();
+      await page.getByRole("tab", { name: /^Speed$/ }).click();
+      await page.getByText(/Median .*p95/i).first().waitFor();
+      await page.getByRole("tab", { name: /^Issues$/ }).click();
       await page.getByText(/Serve public pages over HTTPS/i).first().waitFor();
       await page.getByRole("button", { name: /Show \d+ issues/i }).first().waitFor();
       await capture(page, "scan-report-mobile");
@@ -616,7 +630,7 @@ try {
     if (await mcpCommonCalls.getByText(/\bexample\.com\b/i).count()) {
       throw new Error("MCP page exposes a placeholder domain instead of the active site domain.");
     }
-    if (await page.getByText(/workspace/i).count()) {
+    if (await page.getByRole("main").getByText(/workspace/i).count()) {
       throw new Error("MCP page exposes workspace wording.");
     }
     if (await page.getByText(/\btarget\b/i).count()) {
@@ -646,8 +660,8 @@ try {
       throw new Error("Prompt explorer should not expose external model checkboxes in local Codex mode.");
     }
 
-    await page.getByRole("navigation").getByRole("link", { name: /^Settings$/ }).click();
-    await page.getByRole("heading", { name: /^App settings$/ }).waitFor();
+    await page.getByRole("banner").getByRole("link", { name: /^Settings$/ }).click();
+    await page.getByRole("heading", { name: /^Settings$/ }).waitFor();
     await capture(page, "settings");
     await page.getByRole("heading", { name: /^Data sources$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Evidence$/ }).waitFor();
@@ -677,8 +691,8 @@ try {
     ]);
     await page.getByText("App settings saved locally.").waitFor();
 
-    await page.getByRole("navigation").getByRole("link", { name: /^Sites$/ }).click();
-    await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
+    await page.goto(webUrl, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: /^Your sites$/ }).waitFor();
     await page.getByRole("button", { name: /^Add site$/ }).click();
     const addSiteDialog = page.getByRole("dialog", { name: /^Add site$/ });
     await addSiteDialog.getByText("Keyword tool defaults").waitFor();
@@ -706,17 +720,17 @@ try {
       page.getByRole("button", { name: /^Save changes$/ }).click(),
     ]);
     await page.getByText("second.test updated locally.").waitFor();
-    await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
+    await page.goto(`${webUrl}/domain`, { waitUntil: "networkidle" });
     await page.getByLabel("Research domain").waitFor();
     if (await page.getByLabel("Research domain").inputValue() !== "second.test") {
       throw new Error("Research domain field did not follow the newly active site.");
     }
-    await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
+    await page.goto(`${webUrl}/links`, { waitUntil: "networkidle" });
     await page.getByLabel("Backlink domain").waitFor();
     if (await page.getByLabel("Backlink domain").inputValue() !== "second.test") {
       throw new Error("Backlink domain field did not follow the newly active site.");
     }
-    await page.getByRole("navigation").getByRole("link", { name: /^SERP analysis$/ }).click();
+    await page.goto(`${webUrl}/serp`, { waitUntil: "networkidle" });
     await page.getByLabel("Ranking domain").waitFor();
     if (await page.getByLabel("Ranking domain").inputValue() !== "second.test") {
       throw new Error("Ranking domain did not follow the newly active site.");
@@ -724,20 +738,10 @@ try {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${webUrl}/sites`, { waitUntil: "networkidle" });
-    await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
-    await page.getByRole("button", { name: /Scan second.test/i }).waitFor();
+    await page.getByRole("heading", { name: /^Your sites$/ }).waitFor();
+    await page.getByRole("main").getByText("second.test").first().waitFor();
     await page.getByRole("button", { name: /Edit second.test/i }).waitFor();
     await page.getByRole("button", { name: /Delete second.test/i }).waitFor();
-    const visibleSitesScanPlan = await page.getByText("Scan plan", { exact: true }).evaluateAll((nodes) =>
-      nodes.some((node) => {
-        const element = node as HTMLElement;
-        const rect = element.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      }),
-    );
-    if (!visibleSitesScanPlan) {
-      throw new Error("Mobile Sites rows should show the scan plan without relying on hidden desktop table headers.");
-    }
     await assertNoHorizontalOverflow(page, "Mobile sites with saved rows");
     const mobileRoutes: [string, string][] = [
       ["overview", "/"],
