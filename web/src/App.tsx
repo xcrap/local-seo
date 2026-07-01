@@ -3654,11 +3654,22 @@ function BrandLookupResult({ result }: { result: any }) {
         </ReportSection>
         <ReportSection title="Next actions" description="Grounded recommendations saved with this lookup.">
           {recommendationRows.length ? (
-            <div className="space-y-2">
-              {recommendationRows.map((item: string) => (
-                <div key={item} className="rounded-md border bg-muted/25 p-3 text-sm leading-6">{item}</div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">#</TableHead>
+                  <TableHead>Recommended action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+              {recommendationRows.map((item: string, index: number) => (
+                <TableRow key={item}>
+                  <TableCell className="nums text-muted-foreground">{index + 1}</TableCell>
+                  <TableCell className="text-sm leading-6">{item}</TableCell>
+                </TableRow>
               ))}
-            </div>
+              </TableBody>
+            </Table>
           ) : <EmptyState title="No recommendations" text="Recommendations appear when the lookup source returns them." />}
         </ReportSection>
       </div>

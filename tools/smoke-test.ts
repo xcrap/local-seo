@@ -431,9 +431,10 @@ try {
   if (
     webAppClient.includes("function GscInspectionFact") ||
     webAppClient.includes("function AiJobFact") ||
-    webAppClient.includes('<div className="grid gap-3 md:grid-cols-3">')
+    webAppClient.includes('<div className="grid gap-3 md:grid-cols-3">') ||
+    webAppClient.includes("rounded-md border bg-muted/25 p-3 text-sm leading-6")
   ) {
-    throw new Error("Search Console inspection and AI job metadata should render as readable evidence tables, not mini fact cards.");
+    throw new Error("Search Console inspection, AI metadata, and recommendation rows should render as readable evidence tables, not mini fact cards.");
   }
   if (webAppClient.includes("Clear selected site")) {
     throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
