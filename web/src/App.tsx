@@ -217,6 +217,26 @@ function cleanSiteDomain(domain?: string) {
   return String(domain || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
 }
 
+function hostFromUrl(value?: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    return new URL(raw).host.toLowerCase();
+  } catch {
+    return cleanSiteDomain(raw);
+  }
+}
+
+function auditSiteName(row: any) {
+  return row.project_name || row.project_domain || hostFromUrl(row.url) || "Unlinked saved site";
+}
+
+function auditSiteDetail(row: any) {
+  if (row.project_domain) return row.project_domain;
+  const host = hostFromUrl(row.url);
+  return host ? `Scan URL host: ${host}` : "Saved site record unavailable";
+}
+
 function scanHostCandidates(domain: string, crawlHost?: Project["crawl_host"]) {
   const root = domain.replace(/^www\./i, "");
   if (!root || localSiteHost(root)) return root ? [root] : [];
@@ -4264,8 +4284,8 @@ function AuditTable({
             </TableCell>
             {showSite ? (
               <TableCell className="min-w-44">
-                <div className="font-medium">{row.project_name || "Deleted site"}</div>
-                <div className="mt-1 break-all text-xs text-muted-foreground">{row.project_domain || row.project_id}</div>
+                <div className="font-medium">{auditSiteName(row)}</div>
+                <div className="mt-1 break-all text-xs text-muted-foreground">{auditSiteDetail(row)}</div>
               </TableCell>
             ) : null}
             <TableCell><Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge></TableCell>
@@ -4293,7 +4313,7 @@ function AuditTable({
                         to={`/audits/${row.id}`}
                         onClick={(event) => {
                           event.stopPropagation();
-                          setSelectedAuditId(row.project_id, row.id);
+                          if (row.project_id) setSelectedAuditId(row.project_id, row.id);
                         }}
                       >
                         <FileSearch /> Open report

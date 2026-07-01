@@ -408,6 +408,12 @@ try {
   if (webAppClient.includes("Clear selected site")) {
     throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
   }
+  if (webAppClient.includes("\"Deleted site\"") || webAppClient.includes("row.project_domain || row.project_id")) {
+    throw new Error("Audit history should show readable site context and must never fall back to raw internal site IDs.");
+  }
+  if (!webAppClient.includes("if (row.project_id) setSelectedAuditId(row.project_id, row.id);")) {
+    throw new Error("Audit history should only store selected scan state when a scan row has a site ID.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",
