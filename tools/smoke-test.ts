@@ -1120,8 +1120,12 @@ try {
       },
     }),
   });
-  if (mcpDomainOverview.error || mcpDomainOverview.result?.structuredContent?.target !== "example.com") {
-    throw new Error(`MCP get_domain_overview should accept domain and map it internally: ${JSON.stringify(mcpDomainOverview)}`);
+  if (
+    mcpDomainOverview.error ||
+    mcpDomainOverview.result?.structuredContent?.domain !== "example.com" ||
+    "target" in (mcpDomainOverview.result?.structuredContent || {})
+  ) {
+    throw new Error(`MCP get_domain_overview should accept and return domain while mapping legacy internals: ${JSON.stringify(mcpDomainOverview)}`);
   }
   const mcpGsc = await request("/mcp", {
     method: "POST",

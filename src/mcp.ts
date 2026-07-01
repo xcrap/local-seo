@@ -34,6 +34,16 @@ type JsonRpcRequest = {
   params?: any;
 };
 
+function publicMcpResult(result: any) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+  const output = { ...result };
+  if (typeof output.target === "string" && !("domain" in output)) {
+    output.domain = output.target;
+    delete output.target;
+  }
+  return output;
+}
+
 const siteIdInput = {
   siteId: { type: "string", description: "Local site id." },
 };
@@ -380,7 +390,7 @@ export async function handleMcp(c: Context) {
     if (request.method === "tools/call") {
       const name = request.params?.name;
       const args = request.params?.arguments || {};
-      const result = await callTool(name, args);
+      const result = publicMcpResult(await callTool(name, args));
       return c.json({
         jsonrpc: "2.0",
         id,
