@@ -140,7 +140,7 @@ const crawlHostOptions = [
   { value: "both", label: "Try both" },
 ] as const;
 
-type ScanPlanTarget = {
+type ScanUrlPlan = {
   domain?: string;
   crawl_protocol?: Site["crawl_protocol"];
   crawl_host?: Site["crawl_host"];
@@ -323,7 +323,7 @@ function scanProtocolCandidates(domain: string, crawlProtocol?: Site["crawl_prot
   return localSiteHost(domain) ? ["http", "https"] : ["https", "http"];
 }
 
-function scanTargetCandidates(site?: ScanPlanTarget | null) {
+function scanUrlCandidates(site?: ScanUrlPlan | null) {
   const clean = cleanSiteDomain(site?.domain);
   if (!clean) return [];
   const hosts = scanHostCandidates(clean, site?.crawl_host || "auto");
@@ -332,42 +332,42 @@ function scanTargetCandidates(site?: ScanPlanTarget | null) {
   return Array.from(new Set(urls));
 }
 
-function preferredScanUrl(site?: ScanPlanTarget | null) {
-  return scanTargetCandidates(site)[0] || "";
+function preferredScanUrl(site?: ScanUrlPlan | null) {
+  return scanUrlCandidates(site)[0] || "";
 }
 
-function crawlPreferenceLabel(site?: ScanPlanTarget | null) {
+function crawlPreferenceLabel(site?: ScanUrlPlan | null) {
   const protocol = crawlProtocolOptions.find((item) => item.value === (site?.crawl_protocol || "auto"))?.label || "Auto";
   const host = crawlHostOptions.find((item) => item.value === (site?.crawl_host || "auto"))?.label || "Auto";
   return `${protocol} · ${host}`;
 }
 
-function scanTargetDetail(site?: ScanPlanTarget | null) {
-  const candidates = scanTargetCandidates(site);
+function scanUrlDetail(site?: ScanUrlPlan | null) {
+  const candidates = scanUrlCandidates(site);
   if (!candidates.length) return "Set a website address to scan.";
   if (candidates.length === 1) return `${crawlPreferenceLabel(site)} · ${candidates[0]}`;
   return `${crawlPreferenceLabel(site)} · ${formatNumber(candidates.length)} possible crawl URLs`;
 }
 
-function scanTargetShortDetail(site?: ScanPlanTarget | null) {
-  const candidates = scanTargetCandidates(site);
+function scanUrlShortDetail(site?: ScanUrlPlan | null) {
+  const candidates = scanUrlCandidates(site);
   if (!candidates.length) return "No crawl URL";
   return `${crawlPreferenceLabel(site)} · ${formatNumber(candidates.length)} crawl URL${candidates.length === 1 ? "" : "s"}`;
 }
 
-function scanTargetCountLabel(site?: ScanPlanTarget | null) {
-  const count = scanTargetCandidates(site).length;
+function scanUrlCountLabel(site?: ScanUrlPlan | null) {
+  const count = scanUrlCandidates(site).length;
   return `${formatNumber(count)} crawl URL${count === 1 ? "" : "s"}`;
 }
 
-function ScanTargetPills({
+function ScanUrlPills({
   site,
   compact = false,
 }: {
-  site?: ScanPlanTarget | null;
+  site?: ScanUrlPlan | null;
   compact?: boolean;
 }) {
-  const candidates = scanTargetCandidates(site);
+  const candidates = scanUrlCandidates(site);
   if (!candidates.length) return <span className="text-sm text-muted-foreground">Set a website address</span>;
   return (
     <div className={cn("flex flex-wrap gap-2", compact ? "gap-1.5" : "")}>
@@ -391,21 +391,21 @@ function ScanPlanSummary({
   site,
   compact = false,
 }: {
-  site?: ScanPlanTarget | null;
+  site?: ScanUrlPlan | null;
   compact?: boolean;
 }) {
   return (
     <div className={cn("space-y-2", compact ? "space-y-1.5" : "")}>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">{scanTargetCountLabel(site)}</Badge>
+        <Badge variant="outline">{scanUrlCountLabel(site)}</Badge>
         <Badge variant="outline">{crawlPreferenceLabel(site)}</Badge>
       </div>
-      <ScanTargetPills site={site} compact={compact} />
+      <ScanUrlPills site={site} compact={compact} />
     </div>
   );
 }
 
-function ScanPlanPreview({ site }: { site?: ScanPlanTarget | null }) {
+function ScanPlanPreview({ site }: { site?: ScanUrlPlan | null }) {
   return (
     <div className="rounded-md border bg-muted/20 p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -413,9 +413,9 @@ function ScanPlanPreview({ site }: { site?: ScanPlanTarget | null }) {
           <div className="text-sm font-semibold">Scan plan preview</div>
           <div className="mt-0.5 text-xs text-muted-foreground">The scan button will try these URLs in this order.</div>
         </div>
-        <Badge variant="outline">{scanTargetCountLabel(site)}</Badge>
+        <Badge variant="outline">{scanUrlCountLabel(site)}</Badge>
       </div>
-      <ScanTargetPills site={site} compact />
+      <ScanUrlPills site={site} compact />
     </div>
   );
 }
@@ -427,7 +427,7 @@ function siteDisplayName(site?: Site | null) {
 
 function siteSelectLabel(site: Site) {
   const domain = site.domain || "No website address";
-  return `${siteDisplayName(site)} · ${domain} · ${scanTargetShortDetail(site)}`;
+  return `${siteDisplayName(site)} · ${domain} · ${scanUrlShortDetail(site)}`;
 }
 
 function ActiveSiteSelect({
@@ -483,7 +483,7 @@ function Field({
   );
 }
 
-function SiteTargetField({
+function SiteDomainField({
   label,
   value,
   siteDomain,
@@ -781,6 +781,7 @@ function sourceLabel(source?: string) {
     searxng: "SearXNG",
     "local-scan": "Local scan",
     "backlink-import": "Backlink import",
+    "keyword-metrics-import": "Keyword metrics import",
     "web-search": "Web search",
     codex: "Local Codex",
     "search-error": "Search error",
@@ -797,6 +798,7 @@ function sourceVariant(source?: string) {
     source === "searxng" ||
     source === "local-scan" ||
     source === "backlink-import" ||
+    source === "keyword-metrics-import" ||
     source === "web-search" ||
     source === "codex" ||
     source?.startsWith("openserp:")
@@ -1724,7 +1726,7 @@ function SiteCommandCenter({
       area: "Active site",
       status: site.domain || "Needs website address",
       evidence: site.domain
-        ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredScanUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
+        ? `Scan plan: ${scanUrlShortDetail(site)} · starts at ${preferredScanUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
         : "Add a site before running scans, rankings, Search Console imports, or AI work.",
       action: site.domain ? (
         <Button size="sm" onClick={onScan} disabled={scanning}>
@@ -1829,7 +1831,7 @@ function SiteCommandCenter({
               The active site feeds scans, local link evidence, rankings, Search Console, and AI work.
             </p>
           </div>
-          {site.domain ? <Badge variant="outline">{scanTargetShortDetail(site)}</Badge> : null}
+          {site.domain ? <Badge variant="outline">{scanUrlShortDetail(site)}</Badge> : null}
         </div>
       </div>
       <div className="divide-y md:hidden">
@@ -2507,11 +2509,13 @@ function KeywordTable({
 function SavedPage({ site }: { site: Site }) {
   const [rows, setRows] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
+  const [metricImports, setMetricImports] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const selectedIds = Object.entries(selected).filter(([, checked]) => checked).map(([id]) => id);
@@ -2529,6 +2533,7 @@ function SavedPage({ site }: { site: Site }) {
       });
       setRows(data.rows || []);
       setTags(data.tags || await api.keywordTags(site.id));
+      setMetricImports(await api.keywordMetricImports(site.id));
       setSelected({});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load saved keywords");
@@ -2571,6 +2576,30 @@ function SavedPage({ site }: { site: Site }) {
     }
   }
 
+  async function importMetricsCsv(event: FormEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setError("");
+    setMessage("");
+    try {
+      const csv = await file.text();
+      const imported = await api.importKeywordMetrics({
+        siteId: site.id,
+        sourceName: file.name,
+        csv,
+      });
+      setMessage(`Imported ${formatNumber(imported.rowCount || imported.row_count || 0)} keyword metric rows from ${file.name}.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not import keyword metrics CSV");
+    } finally {
+      input.value = "";
+      setImporting(false);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -2605,6 +2634,22 @@ function SavedPage({ site }: { site: Site }) {
           </Field>
           <Button onClick={load} disabled={loading}><Search /> {loading ? "Loading" : "Apply"}</Button>
         </div>
+        <div className="mt-4 rounded-md border bg-muted/25">
+          <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)_280px]">
+            <div className="border-b px-4 py-3 md:border-b-0 md:border-r">
+              <div className="text-sm font-medium">Keyword metrics</div>
+              <Badge className="mt-2" variant={metricImports.length ? "good" : "outline"}>{metricImports.length ? "Imported" : "CSV ready"}</Badge>
+            </div>
+            <div className="border-b px-4 py-3 text-sm leading-6 text-muted-foreground md:border-b-0 md:border-r">
+              Import real keyword, volume, difficulty, CPC, and intent columns. Rows update the saved keyword list and matching rank tracker keywords.
+            </div>
+            <div className="px-4 py-3">
+              <Field label="Import metrics CSV">
+                <Input type="file" accept=".csv,text/csv" onChange={importMetricsCsv} disabled={importing} />
+              </Field>
+            </div>
+          </div>
+        </div>
       </section>
       {error ? <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       {message ? <p className="mb-4 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
@@ -2631,6 +2676,9 @@ function SavedPage({ site }: { site: Site }) {
             />
           )}
       </ReportSection>
+      <div className="mt-6">
+        <HistoryList title="Keyword metric imports" rows={metricImports} labelKey="sourceName" labelTitle="Source file" />
+      </div>
     </>
   );
 }
@@ -2722,7 +2770,7 @@ function SerpPage({ site }: { site: Site }) {
           <Field label="Search query">
             <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="best local seo tool" required />
           </Field>
-          <SiteTargetField
+          <SiteDomainField
             label="Ranking domain"
             value={domain}
             siteDomain={site.domain}
@@ -3111,7 +3159,7 @@ function DomainPage({ site }: { site: Site }) {
       <PageHeader eyebrow="Competitive" title="Organic research" description="Ranked keywords and top pages for the active site or a competitor site." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
-          <SiteTargetField
+          <SiteDomainField
             label="Research domain"
             value={domain}
             siteDomain={site.domain}
@@ -3551,7 +3599,7 @@ function LinksPage({ site }: { site: Site }) {
       <PageHeader eyebrow="Authority" title="Links" description="Local crawl links come from saved scans. Web-wide backlink tables come from CSV imports saved in SQLite." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
-          <SiteTargetField
+          <SiteDomainField
             label="Web-wide backlink domain"
             value={domain}
             siteDomain={site.domain}
@@ -4435,12 +4483,12 @@ function ScansPage({ site }: { site: Site }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">Scan plan</span>
-              {site.domain ? <Badge variant="outline">{scanTargetShortDetail(site)}</Badge> : null}
+              {site.domain ? <Badge variant="outline">{scanUrlShortDetail(site)}</Badge> : null}
             </div>
             <div className="mt-3">
-              {site.domain ? <ScanTargetPills site={site} /> : <p className="text-xl font-semibold">Add a website address</p>}
+              {site.domain ? <ScanUrlPills site={site} /> : <p className="text-xl font-semibold">Add a website address</p>}
             </div>
-            {site.domain ? <p className="mt-2 text-sm text-muted-foreground">{scanTargetDetail(site)}</p> : null}
+            {site.domain ? <p className="mt-2 text-sm text-muted-foreground">{scanUrlDetail(site)}</p> : null}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row xl:justify-end">
             {site.domain ? (
@@ -5505,7 +5553,7 @@ function ScanReportOverview({
   const progress = scanProgress(scan);
   const scoreVariant = scan.status === "failed" ? "bad" : isActive ? "warn" : finalScore >= 85 ? "good" : finalScore >= 60 ? "warn" : "bad";
   const sourceUrl = result.startUrl || scan.url;
-  const canonicalTarget = result.pages?.find((page: any) => page.finalUrl)?.finalUrl || sourceUrl;
+  const canonicalUrl = result.pages?.find((page: any) => page.finalUrl)?.finalUrl || sourceUrl;
   const rows = [
     {
       area: "Issue impact",
@@ -5569,7 +5617,7 @@ function ScanReportOverview({
       status: scan.status,
       evidence: (
         <span className="break-all">
-          Started at {sourceUrl}. Final home evidence: {canonicalTarget}.
+          Started at {sourceUrl}. Final home evidence: {canonicalUrl}.
         </span>
       ),
       action: isCompleted
@@ -7305,7 +7353,7 @@ function SettingsPage() {
                 ),
               },
               { title: "Technical scans", status: "Active", tone: "good", text: "Local crawler checks metadata, images, links, robots, sitemap, indexability, headings, content, schema, and social tags." },
-              { title: "Keyword ideas", status: "Active", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Volume, CPC, and difficulty stay blank unless real metrics are imported later." },
+              { title: "Keyword ideas", status: "CSV import ready", tone: "good", text: "DuckDuckGo suggestions provide real query ideas. Import keyword metrics CSVs on the Saved keywords page for volume, CPC, and difficulty." },
               { title: "SERP and rank checks", status: serpProviderStatus(config), tone: "good", text: "Uses local/self-hosted OpenSERP or SearXNG when configured, otherwise live DuckDuckGo results. The source is shown on each report." },
               { title: "Search Console", status: "Local import ready", tone: "good", text: "Import Search Console CSVs locally. Google connection is optional for live performance and URL inspection." },
               { title: "Backlink index", status: "CSV import ready", tone: "good", text: "Import backlink CSVs on the Links page. No generated backlink rows are shown." },

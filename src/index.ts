@@ -29,7 +29,7 @@ import {
   setGscSite,
 } from "./gsc";
 import { handleMcp, mcpToolList } from "./mcp";
-import { resolveSavedSiteScanUrl, siteScanCandidates } from "./site-target";
+import { resolveSavedSiteScanUrl, siteScanUrlCandidates } from "./site-scan-url";
 import {
   addRankKeywords,
   backlinksOverview,
@@ -53,6 +53,7 @@ import {
   getSerpAnalysis,
   getSite,
   importBacklinksCsv,
+  importKeywordMetricsCsv,
   listBacklinkSnapshots,
   listAllScans,
   listScans,
@@ -63,6 +64,7 @@ import {
   listRankTrackers,
   listSavedKeywordTags,
   listSavedKeywords,
+  listKeywordMetricImports,
   listSerpRuns,
   promptExplorer,
   siteSummary,
@@ -262,7 +264,7 @@ async function startSavedSiteScan(c: any) {
   const site = getSite(c.req.param("id"));
   if (!site) return c.json({ error: "Site not found." }, 404);
   if (!site.domain) return c.json({ error: "Set a site domain first." }, 400);
-  const candidateUrls = siteScanCandidates(site);
+  const candidateUrls = siteScanUrlCandidates(site);
   const url = await resolveSavedSiteScanUrl(site);
   const scan = startScan(site.id, url);
   return c.json({
@@ -371,6 +373,14 @@ app.get(
       },
     });
   }),
+);
+app.get(
+  "/api/sites/:id/keyword-metric-imports",
+  safe((c) => c.json(listKeywordMetricImports(c.req.param("id")))),
+);
+app.post(
+  "/api/keywords/import-metrics",
+  safe(async (c) => c.json(importKeywordMetricsCsv((await readSiteScopedJson(c)) as any))),
 );
 app.post(
   "/api/keywords/save",

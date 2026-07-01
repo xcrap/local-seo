@@ -83,6 +83,19 @@ db.exec(`
     UNIQUE(site_id, keyword, location_code, language_code)
   );
 
+  CREATE TABLE IF NOT EXISTS keyword_metric_imports (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    source_name TEXT NOT NULL DEFAULT '',
+    row_count INTEGER NOT NULL DEFAULT 0,
+    inserted_count INTEGER NOT NULL DEFAULT 0,
+    updated_count INTEGER NOT NULL DEFAULT 0,
+    rows_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_keyword_metric_imports_site_created ON keyword_metric_imports(site_id, created_at DESC);
+
   CREATE TABLE IF NOT EXISTS rank_trackers (
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,

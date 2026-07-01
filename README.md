@@ -19,7 +19,7 @@ data connectors only when you configure them.
 ## Local Workflows
 
 - **Sites:** saved websites with domain, crawl URL preferences, optional keyword tool defaults, and notes.
-- **Keyword research:** real DuckDuckGo suggestions. Volume, CPC, and difficulty stay unavailable unless real metric imports are added later.
+- **Keyword research:** real DuckDuckGo suggestions, plus keyword metrics CSV import for volume, CPC, difficulty, and intent. Metrics are never generated locally.
 - **SERP analysis:** live web result snapshots, active-site ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
@@ -65,12 +65,11 @@ domain.
 
 SERP and rank checks can use self-hosted OpenSERP, self-hosted SearXNG, or the
 built-in DuckDuckGo fallback. External SEO metrics are never generated locally.
-Google keyword volumes, CPC, keyword difficulty, and third-party traffic
-estimates require future import support or a deliberately built adapter.
-Backlink tables can be populated from real CSV imports on the Links page. Local
-scans still feed technical pages, internal/external links, images, assets,
-sitemap, robots, and response timing into reports. The app shows unavailable
-states instead of invented rows.
+Keyword volumes, CPC, keyword difficulty, and backlink tables can be populated
+from real CSV imports. Third-party traffic estimates still require future import
+support or a deliberately built adapter. Local scans feed technical pages,
+internal/external links, images, assets, sitemap, robots, and response timing
+into reports. The app shows unavailable states instead of invented rows.
 
 This app is local-first. Hosted product concerns such as billing, teams/orgs,
 hosted auth, queues, and hosted cron workflows are not part of this fresh local

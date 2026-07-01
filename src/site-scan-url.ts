@@ -1,6 +1,6 @@
 import type { CrawlHost, CrawlProtocol } from "./seo";
 
-type SavedSiteScanTarget = {
+type SavedSiteScanUrlPlan = {
   domain: string;
   crawl_protocol?: CrawlProtocol | string;
   crawl_host?: CrawlHost | string;
@@ -73,7 +73,7 @@ function scanProtocolCandidates(domain: string, crawlProtocol: string) {
   return localHostFirst(domain) ? ["http", "https"] : ["https", "http"];
 }
 
-export function siteScanCandidates(site: SavedSiteScanTarget) {
+export function siteScanUrlCandidates(site: SavedSiteScanUrlPlan) {
   const cleanDomain = site.domain.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
   const crawlProtocol = normalizeCrawlProtocol(site.crawl_protocol);
   const crawlHost = normalizeCrawlHost(site.crawl_host);
@@ -87,8 +87,8 @@ export function siteScanCandidates(site: SavedSiteScanTarget) {
   return [...new Set(urls)];
 }
 
-export async function resolveSavedSiteScanUrl(site: SavedSiteScanTarget) {
-  const candidates = siteScanCandidates(site);
+export async function resolveSavedSiteScanUrl(site: SavedSiteScanUrlPlan) {
+  const candidates = siteScanUrlCandidates(site);
   let firstAnswered = "";
   for (const candidate of candidates) {
     const probe = await probeScanUrl(candidate);

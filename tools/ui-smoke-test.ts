@@ -354,6 +354,24 @@ try {
     await page.getByRole("heading", { name: /^Saved keywords$/ }).waitFor();
     await page.getByLabel("Search keywords").waitFor();
     await page.getByText("Tag filter").waitFor();
+    await page.getByLabel("Import metrics CSV").waitFor();
+    const keywordMetricsCsvPath = path.join(tempDir, "keyword-metrics-ui.csv");
+    await writeFile(
+      keywordMetricsCsvPath,
+      [
+        "keyword,search_volume,difficulty,cpc,intent",
+        "fixture imported keyword,55,8,0.4,informational",
+        "fixture seo,1400,33,2.2,commercial",
+      ].join("\n"),
+    );
+    await page.getByLabel("Import metrics CSV").setInputFiles(keywordMetricsCsvPath);
+    await page.getByText(/Imported 2 keyword metric rows/i).waitFor();
+    await page.getByLabel("Search keywords").fill("fixture imported keyword");
+    await page.getByRole("button", { name: /^Apply$/ }).click();
+    await page.getByRole("row", { name: /fixture imported keyword.*55.*8.*0\.4.*informational/i }).waitFor();
+    await page.getByRole("heading", { name: /^Keyword metric imports$/ }).waitFor();
+    await page.getByRole("cell", { name: "keyword-metrics-ui.csv", exact: true }).waitFor();
+    await capture(page, "saved-keywords");
 
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByRole("heading", { name: /^Organic research$/ }).waitFor();
@@ -521,6 +539,11 @@ try {
     await page.goto(`${webUrl}/audits`, { waitUntil: "networkidle" });
     if (new URL(page.url()).pathname !== "/audits") {
       throw new Error(`Old /audits route should not redirect, got ${page.url()}.`);
+    }
+    await page.getByRole("heading", { name: /^Page not found$/ }).waitFor();
+    await page.goto(`${webUrl}/projects`, { waitUntil: "networkidle" });
+    if (new URL(page.url()).pathname !== "/projects") {
+      throw new Error(`Legacy /projects route should not redirect, got ${page.url()}.`);
     }
     await page.getByRole("heading", { name: /^Page not found$/ }).waitFor();
     await page.goto(`${webUrl}/scans`, { waitUntil: "networkidle" });

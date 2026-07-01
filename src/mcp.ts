@@ -14,6 +14,7 @@ import {
   getScan,
   getSite,
   importBacklinksCsv,
+  importKeywordMetricsCsv,
   listRankTrackers,
   listSites,
   listSavedKeywords,
@@ -26,7 +27,7 @@ import {
   updateSavedKeywordTags,
 } from "./seo";
 import { getGscPerformance, inspectGscUrls } from "./gsc";
-import { resolveSavedSiteScanUrl, siteScanCandidates } from "./site-target";
+import { resolveSavedSiteScanUrl, siteScanUrlCandidates } from "./site-scan-url";
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -34,20 +35,6 @@ type JsonRpcRequest = {
   method?: string;
   params?: any;
 };
-
-function publicMcpResult(result: any): any {
-  if (Array.isArray(result)) return result.map(publicMcpResult);
-  if (!result || typeof result !== "object") return result;
-  const output: Record<string, any> = {};
-  for (const [key, value] of Object.entries(result)) {
-    let publicKey = key;
-    if (key === "target" && typeof value === "string" && !("domain" in result)) publicKey = "domain";
-    if (key === "targetPosition") publicKey = "domainPosition";
-    if (key === "isTarget") publicKey = "isDomain";
-    output[publicKey] = publicMcpResult(value);
-  }
-  return output;
-}
 
 const siteIdInput = {
   siteId: { type: "string", description: "Local site id." },
@@ -146,6 +133,19 @@ const tools = [
         keywords: { type: "array" },
       },
       required: ["siteId", "keywords"],
+    },
+  },
+  {
+    name: "import_keyword_metrics",
+    description: "Import real keyword metrics CSV rows into local SQLite for a saved site.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...siteIdInput,
+        sourceName: { type: "string" },
+        csv: { type: "string" },
+      },
+      required: ["siteId", "csv"],
     },
   },
   {
@@ -409,7 +409,7 @@ export async function handleMcp(c: Context) {
     if (request.method === "tools/call") {
       const name = request.params?.name;
       const args = request.params?.arguments || {};
-      const result = publicMcpResult(await callTool(name, args));
+      const result = await callTool(name, args);
       return c.json({
         jsonrpc: "2.0",
         id,
@@ -461,6 +461,8 @@ async function callTool(name: string, args: any) {
       return querySavedKeywords(args);
     case "save_keywords":
       return saveKeywords(args);
+    case "import_keyword_metrics":
+      return importKeywordMetricsCsv(args);
     case "update_saved_keyword_tags":
       return updateSavedKeywordTags(args);
     case "get_domain_overview":
@@ -487,7 +489,7 @@ async function callTool(name: string, args: any) {
       const siteId = args.siteId;
       const site = getSite(siteId);
       if (!site) throw new Error("Site not found.");
-      const candidateUrls = args.url ? [String(args.url)] : site.domain ? siteScanCandidates(site) : [];
+      const candidateUrls = args.url ? [String(args.url)] : site.domain ? siteScanUrlCandidates(site) : [];
       const url = args.url || (site.domain ? await resolveSavedSiteScanUrl(site) : "");
       if (!url) throw new Error("Set a site domain or pass a URL.");
       const scan = startScan(site.id, url);

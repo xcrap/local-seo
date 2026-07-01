@@ -258,7 +258,7 @@ try {
     if (tables.has("audits")) {
       throw new Error("Fresh SQLite schema should use scans, not audits.");
     }
-    for (const table of ["saved_keywords", "scans", "gsc_imports", "domain_snapshots", "backlink_snapshots", "backlink_imports", "serp_runs"]) {
+    for (const table of ["saved_keywords", "keyword_metric_imports", "scans", "gsc_imports", "domain_snapshots", "backlink_snapshots", "backlink_imports", "serp_runs"]) {
       const columns = schemaDb.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((row) => row.name);
       if (!columns.includes("site_id")) {
         throw new Error(`Fresh SQLite table ${table} should reference site_id.`);
@@ -928,6 +928,42 @@ try {
     body: JSON.stringify({ tagNames: ["smoke"], pageSize: 50 }),
   });
   if (!saved.rows?.length || !saved.tags?.length) throw new Error("Saved keyword assertions failed.");
+  const keywordMetricImport = await request("/api/keywords/import-metrics", {
+    method: "POST",
+    body: JSON.stringify({
+      siteId: site.id,
+      sourceName: "keyword-metrics.csv",
+      csv: [
+        "keyword,search_volume,difficulty,cpc,intent",
+        "seo software,1200,44,3.25,commercial",
+        "local seo sqlite,90,12,1.10,informational",
+      ].join("\n"),
+    }),
+  });
+  if (
+    keywordMetricImport.source !== "keyword-metrics-import" ||
+    keywordMetricImport.rowCount !== 2 ||
+    keywordMetricImport.insertedCount < 1 ||
+    keywordMetricImport.updatedCount < 1
+  ) {
+    throw new Error(`Keyword metric CSV import did not save real local rows: ${JSON.stringify(keywordMetricImport)}`);
+  }
+  const metricImports = await request(`/api/sites/${site.id}/keyword-metric-imports`);
+  if (!metricImports.some((row: any) => row.id === keywordMetricImport.id)) {
+    throw new Error("Keyword metric import history was not persisted in SQLite.");
+  }
+  const savedWithMetrics = await request(`/api/sites/${site.id}/keywords/query`, {
+    method: "POST",
+    body: JSON.stringify({ search: "seo software", pageSize: 10 }),
+  });
+  if (
+    savedWithMetrics.rows?.[0]?.search_volume !== 1200 ||
+    savedWithMetrics.rows?.[0]?.difficulty !== 44 ||
+    savedWithMetrics.rows?.[0]?.cpc !== 3.25 ||
+    savedWithMetrics.rows?.[0]?.intent !== "commercial"
+  ) {
+    throw new Error(`Keyword metric import should update saved keyword metrics: ${JSON.stringify(savedWithMetrics)}`);
+  }
   await request(`/api/sites/${site.id}/keywords/tags`, {
     method: "POST",
     body: JSON.stringify({ savedKeywordIds: [saved.rows[0].id], addTags: ["priority"] }),
@@ -1474,6 +1510,7 @@ try {
     !toolNames.has("get_scan") ||
     !toolNames.has("get_backlinks_profile") ||
     !toolNames.has("import_backlinks") ||
+    !toolNames.has("import_keyword_metrics") ||
     !toolNames.has("inspect_urls")
   ) {
     throw new Error("Smoke assertions failed.");
@@ -1524,6 +1561,10 @@ try {
   if (!importBacklinksTool?.inputSchema?.required?.includes("siteId") || !importBacklinksTool?.inputSchema?.required?.includes("csv")) {
     throw new Error("MCP import_backlinks should require siteId and csv.");
   }
+  const importKeywordMetricsTool = (mcp.result?.tools || []).find((row: any) => row.name === "import_keyword_metrics");
+  if (!importKeywordMetricsTool?.inputSchema?.required?.includes("siteId") || !importKeywordMetricsTool?.inputSchema?.required?.includes("csv")) {
+    throw new Error("MCP import_keyword_metrics should require siteId and csv.");
+  }
   const mcpDomainOverview = await request("/mcp", {
     method: "POST",
     body: JSON.stringify({
@@ -1569,6 +1610,32 @@ try {
     mcpBacklinkImport.result?.structuredContent?.rowCount !== 1
   ) {
     throw new Error(`MCP import_backlinks should save real imported rows: ${JSON.stringify(mcpBacklinkImport)}`);
+  }
+  const mcpKeywordMetricImport = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 204,
+      method: "tools/call",
+      params: {
+        name: "import_keyword_metrics",
+        arguments: {
+          siteId: site.id,
+          sourceName: "mcp-keyword-metrics.csv",
+          csv: [
+            "keyword,search_volume,difficulty,cpc,intent",
+            "mcp seo metric,70,11,0.8,informational",
+          ].join("\n"),
+        },
+      },
+    }),
+  });
+  if (
+    mcpKeywordMetricImport.error ||
+    mcpKeywordMetricImport.result?.structuredContent?.source !== "keyword-metrics-import" ||
+    mcpKeywordMetricImport.result?.structuredContent?.rowCount !== 1
+  ) {
+    throw new Error(`MCP import_keyword_metrics should save real imported rows: ${JSON.stringify(mcpKeywordMetricImport)}`);
   }
   const mcpSerpAnalysis = await request("/mcp", {
     method: "POST",

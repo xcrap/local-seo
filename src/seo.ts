@@ -336,10 +336,9 @@ function emptyProviderResult(feature: string, extra: Record<string, unknown> = {
 
 function publicDomainResult(result: any, fallbackDomain = "") {
   if (!result || typeof result !== "object" || Array.isArray(result)) return result;
-  const { target, ...rest } = result;
   return {
-    ...rest,
-    domain: rest.domain || fallbackDomain || target || "",
+    ...result,
+    domain: result.domain || fallbackDomain || "",
   };
 }
 
@@ -355,32 +354,20 @@ function publicDomainSnapshotRow(row: any) {
 
 function publicSerpResult(result: any) {
   if (!result || typeof result !== "object" || Array.isArray(result)) return result;
-  const { target, targetPosition, rows, ...rest } = result;
   return {
-    ...rest,
-    rows: Array.isArray(rows)
-      ? rows.map((row: any) => {
-          const { isTarget, ...rowRest } = row || {};
-          return { ...rowRest, isDomain: Boolean(rowRest.isDomain ?? isTarget) };
-        })
-      : rows,
-    domain: rest.domain || target || "",
-    domainPosition: rest.domainPosition ?? targetPosition ?? null,
+    ...result,
+    rows: result.rows,
+    domain: result.domain || "",
+    domainPosition: result.domainPosition ?? null,
   };
 }
 
 function publicBrandLookupResult(result: any) {
   if (!result || typeof result !== "object" || Array.isArray(result)) return result;
-  const { resolvedTarget, shareOfVoice, ...rest } = result;
   return {
-    ...rest,
-    resolvedEntity: rest.resolvedEntity || resolvedTarget || "",
-    shareOfVoice: Array.isArray(shareOfVoice)
-      ? shareOfVoice.map((row: any) => {
-          const { target, ...rowRest } = row || {};
-          return { ...rowRest, isPrimary: Boolean(rowRest.isPrimary ?? target) };
-        })
-      : shareOfVoice,
+    ...result,
+    resolvedEntity: result.resolvedEntity || "",
+    shareOfVoice: result.shareOfVoice,
   };
 }
 
@@ -508,6 +495,160 @@ export function saveKeywords(input: {
     saved.push(keywordRow.keyword);
   }
   return { saved };
+}
+
+type ImportedKeywordMetricRow = {
+  keyword: string;
+  searchVolume: number | null;
+  difficulty: number | null;
+  cpc: number | null;
+  intent: string;
+};
+
+function parseKeywordMetricsCsv(csv: string) {
+  const parsed = Papa.parse<Record<string, unknown>>(csv, {
+    header: true,
+    skipEmptyLines: true,
+  });
+  if (parsed.errors.length) {
+    const firstError = parsed.errors[0];
+    throw new Error(`Keyword metrics CSV could not be parsed: ${firstError.message}`);
+  }
+  return parsed.data.filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+}
+
+function normalizeImportedKeywordMetricRow(raw: Record<string, unknown>): ImportedKeywordMetricRow | null {
+  const row = normalizedCsvRow(raw);
+  const keyword = csvField(row, ["keyword", "query", "search term", "search_term", "term"]);
+  if (!keyword) return null;
+  return {
+    keyword,
+    searchVolume: csvNumber(row, ["search volume", "search_volume", "volume", "avg monthly searches", "monthly searches", "impressions"]),
+    difficulty: csvNumber(row, ["difficulty", "keyword difficulty", "keyword_difficulty", "kd", "seo difficulty"]),
+    cpc: csvNumber(row, ["cpc", "cost per click", "cost_per_click", "avg cpc", "average cpc"]),
+    intent: csvField(row, ["intent", "search intent", "main intent"]) || "unknown",
+  };
+}
+
+function mapKeywordMetricImport(row: any) {
+  return {
+    id: row.id,
+    siteId: row.site_id,
+    source: "keyword-metrics-import",
+    sourceName: row.source_name,
+    source_name: row.source_name,
+    rowCount: row.row_count,
+    row_count: row.row_count,
+    insertedCount: row.inserted_count,
+    inserted_count: row.inserted_count,
+    updatedCount: row.updated_count,
+    updated_count: row.updated_count,
+    rows: jsonParse<ImportedKeywordMetricRow[]>(row.rows_json, []),
+    createdAt: row.created_at,
+    created_at: row.created_at,
+  };
+}
+
+export function listKeywordMetricImports(siteId: string) {
+  return all<any>(
+    "SELECT * FROM keyword_metric_imports WHERE site_id = ? ORDER BY created_at DESC",
+    [siteId],
+  ).map(mapKeywordMetricImport);
+}
+
+export function importKeywordMetricsCsv(input: {
+  siteId?: string;
+  sourceName?: string;
+  csv?: string;
+  rows?: Record<string, unknown>[];
+}) {
+  const site = getSite(String(input.siteId || ""));
+  if (!site) throw new Error("Site not found.");
+  const rawRows = input.csv ? parseKeywordMetricsCsv(input.csv) : input.rows || [];
+  const rows = rawRows
+    .map(normalizeImportedKeywordMetricRow)
+    .filter((row): row is ImportedKeywordMetricRow => Boolean(row));
+  if (!rows.length) throw new Error("Import file has no keyword metric rows.");
+
+  let insertedCount = 0;
+  let updatedCount = 0;
+  for (const row of rows) {
+    const existing = get<any>(
+      "SELECT * FROM saved_keywords WHERE site_id = ? AND lower(keyword) = lower(?) AND location_code = ? AND language_code = ?",
+      [site.id, row.keyword, site.location_code, site.language_code],
+    );
+    const nextIntent = row.intent && row.intent !== "unknown" ? row.intent : existing?.intent || "unknown";
+    if (existing) {
+      run(
+        `
+        UPDATE saved_keywords
+        SET search_volume = ?, difficulty = ?, cpc = ?, intent = ?, source = ?
+        WHERE id = ?
+        `,
+        [
+          row.searchVolume ?? existing.search_volume,
+          row.difficulty ?? existing.difficulty,
+          row.cpc ?? existing.cpc,
+          nextIntent,
+          "keyword-metrics-import",
+          existing.id,
+        ],
+      );
+      updatedCount += 1;
+    } else {
+      run(
+        `
+        INSERT INTO saved_keywords
+          (id, site_id, keyword, location_code, language_code, search_volume, difficulty, cpc, intent, tags, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?)
+        `,
+        [
+          randomUUID(),
+          site.id,
+          row.keyword,
+          site.location_code,
+          site.language_code,
+          row.searchVolume,
+          row.difficulty,
+          row.cpc,
+          nextIntent,
+          "keyword-metrics-import",
+        ],
+      );
+      insertedCount += 1;
+    }
+    run(
+      `
+      UPDATE rank_keywords
+      SET search_volume = COALESCE(?, search_volume),
+          keyword_difficulty = COALESCE(?, keyword_difficulty),
+          cpc = COALESCE(?, cpc),
+          metrics_fetched_at = CURRENT_TIMESTAMP
+      WHERE lower(keyword) = lower(?)
+        AND tracker_id IN (SELECT id FROM rank_trackers WHERE site_id = ?)
+      `,
+      [row.searchVolume, row.difficulty, row.cpc, row.keyword, site.id],
+    );
+  }
+
+  const id = randomUUID();
+  run(
+    `
+    INSERT INTO keyword_metric_imports
+      (id, site_id, source_name, row_count, inserted_count, updated_count, rows_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      id,
+      site.id,
+      String(input.sourceName || "Keyword metrics CSV").slice(0, 160),
+      rows.length,
+      insertedCount,
+      updatedCount,
+      JSON.stringify(rows),
+    ],
+  );
+  return mapKeywordMetricImport(get<any>("SELECT * FROM keyword_metric_imports WHERE id = ?", [id]));
 }
 
 export function listSavedKeywords(siteId: string) {
@@ -4078,6 +4219,7 @@ export function siteSummary(siteId: string) {
   return {
     site: site,
     savedKeywords: listSavedKeywords(siteId),
+    keywordMetricImports: listKeywordMetricImports(siteId),
     rankTrackers: listRankTrackers(siteId),
     scans: listScans(siteId),
     domainSnapshots: listDomainSnapshots(siteId),

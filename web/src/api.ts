@@ -81,6 +81,9 @@ export const api = {
       body: JSON.stringify({ savedKeywordIds }),
     }),
   savedKeywordsCsvUrl: (siteId: string) => `/api/sites/${siteId}/keywords.csv`,
+  keywordMetricImports: (siteId: string) => request<any[]>(`/api/sites/${siteId}/keyword-metric-imports`),
+  importKeywordMetrics: (body: any) =>
+    request<any>("/api/keywords/import-metrics", { method: "POST", body: JSON.stringify(body) }),
   serpRuns: (siteId: string) => request<any[]>(`/api/sites/${siteId}/serp`),
   analyzeSerp: (body: any) =>
     request<any>("/api/serp/analyze", { method: "POST", body: JSON.stringify(body) }),

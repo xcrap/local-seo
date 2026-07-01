@@ -11,7 +11,7 @@ function expect(condition: unknown, message: string) {
 
 try {
   const seo = await import("../src/seo");
-  const { resolveSavedSiteScanUrl } = await import("../src/site-target");
+  const { resolveSavedSiteScanUrl } = await import("../src/site-scan-url");
   expect(seo.sameSiteUrl("https://www.waka.pt/about/", "https://waka.pt"), "Root and www Waka URLs must share crawl scope.");
 
   const site = seo.createSite({
