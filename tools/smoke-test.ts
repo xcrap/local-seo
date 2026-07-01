@@ -808,6 +808,9 @@ try {
   ) {
     throw new Error("Organic provider-not-configured response should keep external metrics null.");
   }
+  if (organicOverview.source === "provider-not-configured" && /DataForSEO/i.test(String(organicOverview.providerRequired || ""))) {
+    throw new Error(`Missing organic provider response should be vendor-neutral: ${JSON.stringify(organicOverview)}`);
+  }
   await request("/api/domain/keywords", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, domain: "example.com", pageSize: 10 }),
@@ -830,6 +833,9 @@ try {
       backlinkOverview.dofollowRatio !== null)
   ) {
     throw new Error("Backlink provider-not-configured response should keep external metrics null.");
+  }
+  if (backlinkOverview.source === "provider-not-configured" && /DataForSEO/i.test(String(backlinkOverview.providerRequired || ""))) {
+    throw new Error(`Missing backlink provider response should be vendor-neutral: ${JSON.stringify(backlinkOverview)}`);
   }
   const deleteTarget = await request("/api/sites", {
     method: "POST",

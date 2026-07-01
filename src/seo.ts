@@ -353,7 +353,7 @@ function numberOrNull(value: unknown) {
 function emptyProviderResult(feature: string, extra: Record<string, unknown> = {}) {
   return {
     source: "provider-not-configured",
-    providerRequired: "DataForSEO",
+    providerRequired: "external-data-source",
     warning: providerRequiredMessage(feature),
     ...extra,
   };
