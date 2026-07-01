@@ -162,6 +162,11 @@ try {
     await page.getByRole("button", { name: /Add site and scan/i }).click();
 
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
+    await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
+    if (await page.getByRole("heading", { name: /^Audit health$/ }).count()) {
+      throw new Error("A running first scan should open on progress before the health overview.");
+    }
+    await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("heading", { name: /^Audit health$/ }).waitFor();
     if (await page.getByRole("heading", { name: /^Audit snapshot$/ }).count()) {
       throw new Error("Overview should not duplicate the audit snapshot table.");

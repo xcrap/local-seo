@@ -4498,8 +4498,12 @@ function pageH1Status(page: any) {
   return { label: "Missing", badge: "0 H1", variant: "warn" };
 }
 
+function defaultAuditTab(audit: any) {
+  return auditIsActive(audit) ? "progress" : "overview";
+}
+
 function AuditDetail({ audit }: { audit: any }) {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(defaultAuditTab(audit));
   const [severityFilter, setSeverityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -4520,6 +4524,9 @@ function AuditDetail({ audit }: { audit: any }) {
   const categories = Object.keys(summary.byCategory || {}).sort();
   const issueTypes = Array.from(new Set<string>(issues.map((issue: any) => String(issue.type || "")).filter(Boolean))).sort();
   const categoryEntries = Object.entries(summary.byCategory || {}).sort((a: any, b: any) => b[1] - a[1]);
+  useEffect(() => {
+    setActiveTab(defaultAuditTab(audit));
+  }, [audit.id]);
   const showIssues = () => setActiveTab("issues");
   const selectSeverity = (severity: string) => {
     setSeverityFilter(severity);
