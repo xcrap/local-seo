@@ -489,21 +489,32 @@ app.post(
   safe(async (c) => c.json(await promptExplorer((await readSiteScopedJson(c)) as any))),
 );
 
-app.get("/api/sites/:id/audits", safe((c) => c.json(listAudits(c.req.param("id")))));
-app.get("/api/audits", safe((c) => c.json(listAllAudits())));
-app.get("/api/audits/:id", safe((c) => c.json(getAudit(c.req.param("id")))));
-app.delete("/api/sites/:id/audits", safe((c) => c.json(clearAudits(c.req.param("id")))));
+const listSiteScansHandler = safe((c: any) => c.json(listAudits(c.req.param("id"))));
+const listAllScansHandler = safe((c: any) => c.json(listAllAudits()));
+const getScanHandler = safe((c: any) => c.json(getAudit(c.req.param("id"))));
+const clearSiteScansHandler = safe((c: any) => c.json(clearAudits(c.req.param("id"))));
+const deleteSiteScanHandler = safe((c: any) => c.json(deleteAudit(c.req.param("siteId"), c.req.param("id"))));
+const startScanHandler = safe(async (c: any) => {
+  const body = await readJson(c);
+  return c.json(startAudit(siteBodyId(body), String(body.url)));
+});
+
+app.get("/api/sites/:id/scans", listSiteScansHandler);
+app.get("/api/scans", listAllScansHandler);
+app.get("/api/scans/:id", getScanHandler);
+app.delete("/api/sites/:id/scans", clearSiteScansHandler);
+app.delete("/api/sites/:siteId/scans/:id", deleteSiteScanHandler);
+app.post("/api/scans", startScanHandler);
+
+app.get("/api/sites/:id/audits", listSiteScansHandler);
+app.get("/api/audits", listAllScansHandler);
+app.get("/api/audits/:id", getScanHandler);
+app.delete("/api/sites/:id/audits", clearSiteScansHandler);
 app.delete(
   "/api/sites/:siteId/audits/:id",
-  safe((c) => c.json(deleteAudit(c.req.param("siteId"), c.req.param("id")))),
+  deleteSiteScanHandler,
 );
-app.post(
-  "/api/audits",
-  safe(async (c) => {
-    const body = await readJson(c);
-    return c.json(startAudit(siteBodyId(body), String(body.url)));
-  }),
-);
+app.post("/api/audits", startScanHandler);
 
 app.get("/api/ai/prompts", safe((c) => c.json(listAiPrompts())));
 app.put(

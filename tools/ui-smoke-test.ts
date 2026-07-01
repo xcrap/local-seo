@@ -498,7 +498,12 @@ try {
     await page.getByRole("navigation").getByRole("link", { name: /^MCP$/ }).click();
     await page.getByRole("heading", { name: /^MCP$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Inputs$/i }).first().waitFor();
+    await page.getByRole("cell", { name: "start_scan" }).waitFor();
     await page.getByRole("cell", { name: "scan_site" }).waitFor();
+    await page.getByRole("cell", { name: "get_scan" }).waitFor();
+    if (await page.getByRole("cell", { name: /^start_audit$|^get_audit$/ }).count()) {
+      throw new Error("MCP screen should show scan-named tools, not audit-named tools.");
+    }
     const activeSiteId = await page.evaluate(() => localStorage.getItem("local-seo:site") || "");
     if (!activeSiteId) {
       throw new Error("MCP page test could not read the active site ID from local storage.");

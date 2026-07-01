@@ -216,7 +216,7 @@ async function requestFailure(pathname: string, options: RequestInit = {}) {
 async function waitForAudit(auditId: string) {
   const started = Date.now();
   while (Date.now() - started < 60_000) {
-    const audit = await request(`/api/audits/${auditId}`);
+    const audit = await request(`/api/scans/${auditId}`);
     if (audit?.status === "completed" || audit?.status === "failed") return audit;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -331,6 +331,12 @@ try {
   }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
   const webCssSource = await readFile(path.join(rootDir, "web/src/index.css"), "utf8");
+  if (webApiClient.includes("/api/audits") || webApiClient.includes("/audits`")) {
+    throw new Error("The React API client should use scan-named /api/scans endpoints.");
+  }
+  if (!webApiClient.includes("/api/scans") || !webApiClient.includes("/scans`")) {
+    throw new Error("The React API client should call scan-named endpoints.");
+  }
   if (!webCssSource.includes(".grid > *") || !webCssSource.includes("min-width: 0")) {
     throw new Error("Grid children should be allowed to shrink so table evidence scrolls internally on mobile.");
   }
@@ -778,7 +784,7 @@ try {
   ) {
     throw new Error(`Organic top pages should fall back to real local audit rows without generated metrics: ${JSON.stringify(localOrganicPages)}`);
   }
-  const emptyEvidenceAudit = await request("/api/audits", {
+  const emptyEvidenceAudit = await request("/api/scans", {
     method: "POST",
     body: JSON.stringify({ siteId: localSite.id, url: emptyEvidenceUrl }),
   });
@@ -835,21 +841,21 @@ try {
   if (mcpFixtureAuditId) {
     await waitForAudit(mcpFixtureAuditId);
   }
-  const fixtureAuditsBeforeClear = await request(`/api/sites/${localSite.id}/audits`);
+  const fixtureAuditsBeforeClear = await request(`/api/sites/${localSite.id}/scans`);
   if (fixtureAuditsBeforeClear.length < 2) {
     throw new Error("Fixture site should have multiple scans before clear-history verification.");
   }
-  const clearedFixtureAudits = await request(`/api/sites/${localSite.id}/audits`, { method: "DELETE" });
+  const clearedFixtureAudits = await request(`/api/sites/${localSite.id}/scans`, { method: "DELETE" });
   if (clearedFixtureAudits.deleted < 2) {
     throw new Error(`Clear history should delete fixture scans, got ${clearedFixtureAudits.deleted}.`);
   }
-  const fixtureAuditsAfterClear = await request(`/api/sites/${localSite.id}/audits`);
+  const fixtureAuditsAfterClear = await request(`/api/sites/${localSite.id}/scans`);
   if (fixtureAuditsAfterClear.length !== 0) {
     throw new Error("Clear history did not remove all fixture scans from local SQLite.");
   }
-  const siteAudits = await request(`/api/sites/${site.id}/audits`);
+  const siteAudits = await request(`/api/sites/${site.id}/scans`);
   if (!siteAudits.some((row: any) => row.id === siteScan.audit.id)) {
-    throw new Error("Site audits endpoint did not return the scan.");
+    throw new Error("Site scans endpoint did not return the scan.");
   }
   const keywordResearch = await request("/api/keywords/research", {
     method: "POST",
@@ -860,7 +866,7 @@ try {
     : [
         { keyword: "seo software", searchVolume: null, difficulty: null, cpc: null, intent: "manual" },
         { keyword: "seo tools", searchVolume: null, difficulty: null, cpc: null, intent: "manual" },
-        { keyword: "technical seo audit", searchVolume: null, difficulty: null, cpc: null, intent: "manual" },
+        { keyword: "technical seo scan", searchVolume: null, difficulty: null, cpc: null, intent: "manual" },
       ];
   await request("/api/keywords/save", {
     method: "POST",
@@ -1198,28 +1204,28 @@ try {
   } finally {
     localHistoryDb.close();
   }
-  const audit = await request("/api/audits", {
+  const audit = await request("/api/scans", {
     method: "POST",
     body: JSON.stringify({ siteId: site.id, url: "https://example.com" }),
   });
-  await request(`/api/audits/${audit.id}`);
-  const siteAuditsAfterSecondScan = await request(`/api/sites/${site.id}/audits`);
+  await request(`/api/scans/${audit.id}`);
+  const siteAuditsAfterSecondScan = await request(`/api/sites/${site.id}/scans`);
   if (
     siteAuditsAfterSecondScan.length < 2 ||
     !siteAuditsAfterSecondScan.some((row: any) => row.id === siteScan.audit.id) ||
     !siteAuditsAfterSecondScan.some((row: any) => row.id === audit.id)
   ) {
-    throw new Error("Site audits endpoint should keep every scan for the site until the user deletes it.");
+    throw new Error("Site scans endpoint should keep every scan for the site until the user deletes it.");
   }
   const otherHistorySite = await request("/api/sites", {
     method: "POST",
     body: JSON.stringify({ name: "Other History Site", domain: "other-history.example" }),
   });
-  const otherHistoryAudit = await request("/api/audits", {
+  const otherHistoryAudit = await request("/api/scans", {
     method: "POST",
     body: JSON.stringify({ siteId: otherHistorySite.id, url: "https://other-history.example" }),
   });
-  const allSavedAudits = await request("/api/audits");
+  const allSavedAudits = await request("/api/scans");
   const allSavedAuditIds = new Set((allSavedAudits || []).map((row: any) => row.id));
   for (const id of [siteScan.audit.id, audit.id, otherHistoryAudit.id]) {
     if (!allSavedAuditIds.has(id)) {
@@ -1358,11 +1364,24 @@ try {
     !dashboardWithGsc.activeSite ||
     !Array.isArray(mcp.result?.tools) ||
     !toolNames.has("list_sites") ||
+    !toolNames.has("start_scan") ||
     !toolNames.has("scan_site") ||
+    !toolNames.has("get_scan") ||
     !toolNames.has("get_backlinks_profile") ||
     !toolNames.has("inspect_urls")
   ) {
     throw new Error("Smoke assertions failed.");
+  }
+  if (toolNames.has("start_audit") || toolNames.has("get_audit")) {
+    throw new Error("MCP tools/list should advertise scan-named tools, not audit-named tools.");
+  }
+  const startScanTool = (mcp.result?.tools || []).find((tool: any) => tool.name === "start_scan");
+  if (!startScanTool?.inputSchema?.required?.includes("siteId") || !startScanTool?.inputSchema?.required?.includes("url")) {
+    throw new Error("MCP start_scan should require siteId and url.");
+  }
+  const getScanTool = (mcp.result?.tools || []).find((tool: any) => tool.name === "get_scan");
+  if (!getScanTool?.inputSchema?.required?.includes("scanId")) {
+    throw new Error("MCP get_scan should require scanId.");
   }
   const scanSiteTool = (mcp.result?.tools || []).find((tool: any) => tool.name === "scan_site");
   if (!scanSiteTool?.inputSchema?.required?.includes("siteId")) {

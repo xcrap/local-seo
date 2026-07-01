@@ -256,7 +256,7 @@ const tools = [
     },
   },
   {
-    name: "start_audit",
+    name: "start_scan",
     description: "Start a local crawl scan for a site URL.",
     inputSchema: {
       type: "object",
@@ -280,12 +280,12 @@ const tools = [
     },
   },
   {
-    name: "get_audit",
+    name: "get_scan",
     description: "Read a saved scan by id.",
     inputSchema: {
       type: "object",
-      properties: { auditId: { type: "string" } },
-      required: ["auditId"],
+      properties: { scanId: { type: "string" } },
+      required: ["scanId"],
     },
   },
   {
@@ -464,6 +464,7 @@ async function callTool(name: string, args: any) {
       const trackers = listRankTrackers(args.siteId);
       return args.trackerId ? trackers.find((tracker) => tracker.id === args.trackerId) || null : trackers;
     }
+    case "start_scan":
     case "start_audit":
       return startAudit(args.siteId, args.url);
     case "scan_site": {
@@ -486,8 +487,9 @@ async function callTool(name: string, args: any) {
         message: `Started site scan for ${site.domain || url}.`,
       };
     }
+    case "get_scan":
     case "get_audit":
-      return getAudit(args.auditId);
+      return getAudit(args.scanId || args.auditId);
     case "get_gsc_performance":
       return getGscPerformance(args);
     case "inspect_urls":

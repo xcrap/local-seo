@@ -6975,7 +6975,8 @@ function McpPage({ site }: { site: Site }) {
   const endpoint = `${window.location.origin}/mcp`;
   const exampleDomain = cleanSiteDomain(site.domain);
   const exampleSiteId = site.id;
-  const exampleKeyword = exampleDomain ? `${exampleDomain} seo audit` : `${site.name || "site"} seo audit`;
+  const exampleScanUrl = site.domain ? preferredAuditUrl(site) : "https://example.com";
+  const exampleKeyword = exampleDomain ? `${exampleDomain} seo scan` : `${site.name || "site"} seo scan`;
   const groupedTools = useMemo(() => {
     return tools.reduce<Record<string, any[]>>((acc, tool) => {
       const group = mcpToolGroup(tool.name);
@@ -6994,22 +6995,26 @@ function McpPage({ site }: { site: Site }) {
       body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "scan_site", arguments: { siteId: exampleSiteId } } },
     },
     {
+      title: "Scan a URL",
+      body: { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "start_scan", arguments: { siteId: exampleSiteId, url: exampleScanUrl } } },
+    },
+    {
       title: "Read Search Console",
-      body: { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get_gsc_performance", arguments: { siteId: exampleSiteId, startDate: "2026-06-01", endDate: "2026-06-30", dimensions: ["query"] } } },
+      body: { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_gsc_performance", arguments: { siteId: exampleSiteId, startDate: "2026-06-01", endDate: "2026-06-30", dimensions: ["query"] } } },
     },
     ...(exampleDomain
       ? [
           {
             title: "Read organic domain",
-            body: { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_domain_overview", arguments: { siteId: exampleSiteId, domain: exampleDomain } } },
+            body: { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "get_domain_overview", arguments: { siteId: exampleSiteId, domain: exampleDomain } } },
           },
           {
             title: "Read link index",
-            body: { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "get_backlinks_profile", arguments: { siteId: exampleSiteId, domain: exampleDomain, tab: "domains" } } },
+            body: { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "get_backlinks_profile", arguments: { siteId: exampleSiteId, domain: exampleDomain, tab: "domains" } } },
           },
           {
             title: "Analyze SERP",
-            body: { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "analyze_serp", arguments: { siteId: exampleSiteId, keyword: exampleKeyword, domain: exampleDomain } } },
+            body: { jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "analyze_serp", arguments: { siteId: exampleSiteId, keyword: exampleKeyword, domain: exampleDomain } } },
           },
         ]
       : []),

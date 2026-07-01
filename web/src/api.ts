@@ -124,15 +124,15 @@ export const api = {
   promptExplorerRuns: (siteId: string) => request<any[]>(`/api/sites/${siteId}/prompt-explorer`),
   promptExplorer: (body: any) =>
     request<any>("/api/prompt-explorer", { method: "POST", body: JSON.stringify(body) }),
-  allAudits: () => request<any[]>("/api/audits"),
-  audits: (siteId: string) => request<any[]>(`/api/sites/${siteId}/audits`),
-  audit: (id: string) => request<any>(`/api/audits/${id}`),
+  allAudits: () => request<any[]>("/api/scans"),
+  audits: (siteId: string) => request<any[]>(`/api/sites/${siteId}/scans`),
+  audit: (id: string) => request<any>(`/api/scans/${id}`),
   startAudit: (body: any) =>
-    request<any>("/api/audits", { method: "POST", body: JSON.stringify(body) }),
+    request<any>("/api/scans", { method: "POST", body: JSON.stringify(body) }),
   clearAudits: (siteId: string) =>
-    request<any>(`/api/sites/${siteId}/audits`, { method: "DELETE" }),
+    request<any>(`/api/sites/${siteId}/scans`, { method: "DELETE" }),
   deleteAudit: (siteId: string, auditId: string) =>
-    request<any>(`/api/sites/${siteId}/audits/${auditId}`, { method: "DELETE" }),
+    request<any>(`/api/sites/${siteId}/scans/${auditId}`, { method: "DELETE" }),
   aiPrompts: () => request<any[]>("/api/ai/prompts"),
   aiJobs: () => request<any[]>("/api/ai/jobs"),
   createAiJob: (body: any) =>
