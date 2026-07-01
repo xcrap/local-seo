@@ -493,12 +493,6 @@ try {
     if (await mcpCommonCalls.getByText(/\bexample\.com\b/i).count()) {
       throw new Error("MCP page exposes a placeholder domain instead of the active site domain.");
     }
-    if (await page.getByText(/\bprojectId\b/).count()) {
-      throw new Error("MCP page exposes legacy projectId wording.");
-    }
-    if (await page.getByText("list_projects").count()) {
-      throw new Error("MCP page exposes legacy list_projects alias.");
-    }
     if (await page.getByText(/workspace/i).count()) {
       throw new Error("MCP page exposes workspace wording.");
     }

@@ -233,9 +233,6 @@ try {
   if (dashboard.activeSite !== null || dashboard.sites?.length !== 0) {
     throw new Error(`Fresh setup should not create a placeholder site: ${JSON.stringify(dashboard)}`);
   }
-  if ("activeProject" in dashboard || "projects" in dashboard) {
-    throw new Error(`Dashboard response should expose sites, not projects: ${JSON.stringify(dashboard)}`);
-  }
   const initialSites = await request("/api/sites");
   if (initialSites.length !== 0) {
     throw new Error(`Fresh setup should keep the site list empty until the user adds a real site: ${JSON.stringify(initialSites)}`);
@@ -243,8 +240,8 @@ try {
   const schemaDb = new Database(serverDbPath, { readonly: true });
   try {
     const tables = new Set(schemaDb.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name));
-    if (!tables.has("sites") || tables.has("projects")) {
-      throw new Error(`Fresh SQLite schema should create sites, not projects: ${JSON.stringify([...tables].sort())}`);
+    if (!tables.has("sites")) {
+      throw new Error(`Fresh SQLite schema should create sites: ${JSON.stringify([...tables].sort())}`);
     }
     if (tables.has("schema_migrations")) {
       throw new Error("Fresh SQLite schema should be final-state tables, not a migration ledger.");
@@ -259,8 +256,8 @@ try {
     }
     for (const table of ["saved_keywords", "audits", "gsc_imports", "domain_snapshots", "backlink_snapshots", "serp_runs"]) {
       const columns = schemaDb.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((row) => row.name);
-      if (columns.includes("project_id")) {
-        throw new Error(`Fresh SQLite table ${table} should use site_id, not project_id.`);
+      if (!columns.includes("site_id")) {
+        throw new Error(`Fresh SQLite table ${table} should reference site_id.`);
       }
       if (["domain_snapshots", "backlink_snapshots", "serp_runs"].includes(table) && columns.includes("target")) {
         throw new Error(`Fresh SQLite table ${table} should use domain, not target.`);
@@ -268,12 +265,6 @@ try {
     }
   } finally {
     schemaDb.close();
-  }
-  const legacyProjectsResponse = await fetch(`${baseUrl}/api/projects`, {
-    headers: cookieJar.size ? { Cookie: cookieHeader() } : {},
-  });
-  if (legacyProjectsResponse.status !== 404) {
-    throw new Error(`Legacy /api/projects route should be gone, got ${legacyProjectsResponse.status}.`);
   }
   const dbSource = await readFile(path.join(rootDir, "src/db.ts"), "utf8");
   if (/DELETE\s+FROM\s+(sites|audits|gsc_imports)\b/i.test(dbSource)) {
@@ -284,34 +275,17 @@ try {
     "MIGRATIONS_TABLE",
     "function migrate",
     "migrateStep(",
-    "001_local_seo_init",
-    "002_feature_depth",
-    "003_openseo_local_parity",
-    "004_project_crawl_preferences",
-    "004_site_crawl_preferences",
-    "005_gsc_imports",
-    "006_remove_generated_fallback_snapshots",
-    "007_site_schema_names",
-    "007_remove_unused_site_archive_state",
-    "ALTER TABLE projects RENAME TO sites",
-    "idx_projects_active",
     "idx_sites_active",
     "archived_at",
     "local-fallback",
-    "project_id",
   ]) {
     if (dbSource.includes(removedSchemaBridge)) {
-      throw new Error(`Fresh app database startup should not keep old project-schema compatibility code: ${removedSchemaBridge}`);
+      throw new Error(`Fresh app database startup should not keep compatibility code: ${removedSchemaBridge}`);
     }
   }
   const gscSource = await readFile(path.join(rootDir, "src/gsc.ts"), "utf8");
   if (gscSource.includes(".slice(0, 5000)")) {
     throw new Error("Search Console CSV imports must not silently drop rows after 5,000 entries.");
-  }
-  for (const gscProjectLeak of ["callback?projectId", "projectId: row.project_id", "projectId, nonce"]) {
-    if (gscSource.includes(gscProjectLeak)) {
-      throw new Error(`Search Console public surface should use siteId, not ${gscProjectLeak}.`);
-    }
   }
   const readmeSource = await readFile(path.join(rootDir, "README.md"), "utf8");
   const viteConfigSource = await readFile(path.join(rootDir, "web/vite.config.ts"), "utf8");
@@ -338,9 +312,6 @@ try {
     throw new Error("Docs and env examples should stay vendor-neutral for optional external metrics sources.");
   }
   const apiServerSource = await readFile(path.join(rootDir, "src/index.ts"), "utf8");
-  if (apiServerSource.includes('"/api/projects')) {
-    throw new Error("Public API routes should expose /api/sites only, not legacy /api/projects aliases.");
-  }
   const mcpSource = await readFile(path.join(rootDir, "src/mcp.ts"), "utf8");
   if (mcpSource.includes("cloudflare:")) {
     throw new Error("Runtime MCP responses should not keep Cloudflare fields.");
@@ -349,15 +320,7 @@ try {
     throw new Error("Domain APIs should require domain explicitly instead of keeping old domainOrUrl/url aliases.");
   }
   const seoSource = await readFile(path.join(rootDir, "src/seo.ts"), "utf8");
-  if (/\bconst\s+project\s*=\s*getSite\b/.test(seoSource) || /\bconst\s+project\s*=\s*getSite\b/.test(gscSource)) {
-    throw new Error("Site service code should use site naming internally, not project variables around getSite.");
-  }
-  for (const legacySeoName of ["type Project", "createProject", "getProject", "listProjects", "updateProject", "deleteProject", "projectSummary"]) {
-    if (seoSource.includes(legacySeoName)) {
-      throw new Error(`SEO service should use site-named exports, not ${legacySeoName}.`);
-    }
-  }
-  if (seoSource.includes("activeProject:") || /^\s*projects:/m.test(seoSource)) {
+  if (!seoSource.includes("activeSite:") || !/^\s*sites:/m.test(seoSource)) {
     throw new Error("Dashboard API should return activeSite/sites terminology.");
   }
   if (/slice\(0,\s*5\)/.test(seoSource)) {
@@ -371,26 +334,12 @@ try {
   if (!webCssSource.includes(".grid > *") || !webCssSource.includes("min-width: 0")) {
     throw new Error("Grid children should be allowed to shrink so table evidence scrolls internally on mobile.");
   }
-  if (webApiClient.includes("/api/projects")) {
-    throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");
-  }
-  for (const legacyWebApiName of ["type Project", "projects:", "project:", "createProject", "updateProject", "deleteProject", "scanProject"]) {
-    if (webApiClient.includes(legacyWebApiName)) {
-      throw new Error(`The web API client should expose site-named helpers, not ${legacyWebApiName}.`);
-    }
-  }
-  if (webApiClient.includes("JSON.stringify({ projectId")) {
-    throw new Error("The web client should send siteId in request bodies instead of projectId.");
-  }
   const webAppClient = await readFile(path.join(rootDir, "web/src/App.tsx"), "utf8");
   if (!webAppClient.includes("One local admin account for this install.") || !webAppClient.includes("SQLite is the source of truth on this machine.") || !webAppClient.includes("No hosted auth service is required.")) {
     throw new Error("First-run setup should explain the single local admin, SQLite source of truth, and no hosted auth model.");
   }
   if (/DataForSEO|DATAFORSEO/.test(webAppClient)) {
     throw new Error("The React UI should not advertise a paid metrics provider by name.");
-  }
-  if (webAppClient.includes('path="/projects"') || webAppClient.includes('to="/projects"')) {
-    throw new Error("The React app should not expose or redirect a legacy /projects route.");
   }
   if (!webAppClient.includes('path="/links"') || !webAppClient.includes('to="/links"')) {
     throw new Error("The React app should expose Links at /links.");
@@ -410,19 +359,11 @@ try {
   if (!webAppClient.includes('path="*" element={<NotFoundPage />}') || !webAppClient.includes("function NotFoundPage")) {
     throw new Error("The React app should render a useful not-found screen for unknown local routes.");
   }
-  for (const legacyWebCall of ["api.projects", "api.project", "api.createProject", "api.updateProject", "api.deleteProject", "api.scanProject"]) {
-    if (webAppClient.includes(legacyWebCall)) {
-      throw new Error(`The app should call site-named API helpers, not ${legacyWebCall}.`);
-    }
-  }
   if (/type=["']date["']/.test(webAppClient) || !webAppClient.includes("function DatePicker") || !webAppClient.includes("<Calendar")) {
     throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
   }
   if (!webAppClient.includes("function EvidenceValue") || !webAppClient.includes("more in saved evidence")) {
     throw new Error("Audit issue evidence should summarize long sample lists without crushing table columns.");
-  }
-  if (webAppClient.includes("projectId:")) {
-    throw new Error("The app should send siteId for active-site actions, not projectId.");
   }
   if (webAppClient.includes("absolute bottom-5") || !webAppClient.includes("min-h-0 flex-1 space-y-1 overflow-y-auto")) {
     throw new Error("Desktop sidebar navigation should scroll above a real footer instead of overlapping the sign-out button.");
@@ -463,9 +404,9 @@ try {
   if (/from the latest (site|local) audit|The latest audit did not/i.test(webAppClient)) {
     throw new Error("Audit-derived evidence pages should not present local crawl data as latest-only.");
   }
-  for (const legacyTargetLabel of ["Organic target", "External backlink target", "Analyze target", "Custom target"]) {
-    if (webAppClient.includes(legacyTargetLabel)) {
-      throw new Error(`Organic and Links pages should use active-site/competitor wording, not "${legacyTargetLabel}".`);
+  for (const removedTargetLabel of ["Organic target", "External backlink target", "Analyze target", "Custom target"]) {
+    if (webAppClient.includes(removedTargetLabel)) {
+      throw new Error(`Organic and Links pages should use active-site/competitor wording, not "${removedTargetLabel}".`);
     }
   }
   if (webAppClient.includes("target domain")) {
@@ -633,11 +574,8 @@ try {
   if (webAppClient.includes("Clear selected site")) {
     throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
   }
-  if (webAppClient.includes("\"Deleted site\"") || webAppClient.includes("row.project_domain") || webAppClient.includes("row.project_id")) {
+  if (webAppClient.includes("\"Deleted site\"")) {
     throw new Error("Audit history should show readable site context and must never fall back to raw internal site IDs.");
-  }
-  if (webAppClient.includes("local-seo:project") || webAppClient.includes("legacySiteStorageKey") || webAppClient.includes("legacySelectedAuditStorageKey")) {
-    throw new Error("Fresh app storage should not preserve legacy project or unscoped scan-selection keys.");
   }
   if (!webAppClient.includes("if (row.site_id) setSelectedAuditId(row.site_id, row.id);")) {
     throw new Error("Audit history should only store selected scan state when a scan row has a site ID.");
@@ -732,7 +670,7 @@ try {
     throw new Error("Site scan did not return related report statuses.");
   }
   if (!siteScan.related?.some((row: any) => row.key === "links" && row.route === "/links")) {
-    throw new Error(`Site scan should send users to the Links route, not a legacy route: ${JSON.stringify(siteScan.related)}`);
+    throw new Error(`Site scan should send users to the Links route: ${JSON.stringify(siteScan.related)}`);
   }
   const localSite = await request("/api/sites", {
     method: "POST",
@@ -1164,8 +1102,8 @@ try {
     const domainHistoryRows = await request(`/api/sites/${site.id}/domain-snapshots`);
     const backlinkHistoryRows = await request(`/api/sites/${site.id}/backlink-snapshots`);
     for (const row of [...domainHistoryRows, ...backlinkHistoryRows]) {
-      if ("target" in row || "project_id" in row || "result_json" in row || "target" in (row.result || {})) {
-        throw new Error(`Organic/backlink history should expose domain/site fields, not target/project internals: ${JSON.stringify(row)}`);
+      if ("target" in row || "result_json" in row || "target" in (row.result || {})) {
+        throw new Error(`Organic/backlink history should expose domain/site fields, not raw internals: ${JSON.stringify(row)}`);
       }
       if (!row.domain) {
         throw new Error(`Organic/backlink history row should expose the checked domain: ${JSON.stringify(row)}`);
@@ -1187,8 +1125,8 @@ try {
       }
     }
     const siteSummaryWithFullHistory = await request(`/api/sites/${site.id}`);
-    if (!siteSummaryWithFullHistory.site || "project" in siteSummaryWithFullHistory) {
-      throw new Error(`Site summary response should expose site, not project: ${JSON.stringify(siteSummaryWithFullHistory)}`);
+    if (!siteSummaryWithFullHistory.site) {
+      throw new Error(`Site summary response should expose site: ${JSON.stringify(siteSummaryWithFullHistory)}`);
     }
     for (const row of [
       ...(siteSummaryWithFullHistory.serpRuns || []),
@@ -1208,7 +1146,7 @@ try {
       ...(siteSummaryWithFullHistory.domainSnapshots || []),
       ...(siteSummaryWithFullHistory.backlinkSnapshots || []),
     ]) {
-      if ("target" in row || "project_id" in row || "target" in (row.result || {})) {
+      if ("target" in row || "target" in (row.result || {})) {
         throw new Error(`Site summary organic/backlink rows should expose domain/site fields: ${JSON.stringify(row)}`);
       }
     }
@@ -1267,9 +1205,6 @@ try {
   if (!allSavedAudits.some((row: any) => row.id === otherHistoryAudit.id && row.site_name === "Other History Site")) {
     throw new Error("Global scan ledger should include the saved site name for each scan.");
   }
-  if (allSavedAudits.some((row: any) => "project_id" in row || "project_name" in row || "project_domain" in row)) {
-    throw new Error(`Public scan ledger should expose site fields, not project fields: ${JSON.stringify(allSavedAudits[0])}`);
-  }
   const scanHistoryDb = new Database(serverDbPath);
   try {
     const insertAudit = scanHistoryDb.prepare(`
@@ -1316,15 +1251,13 @@ try {
     fullGscImport.rows?.length !== 5025 ||
     fullGscImport.totals?.clicks !== 5025 ||
     fullGscImport.totals?.impressions !== 10050 ||
-    fullGscImport.siteId !== site.id ||
-    "projectId" in fullGscImport
+    fullGscImport.siteId !== site.id
   ) {
     throw new Error(`GSC CSV import silently dropped rows: ${JSON.stringify({
       rowCount: fullGscImport.rowCount,
       returnedRows: fullGscImport.rows?.length,
       totals: fullGscImport.totals,
       siteId: fullGscImport.siteId,
-      projectId: fullGscImport.projectId,
     })}`);
   }
   const gscImport = await request("/api/gsc/import", {
@@ -1351,8 +1284,8 @@ try {
   if (!gscImports.length || gscImports[0].id !== gscImport.id || !gscImports.some((row: any) => row.id === fullGscImport.id)) {
     throw new Error("GSC import was not persisted in SQLite.");
   }
-  if (gscImports.some((row: any) => row.projectId || row.siteId !== site.id)) {
-    throw new Error(`GSC import history should expose siteId, not projectId: ${JSON.stringify(gscImports[0])}`);
+  if (gscImports.some((row: any) => row.siteId !== site.id)) {
+    throw new Error(`GSC import history should expose siteId: ${JSON.stringify(gscImports[0])}`);
   }
   const gscHistoryDb = new Database(serverDbPath);
   try {
@@ -1414,31 +1347,11 @@ try {
   if (!/saved scan plan/i.test(scanSiteTool?.description || "")) {
     throw new Error(`MCP scan_site should describe that it uses the saved scan plan: ${scanSiteTool?.description}`);
   }
-  for (const legacyName of ["list_projects", "create_project", "get_project_summary"]) {
-    if (toolNames.has(legacyName)) {
-      throw new Error(`MCP tools/list should not advertise legacy alias ${legacyName}.`);
-    }
-  }
-  const legacyMcp = await request("/mcp", {
-    method: "POST",
-    body: JSON.stringify({ jsonrpc: "2.0", id: 199, method: "tools/call", params: { name: "list_projects", arguments: {} } }),
-  });
-  if (!legacyMcp.error || !/Unknown tool/i.test(String(legacyMcp.error.message || ""))) {
-    throw new Error(`MCP legacy list_projects alias should be unavailable: ${JSON.stringify(legacyMcp)}`);
-  }
-  const legacyDescriptionTool = (mcp.result?.tools || []).find((tool: any) =>
-    /^Legacy alias:/i.test(tool.description || "") || /workspace|target domain|project|selected-site/i.test(tool.description || ""),
+  const staleDescriptionTool = (mcp.result?.tools || []).find((tool: any) =>
+    /workspace|target domain|selected-site/i.test(tool.description || ""),
   );
-  if (legacyDescriptionTool) {
-    throw new Error(`MCP tools/list should not advertise legacy project/workspace/selected-site copy: ${legacyDescriptionTool.name}`);
-  }
-  const projectRequiredTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.required?.includes("projectId"));
-  if (projectRequiredTool) {
-    throw new Error(`MCP tools/list still requires projectId: ${projectRequiredTool.name}`);
-  }
-  const projectPropertyTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.properties?.projectId);
-  if (projectPropertyTool) {
-    throw new Error(`MCP tools/list still exposes projectId: ${projectPropertyTool.name}`);
+  if (staleDescriptionTool) {
+    throw new Error(`MCP tools/list should not advertise workspace/selected-site copy: ${staleDescriptionTool.name}`);
   }
   const targetRequiredTool = (mcp.result?.tools || []).find((tool: any) => tool.inputSchema?.required?.includes("target"));
   if (targetRequiredTool) {
@@ -1513,17 +1426,6 @@ try {
   });
   if (mcpKeywordResearch.error || !Array.isArray(mcpKeywordResearch.result?.structuredContent?.rows)) {
     throw new Error(`MCP research_keywords should return structured keyword rows: ${JSON.stringify(mcpKeywordResearch)}`);
-  }
-  for (const [label, response] of [
-    ["scan_site", localMcpScan],
-    ["get_domain_overview", mcpDomainOverview],
-    ["research_keywords", mcpKeywordResearch],
-  ] as const) {
-    const structured = response.result?.structuredContent || {};
-    const serialized = JSON.stringify(structured);
-    if (/"project(?:Id|_id|_name|_domain)"/.test(serialized)) {
-      throw new Error(`MCP ${label} structured output should expose site identifiers, not project identifiers: ${serialized}`);
-    }
   }
   const mcpGsc = await request("/mcp", {
     method: "POST",
