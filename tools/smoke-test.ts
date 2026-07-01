@@ -261,7 +261,7 @@ try {
   }
   const readmeSource = await readFile(path.join(rootDir, "README.md"), "utf8");
   if (/target domain|target ownership|crawl target preferences/i.test(readmeSource)) {
-    throw new Error("README should explain selected-site/comparison-site workflows with clear site and crawl URL wording.");
+    throw new Error("README should explain active-site/comparison-site workflows with clear site and crawl URL wording.");
   }
   if (/search market\/language locale/i.test(readmeSource)) {
     throw new Error("README should describe keyword tool defaults, not a site search-language locale.");
@@ -312,7 +312,10 @@ try {
     throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
   }
   if (webAppClient.includes("projectId: project.id")) {
-    throw new Error("The app should send siteId for selected-site actions.");
+    throw new Error("The app should send siteId for active-site actions.");
+  }
+  if (/selected-site/i.test(webAppClient)) {
+    throw new Error("The app should use active-site wording instead of selected-site implementation copy.");
   }
   if (webAppClient.includes("window.location.href")) {
     throw new Error("The app shell should use React Router navigation instead of full-page window.location.href route changes.");
@@ -346,7 +349,7 @@ try {
   }
   for (const legacyTargetLabel of ["Organic target", "External backlink target", "Analyze target", "Custom target"]) {
     if (webAppClient.includes(legacyTargetLabel)) {
-      throw new Error(`Organic and Links pages should use selected-site/competitor wording, not "${legacyTargetLabel}".`);
+      throw new Error(`Organic and Links pages should use active-site/competitor wording, not "${legacyTargetLabel}".`);
     }
   }
   if (webAppClient.includes("target domain")) {
@@ -603,6 +606,17 @@ try {
     indexableRows + nonIndexableRows + unknownIndexabilityRows !== fixturePages.length
   ) {
     throw new Error("Fixture audit indexability summary does not match page-level evidence.");
+  }
+  const timedFixturePages = fixturePages.filter((page: any) => Number.isFinite(Number(page.loadMs)) && Number(page.loadMs) >= 0);
+  if (
+    timedFixturePages.length !== fixturePages.length ||
+    fixtureSummary.measuredPageLoads !== timedFixturePages.length ||
+    !Number.isFinite(Number(fixtureSummary.averagePageLoadMs)) ||
+    !Number.isFinite(Number(fixtureSummary.medianPageLoadMs)) ||
+    !Number.isFinite(Number(fixtureSummary.p95PageLoadMs)) ||
+    Number(fixtureSummary.p95PageLoadMs) < Number(fixtureSummary.medianPageLoadMs)
+  ) {
+    throw new Error(`Fixture audit speed summary does not match page-level response timings: ${JSON.stringify(fixtureSummary)}`);
   }
   const emptyEvidenceAudit = await request("/api/audits", {
     method: "POST",

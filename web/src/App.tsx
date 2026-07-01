@@ -490,18 +490,18 @@ function SiteTargetField({
         {siteDomain ? (
           <div className="flex items-center gap-2">
             <Badge variant={usingSelectedSite ? "good" : "outline"}>
-              {usingSelectedSite ? "Selected site" : "Competitor/custom site"}
+              {usingSelectedSite ? "Active site" : "Competitor/custom site"}
             </Badge>
             {!usingSelectedSite ? (
               <Button type="button" size="sm" variant="ghost" onClick={() => onChange(siteDomain)}>
-                Use selected site
+                Use active site
               </Button>
             ) : null}
           </div>
         ) : null}
       </div>
       <Input aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} placeholder={siteDomain || "example.com"} />
-      {siteDomain ? <p className="text-xs text-muted-foreground">Selected site: {siteDomain}</p> : null}
+      {siteDomain ? <p className="text-xs text-muted-foreground">Active site: {siteDomain}</p> : null}
       {hint ? <p className="text-xs leading-5 text-muted-foreground">{hint}</p> : null}
     </div>
   );
@@ -706,6 +706,11 @@ function formatNumber(value: unknown) {
   return Number.isFinite(number) ? new Intl.NumberFormat().format(number) : String(value);
 }
 
+function formatMs(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? `${formatNumber(Math.round(number))} ms` : "-";
+}
+
 function metricValue(...values: unknown[]) {
   return values.find((value) => value !== null && value !== undefined && value !== "") ?? null;
 }
@@ -908,6 +913,11 @@ function maxCount(...values: unknown[]) {
   return numbers.length ? Math.max(...numbers) : 0;
 }
 
+function metricNumber(value: unknown, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
 function hasIndexabilityEvidence(page: any) {
   return typeof page?.indexable === "boolean";
 }
@@ -927,6 +937,18 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
   const imageInventory = Array.isArray(result.imageInventory) ? result.imageInventory : [];
   const assets = Array.isArray(result.assets) ? result.assets : [];
   const sitemapUrls = Array.isArray(result.sitemap?.urls) ? result.sitemap.urls : [];
+  const loadTimes = pages
+    .map((page: any) => Number(page.loadMs))
+    .filter((value: number) => Number.isFinite(value) && value >= 0)
+    .sort((a: number, b: number) => a - b);
+  const loadPercentile = (percentile: number) => {
+    if (!loadTimes.length) return 0;
+    const index = Math.min(loadTimes.length - 1, Math.max(0, Math.ceil((percentile / 100) * loadTimes.length) - 1));
+    return loadTimes[index] || 0;
+  };
+  const averageLoadMs = loadTimes.length
+    ? Math.round(loadTimes.reduce((sum: number, value: number) => sum + value, 0) / loadTimes.length)
+    : 0;
   const pageCount = maxCount(summary.pages, audit?.pages_crawled, pages.length);
   const indexabilityKnownPages = pages.filter(hasIndexabilityEvidence).length;
   const indexablePages = maxCount(summary.indexablePages, pages.filter((page: any) => page.indexable === true).length);
@@ -955,6 +977,13 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
     checkedLinks,
     checkedImages,
     checkedAssets,
+    measuredPageLoads: maxCount(summary.measuredPageLoads, loadTimes.length),
+    averagePageLoadMs: metricNumber(summary.averagePageLoadMs, averageLoadMs),
+    medianPageLoadMs: metricNumber(summary.medianPageLoadMs, loadPercentile(50)),
+    p95PageLoadMs: metricNumber(summary.p95PageLoadMs, loadPercentile(95)),
+    slowestPageLoadMs: metricNumber(summary.slowestPageLoadMs, loadTimes[loadTimes.length - 1] || 0),
+    slowPages: maxCount(summary.slowPages, loadTimes.filter((value: number) => value > 2000).length),
+    verySlowPages: maxCount(summary.verySlowPages, loadTimes.filter((value: number) => value > 4000).length),
     cssImageResources: maxCount(summary.cssImageResources, images.filter((image: any) => image.purpose === "css-url" || image.purpose === "external-css-url").length),
     brokenLinks: maxCount(summary.brokenLinks, links.filter((link: any) => link.ok === false).length),
     brokenImages: maxCount(summary.brokenImages, images.filter((image: any) => image.ok === false).length),
@@ -1594,7 +1623,7 @@ function SiteCommandCenter({
   const rows = [
     {
       key: "site",
-      area: "Selected site",
+      area: "Active site",
       status: site.domain || "missing",
       evidence: site.domain
         ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredAuditUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
@@ -1677,7 +1706,7 @@ function SiteCommandCenter({
           <div>
             <h2 className="text-lg font-semibold">Site control</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              One selected site feeds audits, local link evidence, rankings, Search Console, and AI work.
+              The active site feeds audits, local link evidence, rankings, Search Console, and AI work.
             </p>
           </div>
           {site.domain ? <Badge variant="outline">{scanTargetShortDetail(site)}</Badge> : null}
@@ -1930,7 +1959,7 @@ function SitesPage({
       <PageHeader
         eyebrow="Websites"
         title="Sites"
-        description="A site is one saved website address plus its crawl URL preferences. The selected site feeds scans, reports, crawl links, rankings, and Search Console."
+        description="A site is one saved website address plus its crawl URL preferences. The active site feeds scans, reports, crawl links, rankings, and Search Console."
         action={
           <Dialog open={open} onOpenChange={(nextOpen) => {
             setOpen(nextOpen);
@@ -2469,7 +2498,7 @@ function SerpPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="SERP" title="SERP analysis" description="Inspect ranking pages, selected-site ownership, intent mix, and content opportunities for one query." />
+      <PageHeader eyebrow="SERP" title="SERP analysis" description="Inspect ranking pages, active-site ownership, intent mix, and content opportunities for one query." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end" onSubmit={submit}>
           <Field label="Search query">
@@ -2479,7 +2508,7 @@ function SerpPage({ site }: { site: Site }) {
             label="SERP ownership site"
             value={target}
             siteDomain={site.domain}
-            hint="Use the selected site or enter a competitor domain to highlight matching ranking rows."
+            hint="Use the active site or enter a competitor domain to highlight matching ranking rows."
             onChange={setTarget}
           />
           <Button disabled={loading || !keyword.trim()}><Activity /> {loading ? "Analyzing" : "Analyze SERP"}</Button>
@@ -2493,7 +2522,7 @@ function SerpPage({ site }: { site: Site }) {
             result ? (
               <span className="flex flex-wrap items-center gap-2">
                 <SourceBadge source={result.source} />
-                <span>Selected site position: {result.targetPosition || "not found"}</span>
+                <span>Active site position: {result.targetPosition || "not found"}</span>
                 {result.warning ? <span>{result.warning}</span> : null}
               </span>
             ) : "Run a query to inspect the SERP."
@@ -2859,14 +2888,14 @@ function DomainPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="Competitive" title="Organic research" description="Ranked keywords and top pages for the selected site or a competitor site." />
+      <PageHeader eyebrow="Competitive" title="Organic research" description="Ranked keywords and top pages for the active site or a competitor site." />
       <section className="rounded-md border bg-background p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
           <SiteTargetField
             label="Organic research site"
             value={target}
             siteDomain={site.domain}
-            hint="Use the selected site or enter a competitor domain. Local crawl evidence below comes from saved audits."
+            hint="Use the active site or enter a competitor domain. Local crawl evidence below comes from saved audits."
             onChange={setTarget}
           />
           <div className="flex items-end">
@@ -3111,7 +3140,7 @@ function OrganicSnapshot({ result, target, keywordRows, pageRows }: { result: an
     >
       <StatusEvidenceTable
         rows={[
-          { title: "Research site", status: target || result.target || "-", tone: "good", text: "The selected site or competitor domain analyzed in this run." },
+          { title: "Research site", status: target || result.target || "-", tone: "good", text: "The active site or competitor domain analyzed in this run." },
           { title: "Keyword rows", status: formatNumber(keywordRows), tone: keywordRows ? "good" : "warn", text: "Rows returned by the real organic search dataset." },
           { title: "Page rows", status: formatNumber(pageRows), tone: pageRows ? "good" : "warn", text: "Top pages returned for this domain." },
           { title: "Organic keywords", status: formatMetricStatus(organicKeywords), tone: hasMetric(organicKeywords) ? "good" : "warn", text: "Metric returned by the connected organic dataset." },
@@ -3271,7 +3300,7 @@ function BacklinksPage({ site }: { site: Site }) {
             label="Backlink index site"
             value={target}
             siteDomain={site.domain}
-            hint="Use the selected site or enter a competitor domain. Local link evidence below comes from saved audits."
+            hint="Use the active site or enter a competitor domain. Local link evidence below comes from saved audits."
             onChange={setTarget}
           />
           <div className="flex items-end">
@@ -4203,8 +4232,8 @@ function AuditsPage({ site }: { site: Site }) {
           </div>
           {detail ? <AuditDetail audit={detail} /> : (
             <EmptyState
-              title={allAudits.length ? "No selected-site scan open" : "No scan report yet"}
-              text={allAudits.length ? "Every saved scan is still listed below. Open a row to inspect it, or run a scan for the selected site." : "Start a local site scan to fill this report with crawl evidence."}
+              title={allAudits.length ? "No scan selected for this site" : "No scan report yet"}
+              text={allAudits.length ? "Every saved scan is still listed below. Open a row to inspect it, or run a new scan for this site." : "Start a local site scan to fill this report with crawl evidence."}
               action={
                 !allAudits.length
                   ? site.domain
@@ -4234,7 +4263,7 @@ function AuditsPage({ site }: { site: Site }) {
                 onClick={() => setConfirmClearAudits(true)}
                 disabled={clearingAudits}
               >
-                <Trash2 /> Delete selected-site scans
+                <Trash2 /> Delete scans for this site
               </Button>
             ) : null}
           </div>
@@ -4276,7 +4305,7 @@ function AuditsPage({ site }: { site: Site }) {
       <AlertDialog open={confirmClearAudits} onOpenChange={setConfirmClearAudits}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete selected-site scans?</AlertDialogTitle>
+            <AlertDialogTitle>Delete scans for this site?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes all saved scan reports for {site.domain || site.name} from local SQLite. The saved site, keywords, rankings, and settings stay in place.
             </AlertDialogDescription>
@@ -4285,7 +4314,7 @@ function AuditsPage({ site }: { site: Site }) {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={clearingAudits}>Keep scans</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={clearHistory} disabled={clearingAudits}>
-              {clearingAudits ? "Deleting scans" : "Delete selected-site scans"}
+              {clearingAudits ? "Deleting scans" : "Delete scans for this site"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -5139,6 +5168,14 @@ function AuditReportOverview({
       action: <Badge variant={coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets ? "bad" : "good"}>{coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets ? "failures" : "reachable"}</Badge>,
     },
     {
+      area: "Page speed",
+      status: coverage.measuredPageLoads ? `${formatMs(coverage.averagePageLoadMs)} average response` : "not measured",
+      evidence: coverage.measuredPageLoads
+        ? `${formatNumber(coverage.measuredPageLoads)} pages timed · median ${formatMs(coverage.medianPageLoadMs)} · p95 ${formatMs(coverage.p95PageLoadMs)} · slowest ${formatMs(coverage.slowestPageLoadMs)}.`
+        : "Run a fresh audit to record crawler response timing for each HTML page.",
+      action: <Badge variant={coverage.verySlowPages ? "bad" : coverage.slowPages ? "warn" : coverage.measuredPageLoads ? "good" : "outline"}>{coverage.slowPages ? `${formatNumber(coverage.slowPages)} slow` : coverage.measuredPageLoads ? "measured" : "no timing"}</Badge>,
+    },
+    {
       area: "Metadata",
       status: `${formatNumber(summary.missingTitles || 0)} missing titles · ${formatNumber(summary.missingDescriptions || 0)} missing descriptions`,
       evidence: `${formatNumber(summary.titleLengthIssues || 0)} title length issues · ${formatNumber(summary.descriptionLengthIssues || 0)} description length issues · ${formatNumber(issueTypeCount(result.issues || [], "duplicate-title"))} duplicate titles.`,
@@ -5231,13 +5268,14 @@ function AuditActionBoard({
     { label: "Images", value: Number(summary.imageIssues || 0) + Number(coverage.brokenImages || 0), detail: `${formatNumber(coverage.imageTags)} tags · ${formatNumber(coverage.checkedImages)} URLs checked`, tone: "warn" },
     { label: "Links", value: Number(coverage.brokenLinks || 0) + Number(coverage.redirectedLinks || 0) + Number(summary.emptyAnchorLinks || 0), detail: `${formatNumber(coverage.linkTags)} tags · ${formatNumber(coverage.checkedLinks)} checked`, tone: "warn" },
     { label: "Indexing", value: Number(coverage.nonIndexablePages || 0) + Number(coverage.unknownIndexabilityPages || 0) + Number((summary.byCategory || {}).canonicals || 0), detail: coverage.unknownIndexabilityPages ? `${formatNumber(coverage.unknownIndexabilityPages)} pages need a fresh scan` : `${formatNumber(coverage.indexablePages)} of ${formatNumber(coverage.pages)} indexable`, tone: "bad" },
-    { label: "Speed", value: Number(summary.performanceIssues || 0) + Number(coverage.largeImages || 0), detail: `${formatNumber(coverage.checkedAssets)} CSS/JS checked`, tone: "warn" },
+    { label: "Speed", value: Number(summary.performanceIssues || 0) + Number(coverage.largeImages || 0), detail: coverage.measuredPageLoads ? `${formatMs(coverage.averagePageLoadMs)} avg · p95 ${formatMs(coverage.p95PageLoadMs)}` : `${formatNumber(coverage.checkedAssets)} CSS/JS checked`, tone: "warn" },
   ];
   const coverageRows = [
     { label: "Pages crawled", value: coverage.pages, detail: coverage.unknownIndexabilityPages ? `${formatNumber(coverage.unknownIndexabilityPages)} unknown indexability` : `${formatNumber(coverage.indexablePages)} indexable` },
     { label: "Sitemap URLs reached", value: coverage.sitemapUrls, detail: `${formatNumber(coverage.pagesMissingFromSitemap)} missing from sitemap` },
     { label: "Links checked", value: coverage.checkedLinks, detail: `${formatNumber(coverage.brokenLinks)} failing` },
     { label: "Image URLs checked", value: coverage.checkedImages, detail: `${formatNumber(coverage.brokenImages)} failing` },
+    { label: "Page responses timed", value: coverage.measuredPageLoads, detail: `avg ${formatMs(coverage.averagePageLoadMs)} · p95 ${formatMs(coverage.p95PageLoadMs)}` },
     { label: "CSS image URLs", value: coverage.cssImageResources, detail: "background and stylesheet URLs" },
     { label: "CSS/JS checked", value: coverage.checkedAssets, detail: `${formatNumber(coverage.brokenAssets)} failing` },
     { label: "Orphan pages", value: coverage.orphanPages, detail: `${formatNumber(coverage.deepPages)} deep URLs` },
@@ -5706,7 +5744,7 @@ function AuditMetadataTable({ rows }: { rows: any[] }) {
 function AuditPagesTable({ rows }: { rows: any[] }) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>Page</TableHead><TableHead>Status</TableHead><TableHead>Indexable</TableHead><TableHead>Depth</TableHead><TableHead>Found by</TableHead><TableHead>Inlinks</TableHead><TableHead>Sitemap</TableHead><TableHead>Title</TableHead><TableHead>Description</TableHead><TableHead>H1/H2</TableHead><TableHead>Load</TableHead><TableHead>Links</TableHead><TableHead>Images</TableHead><TableHead>Words</TableHead><TableHead>Issues</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>Page</TableHead><TableHead>Status</TableHead><TableHead>Indexable</TableHead><TableHead>Depth</TableHead><TableHead>Found by</TableHead><TableHead>Inlinks</TableHead><TableHead>Sitemap</TableHead><TableHead>Title</TableHead><TableHead>Description</TableHead><TableHead>H1/H2</TableHead><TableHead>Response</TableHead><TableHead>Links</TableHead><TableHead>Images</TableHead><TableHead>Words</TableHead><TableHead>Issues</TableHead></TableRow></TableHeader>
       <TableBody>
         {rows.map((page) => (
           <TableRow key={page.url}>

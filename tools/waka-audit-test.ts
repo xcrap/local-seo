@@ -58,6 +58,11 @@ try {
   expect(summary.indexablePages === pages.filter((page: any) => page.indexable === true).length, "Waka indexable summary must match page evidence.");
   expect(summary.nonIndexablePages === pages.filter((page: any) => page.indexable === false).length, "Waka non-indexable summary must match page evidence.");
   expect(summary.unknownIndexabilityPages === pages.filter((page: any) => typeof page.indexable !== "boolean").length, "Waka unknown indexability summary must match page evidence.");
+  const timedPages = pages.filter((page: any) => Number.isFinite(Number(page.loadMs)) && Number(page.loadMs) >= 0);
+  expect(timedPages.length === pages.length, "Expected every Waka crawled page to include response timing.");
+  expect(summary.measuredPageLoads === timedPages.length, "Waka speed summary must match page response timing evidence.");
+  expect(Number.isFinite(Number(summary.averagePageLoadMs)), "Expected Waka average response timing to be saved.");
+  expect(Number(summary.p95PageLoadMs) >= Number(summary.medianPageLoadMs), "Expected Waka p95 response timing to be at least the median.");
 
   console.log(JSON.stringify({
     status: audit.status,
@@ -72,6 +77,9 @@ try {
     checkedImages: summary.checkedImages,
     cssImageResources: summary.cssImageResources,
     checkedAssets: summary.checkedAssets,
+    measuredPageLoads: summary.measuredPageLoads,
+    averagePageLoadMs: summary.averagePageLoadMs,
+    p95PageLoadMs: summary.p95PageLoadMs,
     resolvedScanUrl,
     startedUrl: result.startUrl,
     finalHomeUrl: pages[0]?.finalUrl,

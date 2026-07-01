@@ -2329,9 +2329,28 @@ function auditSummary(
     acc[issue.category] = (acc[issue.category] || 0) + 1;
     return acc;
   }, {});
+  const pageLoadTimes = pages
+    .map((page) => Number(page.loadMs))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+    .sort((a, b) => a - b);
+  const loadPercentile = (percentile: number) => {
+    if (!pageLoadTimes.length) return 0;
+    const index = Math.min(pageLoadTimes.length - 1, Math.max(0, Math.ceil((percentile / 100) * pageLoadTimes.length) - 1));
+    return pageLoadTimes[index] || 0;
+  };
+  const averagePageLoadMs = pageLoadTimes.length
+    ? Math.round(pageLoadTimes.reduce((sum, value) => sum + value, 0) / pageLoadTimes.length)
+    : 0;
   return {
     phase,
     pages: pages.length,
+    measuredPageLoads: pageLoadTimes.length,
+    averagePageLoadMs,
+    medianPageLoadMs: loadPercentile(50),
+    p95PageLoadMs: loadPercentile(95),
+    slowestPageLoadMs: pageLoadTimes[pageLoadTimes.length - 1] || 0,
+    slowPages: pageLoadTimes.filter((value) => value > 2000).length,
+    verySlowPages: pageLoadTimes.filter((value) => value > 4000).length,
     indexabilityKnownPages: pages.filter((page) => typeof page.indexable === "boolean").length,
     indexablePages: pages.filter((page) => page.indexable === true).length,
     nonIndexablePages: pages.filter((page) => page.indexable === false).length,

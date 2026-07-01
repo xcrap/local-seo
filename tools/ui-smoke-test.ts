@@ -205,6 +205,7 @@ try {
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("heading", { name: /^Audit health$/ }).waitFor();
     await page.getByRole("row", { name: /Resources.*image URLs checked/i }).waitFor();
+    await page.getByRole("row", { name: /Page speed.*average response/i }).waitFor();
     if (await page.getByText("0 chars").count()) {
       throw new Error("Audit report still shows standalone 0 chars badges.");
     }
@@ -217,14 +218,14 @@ try {
     await page.getByRole("combobox").first().click();
     await page.getByRole("option", { name: new RegExp(`Fixture Site.*localhost:${fixtureServer.port}.*2 crawl URLs`, "i") }).waitFor();
     await page.keyboard.press("Escape");
-    await page.getByRole("row", { name: /Selected site.*Scan website/i }).getByRole("button", { name: /Scan website/i }).click();
+    await page.getByRole("row", { name: /Active site.*Scan website/i }).getByRole("button", { name: /Scan website/i }).click();
     await page.getByRole("heading", { name: /Audit report/i }).waitFor({ timeout: 20_000 });
     await page.getByText("completed").first().waitFor({ timeout: 60_000 });
 
     await page.goto(webUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
     await page.getByText("Technical audit").waitFor();
-    await page.getByRole("row", { name: /Selected site.*Scan website/i }).waitFor();
+    await page.getByRole("row", { name: /Active site.*Scan website/i }).waitFor();
     if (await page.getByText("Workspace totals").count()) {
       throw new Error("Overview still renders the old metric-card totals section.");
     }
@@ -281,7 +282,7 @@ try {
     await page.getByRole("heading", { name: /^Search Console$/ }).waitFor();
     await page.getByRole("tab", { name: /^URL inspection$/ }).click();
     if (await page.getByPlaceholder("https://example.com/page").inputValue() !== `${fixtureUrl}/`) {
-      throw new Error("Search Console inspection URL did not use the selected site's saved crawl URL.");
+      throw new Error("Search Console inspection URL did not use the active site's saved crawl URL.");
     }
     await page.getByRole("tab", { name: /^Local import$/ }).click();
     await page.getByLabel("CSV file").setInputFiles(gscCsvPath);
@@ -327,9 +328,9 @@ try {
     await page.getByRole("navigation").getByRole("link", { name: /^Audits$/ }).click();
     await page.getByRole("heading", { name: /^All scan history$/ }).waitFor();
     await page.getByRole("button", { name: /Delete scan/i }).first().waitFor();
-    await page.getByRole("button", { name: /^Delete selected-site scans$/ }).click();
-    await page.getByRole("heading", { name: /^Delete selected-site scans\?$/ }).waitFor();
-    await page.getByRole("button", { name: /^Delete selected-site scans$/ }).click();
+    await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
+    await page.getByRole("heading", { name: /^Delete scans for this site\?$/ }).waitFor();
+    await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
     await page.getByText("No scan report yet").waitFor();
     await page.getByRole("button", { name: /^Scan site now$/ }).first().waitFor();
     await page.getByText("No audits yet").waitFor();
@@ -419,17 +420,17 @@ try {
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByLabel("Organic research site").waitFor();
     if (await page.getByLabel("Organic research site").inputValue() !== "second.test") {
-      throw new Error("Organic research domain field did not follow the newly selected site.");
+      throw new Error("Organic research domain field did not follow the newly active site.");
     }
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
     await page.getByLabel("Backlink index site").waitFor();
     if (await page.getByLabel("Backlink index site").inputValue() !== "second.test") {
-      throw new Error("Links domain field did not follow the newly selected site.");
+      throw new Error("Links domain field did not follow the newly active site.");
     }
     await page.getByRole("navigation").getByRole("link", { name: /^SERP analysis$/ }).click();
     await page.getByLabel("SERP ownership site").waitFor();
     if (await page.getByLabel("SERP ownership site").inputValue() !== "second.test") {
-      throw new Error("SERP ownership site did not follow the newly selected site.");
+      throw new Error("SERP ownership site did not follow the newly active site.");
     }
   } finally {
     await browser.close();

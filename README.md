@@ -21,12 +21,12 @@ auth service.
 
 - **Sites:** saved websites with domain, crawl URL preferences, optional keyword tool defaults, and notes.
 - **Keyword research:** real DuckDuckGo suggestions, with metrics only when a real metrics source is configured.
-- **SERP analysis:** live web result snapshots, selected-site ownership, ranking-page tables, and history.
+- **SERP analysis:** live web result snapshots, active-site ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
-- **Organic research:** ranked keywords and top pages for the selected site or a comparison site when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
+- **Organic research:** ranked keywords and top pages for the active site or a comparison site when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.
 - **Links and backlinks:** local crawl link graph from audits, plus backlink overview, backlink rows, referring domains, and top linked pages only from a real backlink index.
-- **Site audits:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
+- **Site audits:** local crawler for titles, descriptions, metadata length, H1/H2, heading hierarchy, canonicals, noindex, robots, sitemap indexes, schema, social tags, page response timing, missing/generic/long image alt text, image dimensions, broken links, broken images, broken CSS/JS assets, duplicate titles/descriptions/content, issue groups, progress, detail inspection, and deletion.
 - **Brand lookup:** real web-search evidence and optional AI visibility datasets when connected.
 - **Prompt explorer:** local Codex jobs or optional real AI visibility data-source responses.
 - **Google Search Console:** OAuth connection, property picker, disconnect, search analytics query endpoint, and URL inspection helper.
@@ -59,7 +59,7 @@ bun run admin:password
 
 ## Local Data Model
 
-A site is the website/domain being analyzed. The selected site feeds scans,
+A site is the website/domain being analyzed. The active site feeds scans,
 rank trackers, Search Console, keyword saves, AI jobs, and local history. Each
 audit run is stored separately in SQLite, even when multiple scans use the same
 domain.
