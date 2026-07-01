@@ -301,6 +301,9 @@ try {
   if (webAppClient.includes("rows.slice(0, 6)") || webAppClient.includes("runs.slice(0, 8)")) {
     throw new Error("Local history widgets should not silently cap saved history rows.");
   }
+  if (webAppClient.includes("rounded-md border bg-background p-3 text-sm") || !webAppClient.includes("HistoryTable")) {
+    throw new Error("Local history widgets should render as readable tables instead of mini card stacks.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",

@@ -2397,15 +2397,12 @@ function SerpPage({ project }: { project: Project }) {
         >
           {result?.rows?.length ? <SerpTable rows={result.rows} /> : <EmptyState title="No SERP yet" text="Analyze a keyword to save a local SERP run." />}
         </ReportSection>
-        <ReportSection title="History">
-          <div className="space-y-2">
-            {runs.length ? runs.map((run) => (
-              <div key={run.id} className="rounded-md border bg-background p-3 text-sm">
-                <div className="font-medium">{run.keyword}</div>
-                <div className="text-xs text-muted-foreground">{run.source} · {run.created_at}</div>
-              </div>
-            )) : <EmptyState title="No history" text="Analyze a keyword to create the first saved SERP run." />}
-          </div>
+        <ReportSection title="SERP history" description={`${formatNumber(runs.length)} saved local runs`}>
+          {runs.length ? (
+            <HistoryTable rows={runs} labelKey="keyword" labelTitle="Query" />
+          ) : (
+            <EmptyState title="No history" text="Analyze a keyword to create the first saved SERP run." />
+          )}
         </ReportSection>
       </div>
     </>
@@ -3753,16 +3750,40 @@ function PromptResult({ result }: { result: any }) {
 
 function HistoryList({ title, rows, labelKey }: { title: string; rows: any[]; labelKey: string }) {
   return (
-    <ReportSection title={title}>
-      <div className="space-y-2">
-        {rows.length ? rows.map((row) => (
-          <div key={row.id} className="rounded-md border bg-background p-3 text-sm">
-            <div className="truncate font-medium">{row[labelKey]}</div>
-            <div className="text-xs text-muted-foreground">{row.source} · {row.created_at}</div>
-          </div>
-        )) : <EmptyState title="No history" text="Runs are saved locally." />}
-      </div>
+    <ReportSection title={title} description={`${formatNumber(rows.length)} saved local rows`}>
+      {rows.length ? <HistoryTable rows={rows} labelKey={labelKey} /> : <EmptyState title="No history" text="Runs are saved locally." />}
     </ReportSection>
+  );
+}
+
+function HistoryTable({
+  rows,
+  labelKey,
+  labelTitle = "Run",
+}: {
+  rows: any[];
+  labelKey: string;
+  labelTitle?: string;
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{labelTitle}</TableHead>
+          <TableHead>Source</TableHead>
+          <TableHead>Saved</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.id}>
+            <TableCell className="max-w-md truncate font-medium">{row[labelKey] || "-"}</TableCell>
+            <TableCell><SourceBadge source={row.source} /></TableCell>
+            <TableCell className="text-muted-foreground">{formatDate(row.created_at || row.createdAt)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
