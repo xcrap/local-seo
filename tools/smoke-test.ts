@@ -353,6 +353,16 @@ try {
       throw new Error(`User-facing copy should name domains, URLs, or HTML windows instead of vague target wording: ${vagueTargetCopy}`);
     }
   }
+  for (const specificHistoryLabel of [
+    'labelTitle="Research site"',
+    'labelTitle="Backlink index site"',
+    'labelTitle="Brand or domain"',
+    'labelTitle="Prompt"',
+  ]) {
+    if (!webAppClient.includes(specificHistoryLabel)) {
+      throw new Error(`Saved history tables should use specific column labels: ${specificHistoryLabel}`);
+    }
+  }
   if (!webAppClient.includes("Organic research site") || !webAppClient.includes("Backlink index site") || !webAppClient.includes("SERP ownership site")) {
     throw new Error("Competitive pages should label their domain inputs as site-specific controls.");
   }

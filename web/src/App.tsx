@@ -2878,7 +2878,7 @@ function DomainPage({ project }: { project: Project }) {
             </TabsContent>
           </Tabs>
         </div>
-        <HistoryList title="Organic research history" rows={history} labelKey="target" />
+        <HistoryList title="Organic research history" rows={history} labelKey="target" labelTitle="Research site" />
       </div>
     </>
   );
@@ -3304,7 +3304,7 @@ function BacklinksPage({ project }: { project: Project }) {
             </TabsContent>
           </Tabs>
         </div>
-        <HistoryList title="External backlink history" rows={history} labelKey="target" />
+        <HistoryList title="External backlink history" rows={history} labelKey="target" labelTitle="Backlink index site" />
       </div>
     </>
   );
@@ -3602,7 +3602,7 @@ function BrandLookupPage({ project }: { project: Project }) {
         </ReportSection>
         <div className="space-y-6">
           {result ? <BrandLookupResult result={result} /> : <EmptyState title="No lookup yet" text="Run a brand lookup to save an AI visibility snapshot." />}
-          <HistoryList title="Lookup history" rows={runs} labelKey="query" />
+          <HistoryList title="Lookup history" rows={runs} labelKey="query" labelTitle="Brand or domain" />
         </div>
       </div>
     </>
@@ -3763,7 +3763,7 @@ function PromptExplorerPage({ project }: { project: Project }) {
         </ReportSection>
         <div className="space-y-6">
           {result ? <PromptResult result={result} /> : <EmptyState title="No prompt run" text="Run a prompt to compare AI answer surfaces." />}
-          <HistoryList title="Prompt history" rows={runs} labelKey="prompt" />
+          <HistoryList title="Prompt history" rows={runs} labelKey="prompt" labelTitle="Prompt" />
         </div>
       </div>
     </>
@@ -3825,10 +3825,20 @@ function PromptResult({ result }: { result: any }) {
   );
 }
 
-function HistoryList({ title, rows, labelKey }: { title: string; rows: any[]; labelKey: string }) {
+function HistoryList({
+  title,
+  rows,
+  labelKey,
+  labelTitle = "Saved run",
+}: {
+  title: string;
+  rows: any[];
+  labelKey: string;
+  labelTitle?: string;
+}) {
   return (
     <ReportSection title={title} description={`${formatNumber(rows.length)} saved local rows`}>
-      {rows.length ? <HistoryTable rows={rows} labelKey={labelKey} /> : <EmptyState title="No history" text="Runs are saved locally." />}
+      {rows.length ? <HistoryTable rows={rows} labelKey={labelKey} labelTitle={labelTitle} /> : <EmptyState title="No history" text="Runs are saved locally." />}
     </ReportSection>
   );
 }
