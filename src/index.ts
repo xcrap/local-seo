@@ -279,8 +279,8 @@ async function startSavedSiteScan(c: any) {
   const config = listPublicConfig();
   queueMicrotask(() => {
     Promise.allSettled([
-      domainOverview({ projectId: site.id, target: site.domain }),
-      backlinksOverview({ projectId: site.id, target: site.domain }),
+      domainOverview({ projectId: site.id, domain: site.domain }),
+      backlinksOverview({ projectId: site.id, domain: site.domain }),
     ]).catch((error) => console.error("Site scan snapshots failed:", error));
   });
   return c.json({

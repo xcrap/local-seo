@@ -757,6 +757,9 @@ try {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, domain: "example.com" }),
   });
+  if (organicOverview.domain !== "example.com" || "target" in organicOverview) {
+    throw new Error(`Organic research should expose domain, not target: ${JSON.stringify(organicOverview)}`);
+  }
   const legacyOrganicTarget = await requestFailure("/api/domain/overview", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, target: "example.com" }),
@@ -784,6 +787,9 @@ try {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, domain: "example.com" }),
   });
+  if (backlinkOverview.domain !== "example.com" || "target" in backlinkOverview) {
+    throw new Error(`Backlink overview should expose domain, not target: ${JSON.stringify(backlinkOverview)}`);
+  }
   if (
     backlinkOverview.source === "provider-not-configured" &&
     (backlinkOverview.backlinks !== null ||
@@ -864,10 +870,13 @@ try {
   } finally {
     aiHistoryDb.close();
   }
-  await request("/api/backlinks/profile", {
+  const backlinkProfile = await request("/api/backlinks/profile", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, domain: "example.com", tab: "domains", pageSize: 10 }),
   });
+  if (backlinkProfile.domain !== "example.com" || "target" in backlinkProfile) {
+    throw new Error(`Backlink profile should expose domain, not target: ${JSON.stringify(backlinkProfile)}`);
+  }
   const tracker = await request("/api/rank-trackers", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, domain: "example.com", keywords: ["seo software", "seo tools"] }),
@@ -953,9 +962,19 @@ try {
       insertSavedKeyword.run(keywordId, project.id, `smoke history keyword ${index}`, timestamp);
       insertRankRun.run(rankRunId, trackerId, timestamp, timestamp);
     }
+    const domainHistoryRows = await request(`/api/sites/${project.id}/domain-snapshots`);
+    const backlinkHistoryRows = await request(`/api/sites/${project.id}/backlink-snapshots`);
+    for (const row of [...domainHistoryRows, ...backlinkHistoryRows]) {
+      if ("target" in row || "project_id" in row || "result_json" in row || "target" in (row.result || {})) {
+        throw new Error(`Organic/backlink history should expose domain/site fields, not target/project internals: ${JSON.stringify(row)}`);
+      }
+      if (!row.domain) {
+        throw new Error(`Organic/backlink history row should expose the checked domain: ${JSON.stringify(row)}`);
+      }
+    }
     const historyChecks = [
-      { ids: insertedHistoryIds.domain, rows: await request(`/api/sites/${project.id}/domain-snapshots`), label: "organic research" },
-      { ids: insertedHistoryIds.backlink, rows: await request(`/api/sites/${project.id}/backlink-snapshots`), label: "backlink" },
+      { ids: insertedHistoryIds.domain, rows: domainHistoryRows, label: "organic research" },
+      { ids: insertedHistoryIds.backlink, rows: backlinkHistoryRows, label: "backlink" },
       { ids: insertedHistoryIds.serp, rows: await request(`/api/sites/${project.id}/serp`), label: "SERP" },
       { ids: insertedHistoryIds.brand, rows: await request(`/api/sites/${project.id}/brand-lookup`), label: "brand lookup" },
       { ids: insertedHistoryIds.prompt, rows: await request(`/api/sites/${project.id}/prompt-explorer`), label: "prompt explorer" },
@@ -971,6 +990,14 @@ try {
     const siteSummaryWithFullHistory = await request(`/api/sites/${project.id}`);
     if (!siteSummaryWithFullHistory.site || "project" in siteSummaryWithFullHistory) {
       throw new Error(`Site summary response should expose site, not project: ${JSON.stringify(siteSummaryWithFullHistory)}`);
+    }
+    for (const row of [
+      ...(siteSummaryWithFullHistory.domainSnapshots || []),
+      ...(siteSummaryWithFullHistory.backlinkSnapshots || []),
+    ]) {
+      if ("target" in row || "project_id" in row || "target" in (row.result || {})) {
+        throw new Error(`Site summary organic/backlink rows should expose domain/site fields: ${JSON.stringify(row)}`);
+      }
     }
     const summaryChecks = [
       { ids: insertedHistoryIds.keyword, rows: siteSummaryWithFullHistory.savedKeywords, label: "saved keyword summary" },

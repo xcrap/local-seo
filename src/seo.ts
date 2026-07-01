@@ -359,6 +359,25 @@ function emptyProviderResult(feature: string, extra: Record<string, unknown> = {
   };
 }
 
+function publicDomainResult(result: any, fallbackDomain = "") {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+  const { target, ...rest } = result;
+  return {
+    ...rest,
+    domain: rest.domain || fallbackDomain || target || "",
+  };
+}
+
+function publicDomainSnapshotRow(row: any) {
+  const { project_id, target, result_json, ...rest } = row;
+  return {
+    ...rest,
+    site_id: project_id,
+    domain: target,
+    result: publicDomainResult(jsonParse(result_json, {}), target),
+  };
+}
+
 async function duckDuckGoSuggestions(query: string, limit: number): Promise<KeywordRow[]> {
   const response = await fetchJson(`https://duckduckgo.com/ac/?q=${encodeURIComponent(query)}&type=list`);
   if (!response.ok) throw new Error(`DuckDuckGo suggestions ${response.status}`);
@@ -1017,14 +1036,14 @@ export async function runRankCheck(trackerId: string) {
   return { runId, tracker: listRankTrackers(tracker.project_id).find((item) => item.id === trackerId) };
 }
 
-export async function domainOverview(input: { projectId: string; target: string }) {
+export async function domainOverview(input: { projectId: string; domain?: string; target?: string }) {
   const project = getProject(input.projectId);
   if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.target || project.domain);
+  const target = normalizeDomain(input.domain || input.target || project.domain);
   if (!target) throw new Error("Domain is required.");
   if (!dataForSeoReady()) {
     return emptyProviderResult("Organic research", {
-      target,
+      domain: target,
       organicKeywords: null,
       organicTraffic: null,
       estimatedValue: null,
@@ -1041,7 +1060,7 @@ export async function domainOverview(input: { projectId: string; target: string 
     const raw = data.tasks?.[0]?.result?.[0] || {};
     const metrics = raw.metrics?.organic || raw.metrics || {};
     result = {
-      target,
+      domain: target,
       organicKeywords: numberOrNull(metrics.count ?? raw.organic_keywords),
       organicTraffic: numberOrNull(metrics.etv ?? raw.organic_traffic),
       estimatedValue: numberOrNull(metrics.estimated_paid_traffic_cost ?? raw.estimated_value),
@@ -1052,7 +1071,7 @@ export async function domainOverview(input: { projectId: string; target: string 
   } catch (error) {
     return emptyProviderResult("Organic research", {
       source: "dataforseo-error",
-      target,
+      domain: target,
       organicKeywords: null,
       organicTraffic: null,
       estimatedValue: null,
@@ -1276,17 +1295,17 @@ export function listDomainSnapshots(projectId: string) {
   return all<any>(
     "SELECT * FROM domain_snapshots WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
-  ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
+  ).map(publicDomainSnapshotRow);
 }
 
-export async function backlinksOverview(input: { projectId: string; target: string }) {
+export async function backlinksOverview(input: { projectId: string; domain?: string; target?: string }) {
   const project = getProject(input.projectId);
   if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.target || project.domain);
+  const target = normalizeDomain(input.domain || input.target || project.domain);
   if (!target) throw new Error("Domain is required.");
   if (!dataForSeoReady()) {
     return emptyProviderResult("Backlink index data", {
-      target,
+      domain: target,
       backlinks: null,
       referringDomains: null,
       dofollowRatio: null,
@@ -1299,7 +1318,7 @@ export async function backlinksOverview(input: { projectId: string; target: stri
     const data = await dataForSeo("/v3/backlinks/summary/live", [{ target }]);
     const raw = data.tasks?.[0]?.result?.[0] || {};
     result = {
-      target,
+      domain: target,
       backlinks: numberOrNull(raw.backlinks),
       referringDomains: numberOrNull(raw.referring_domains),
       dofollowRatio: numberOrNull(raw.dofollow_ratio),
@@ -1310,7 +1329,7 @@ export async function backlinksOverview(input: { projectId: string; target: stri
   } catch (error) {
     return emptyProviderResult("Backlink index data", {
       source: "dataforseo-error",
-      target,
+      domain: target,
       backlinks: null,
       referringDomains: null,
       dofollowRatio: null,
@@ -1328,6 +1347,7 @@ export async function backlinksOverview(input: { projectId: string; target: stri
 
 export async function getBacklinksProfile(input: {
   projectId: string;
+  domain?: string;
   target?: string;
   scope?: "domain" | "page";
   tab?: "backlinks" | "domains" | "pages";
@@ -1339,7 +1359,7 @@ export async function getBacklinksProfile(input: {
 }) {
   const project = getProject(input.projectId);
   if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.target || project.domain);
+  const target = normalizeDomain(input.domain || input.target || project.domain);
   if (!target) throw new Error("Domain is required.");
   const tab = input.tab || "backlinks";
   const page = Math.max(1, Number(input.page || 1));
@@ -1433,14 +1453,14 @@ export async function getBacklinksProfile(input: {
     }
   }
 
-  return { source, target, tab, ...result };
+  return { source, domain: target, tab, ...result };
 }
 
 export function listBacklinkSnapshots(projectId: string) {
   return all<any>(
     "SELECT * FROM backlink_snapshots WHERE project_id = ? ORDER BY created_at DESC",
     [projectId],
-  ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
+  ).map(publicDomainSnapshotRow);
 }
 
 function publicAuditRow(row: any) {
@@ -4121,14 +4141,8 @@ export function projectSummary(projectId: string) {
     savedKeywords: listSavedKeywords(projectId),
     rankTrackers: listRankTrackers(projectId),
     audits: listAudits(projectId),
-    domainSnapshots: all<any>(
-      "SELECT * FROM domain_snapshots WHERE project_id = ? ORDER BY created_at DESC",
-      [projectId],
-    ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) })),
-    backlinkSnapshots: all<any>(
-      "SELECT * FROM backlink_snapshots WHERE project_id = ? ORDER BY created_at DESC",
-      [projectId],
-    ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) })),
+    domainSnapshots: listDomainSnapshots(projectId),
+    backlinkSnapshots: listBacklinkSnapshots(projectId),
     serpRuns: listSerpRuns(projectId),
     brandLookupRuns: listBrandLookupRuns(projectId),
     promptExplorerRuns: listPromptExplorerRuns(projectId),

@@ -2794,7 +2794,7 @@ function RankRunsTable({ rows }: { rows: any[] }) {
 
 function DomainPage({ site }: { site: Site }) {
   const navigate = useNavigate();
-  const [target, setTarget] = useState(site.domain);
+  const [domain, setDomain] = useState(site.domain);
   const [overview, setOverview] = useState<any>(null);
   const [keywords, setKeywords] = useState<any>(null);
   const [pages, setPages] = useState<any>(null);
@@ -2811,7 +2811,7 @@ function DomainPage({ site }: { site: Site }) {
   );
 
   useEffect(() => {
-    setTarget(site.domain);
+    setDomain(site.domain);
     setOverview(null);
     setKeywords(null);
     setPages(null);
@@ -2839,7 +2839,7 @@ function DomainPage({ site }: { site: Site }) {
     event?.preventDefault();
     setLoading(true);
     setError("");
-    const body = { siteId: site.id, domain: target, pageSize: 50 };
+    const body = { siteId: site.id, domain, pageSize: 50 };
     try {
       const [overviewData, keywordData, pageData] = await Promise.all([
         api.domainOverview(body),
@@ -2886,13 +2886,13 @@ function DomainPage({ site }: { site: Site }) {
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
           <SiteTargetField
             label="Organic research site"
-            value={target}
+            value={domain}
             siteDomain={site.domain}
             hint="Use the active site or enter a competitor domain. Local crawl evidence below comes from saved audits."
-            onChange={setTarget}
+            onChange={setDomain}
           />
           <div className="flex items-end">
-            <Button disabled={loading || !target.trim()}><Globe2 /> {loading ? "Analyzing" : "Analyze organic site"}</Button>
+            <Button disabled={loading || !domain.trim()}><Globe2 /> {loading ? "Analyzing" : "Analyze organic site"}</Button>
           </div>
         </form>
         {error ? <p className="mt-3 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
@@ -2939,11 +2939,11 @@ function DomainPage({ site }: { site: Site }) {
               </ReportSection>
             </TabsContent>
             <TabsContent value="snapshot">
-              {overview ? <OrganicSnapshot result={overview} target={target} keywordRows={keywords?.keywords?.length || 0} pageRows={pages?.pages?.length || 0} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first organic research snapshot." />}
+              {overview ? <OrganicSnapshot result={overview} domain={domain} keywordRows={keywords?.keywords?.length || 0} pageRows={pages?.pages?.length || 0} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first organic research snapshot." />}
             </TabsContent>
           </Tabs>
         </div>
-        <HistoryList title="Organic research history" rows={history} labelKey="target" labelTitle="Research site" />
+        <HistoryList title="Organic research history" rows={history} labelKey="domain" labelTitle="Research site" />
       </div>
     </>
   );
@@ -3122,7 +3122,7 @@ function LocalOrganicPagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function OrganicSnapshot({ result, target, keywordRows, pageRows }: { result: any; target: string; keywordRows: number; pageRows: number }) {
+function OrganicSnapshot({ result, domain, keywordRows, pageRows }: { result: any; domain: string; keywordRows: number; pageRows: number }) {
   const organicKeywords = metricValue(result.organicKeywords);
   const organicTraffic = metricValue(result.organicTraffic);
   const estimatedValue = metricValue(result.estimatedValue);
@@ -3133,7 +3133,7 @@ function OrganicSnapshot({ result, target, keywordRows, pageRows }: { result: an
     >
       <StatusEvidenceTable
         rows={[
-          { title: "Research site", status: target || result.target || "-", tone: "good", text: "The active site or competitor domain analyzed in this run." },
+          { title: "Research site", status: domain || result.domain || "-", tone: "good", text: "The active site or competitor domain analyzed in this run." },
           { title: "Keyword rows", status: formatNumber(keywordRows), tone: keywordRows ? "good" : "warn", text: "Rows returned by the real organic search dataset." },
           { title: "Page rows", status: formatNumber(pageRows), tone: pageRows ? "good" : "warn", text: "Top pages returned for this domain." },
           { title: "Organic keywords", status: formatMetricStatus(organicKeywords), tone: hasMetric(organicKeywords) ? "good" : "warn", text: "Metric returned by the connected organic dataset." },
@@ -3184,7 +3184,7 @@ function DomainPagesTable({ rows }: { rows: any[] }) {
 
 function BacklinksPage({ site }: { site: Site }) {
   const navigate = useNavigate();
-  const [target, setTarget] = useState(site.domain);
+  const [domain, setDomain] = useState(site.domain);
   const [overview, setOverview] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
@@ -3202,7 +3202,7 @@ function BacklinksPage({ site }: { site: Site }) {
   );
 
   useEffect(() => {
-    setTarget(site.domain);
+    setDomain(site.domain);
     setOverview(null);
     setProfile(null);
     setError("");
@@ -3236,7 +3236,7 @@ function BacklinksPage({ site }: { site: Site }) {
     }
     setLoading(true);
     setError("");
-    const body = { siteId: site.id, domain: target, tab: nextTab, pageSize: 50 };
+    const body = { siteId: site.id, domain, tab: nextTab, pageSize: 50 };
     try {
       const [overviewData, profileData] = await Promise.all([
         api.backlinksOverview(body),
@@ -3291,13 +3291,13 @@ function BacklinksPage({ site }: { site: Site }) {
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
           <SiteTargetField
             label="Backlink index site"
-            value={target}
+            value={domain}
             siteDomain={site.domain}
             hint="Use the active site or enter a competitor domain. Local link evidence below comes from saved audits."
-            onChange={setTarget}
+            onChange={setDomain}
           />
           <div className="flex items-end">
-            <Button disabled={loading || !target.trim() || !backlinkIndexConnected}><Link2 /> {loading ? "Checking" : backlinkIndexConnected ? "Check backlink index" : "Backlink index not connected"}</Button>
+            <Button disabled={loading || !domain.trim() || !backlinkIndexConnected}><Link2 /> {loading ? "Checking" : backlinkIndexConnected ? "Check backlink index" : "Backlink index not connected"}</Button>
           </div>
         </form>
         <div className="mt-4 rounded-md border bg-muted/25">
@@ -3365,11 +3365,11 @@ function BacklinksPage({ site }: { site: Site }) {
               </ReportSection>
             </TabsContent>
             <TabsContent value="snapshot">
-              {overview ? <BacklinkSnapshot result={overview} target={target} rows={profile?.rows?.length || 0} tab={profile?.tab || tab} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first backlink snapshot." />}
+              {overview ? <BacklinkSnapshot result={overview} domain={domain} rows={profile?.rows?.length || 0} tab={profile?.tab || tab} /> : <EmptyState title="No snapshot" text="Run an analysis to save the first backlink snapshot." />}
             </TabsContent>
           </Tabs>
         </div>
-        <HistoryList title="External backlink history" rows={history} labelKey="target" labelTitle="Backlink index site" />
+        <HistoryList title="External backlink history" rows={history} labelKey="domain" labelTitle="Backlink index site" />
       </div>
     </>
   );
@@ -3546,7 +3546,7 @@ function LocalInternalGraphTable({ rows }: { rows: any[] }) {
   );
 }
 
-function BacklinkSnapshot({ result, target, rows, tab }: { result: any; target: string; rows: number; tab: string }) {
+function BacklinkSnapshot({ result, domain, rows, tab }: { result: any; domain: string; rows: number; tab: string }) {
   const backlinks = metricValue(result.backlinks, result.summary?.backlinks);
   const referringDomains = metricValue(result.referringDomains, result.summary?.referringDomains);
   const dofollowRatio = metricValue(result.dofollowRatio);
@@ -3557,7 +3557,7 @@ function BacklinkSnapshot({ result, target, rows, tab }: { result: any; target: 
     >
       <StatusEvidenceTable
         rows={[
-          { title: "Backlink index site", status: target || result.target || "-", tone: "good", text: "The domain or URL checked in this run." },
+          { title: "Backlink index site", status: domain || result.domain || "-", tone: "good", text: "The domain or URL checked in this run." },
           { title: "Visible rows", status: formatNumber(rows), tone: rows ? "good" : "warn", text: `Rows currently loaded in the ${tab} tab.` },
           { title: "Backlinks", status: formatMetricStatus(backlinks), tone: hasMetric(backlinks) ? "good" : "warn", text: "Total backlinks from the connected index." },
           { title: "Referring domains", status: formatMetricStatus(referringDomains), tone: hasMetric(referringDomains) ? "good" : "warn", text: "Unique linking domains from the connected index." },
