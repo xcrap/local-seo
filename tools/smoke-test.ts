@@ -237,6 +237,10 @@ try {
   if (initialSites.length !== 0) {
     throw new Error(`Fresh setup should keep the site list empty until the user adds a real site: ${JSON.stringify(initialSites)}`);
   }
+  const dbSource = await readFile(path.join(rootDir, "src/db.ts"), "utf8");
+  if (/DELETE\s+FROM\s+(projects|audits|gsc_imports)\b/i.test(dbSource)) {
+    throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
+  }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
   if (webApiClient.includes("/api/projects")) {
     throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");

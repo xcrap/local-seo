@@ -325,20 +325,6 @@ migrate(
   `,
 );
 
-migrate(
-  "007_delete_archived_sites",
-  `
-  DELETE FROM projects WHERE archived_at IS NOT NULL;
-  `,
-);
-
-migrate(
-  "008_delete_placeholder_sites",
-  `
-  DELETE FROM projects WHERE domain = '' AND name = 'Add your site';
-  `,
-);
-
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];
 }
