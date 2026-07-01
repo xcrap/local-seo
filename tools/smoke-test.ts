@@ -246,6 +246,10 @@ try {
   if (legacyProjectsResponse.status !== 404) {
     throw new Error(`Legacy /api/projects route should be gone, got ${legacyProjectsResponse.status}.`);
   }
+  const legacyDashboardQuery = await requestFailure("/api/dashboard?projectId=old-id");
+  if (!/Use siteId/i.test(String(legacyDashboardQuery.data?.error || ""))) {
+    throw new Error(`Dashboard should reject projectId query input: ${JSON.stringify(legacyDashboardQuery)}`);
+  }
   const dbSource = await readFile(path.join(rootDir, "src/db.ts"), "utf8");
   if (/DELETE\s+FROM\s+(projects|audits|gsc_imports)\b/i.test(dbSource)) {
     throw new Error("Startup database migrations must not silently delete user-owned sites, audits, or imports.");
@@ -471,10 +475,13 @@ try {
   if (webAppClient.includes("Clear selected site")) {
     throw new Error("Scan-history deletion should not look like it clears or deletes the selected site.");
   }
-  if (webAppClient.includes("\"Deleted site\"") || webAppClient.includes("row.project_domain || row.project_id")) {
+  if (webAppClient.includes("\"Deleted site\"") || webAppClient.includes("row.project_domain") || webAppClient.includes("row.project_id")) {
     throw new Error("Audit history should show readable site context and must never fall back to raw internal site IDs.");
   }
-  if (!webAppClient.includes("if (row.project_id) setSelectedAuditId(row.project_id, row.id);")) {
+  if (webAppClient.includes("local-seo:project") || webAppClient.includes("legacySiteStorageKey") || webAppClient.includes("legacySelectedAuditStorageKey")) {
+    throw new Error("Fresh app storage should not preserve legacy project or unscoped scan-selection keys.");
+  }
+  if (!webAppClient.includes("if (row.site_id) setSelectedAuditId(row.site_id, row.id);")) {
     throw new Error("Audit history should only store selected scan state when a scan row has a site ID.");
   }
   for (const pattern of [
@@ -546,6 +553,13 @@ try {
   }
   if (!siteScan.related?.some((row: any) => row.key === "technical-audit") || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
     throw new Error("Site scan did not return related report statuses.");
+  }
+  const legacyAuditStart = await requestFailure("/api/audits", {
+    method: "POST",
+    body: JSON.stringify({ projectId: project.id, url: "https://example.com" }),
+  });
+  if (!/Use siteId/i.test(String(legacyAuditStart.data?.error || ""))) {
+    throw new Error(`Audit start should reject projectId body input: ${JSON.stringify(legacyAuditStart)}`);
   }
   const localProject = await request("/api/sites", {
     method: "POST",
@@ -726,8 +740,15 @@ try {
   });
   const organicOverview = await request("/api/domain/overview", {
     method: "POST",
+    body: JSON.stringify({ siteId: project.id, domain: "example.com" }),
+  });
+  const legacyOrganicTarget = await requestFailure("/api/domain/overview", {
+    method: "POST",
     body: JSON.stringify({ siteId: project.id, target: "example.com" }),
   });
+  if (!/Use domain/i.test(String(legacyOrganicTarget.data?.error || ""))) {
+    throw new Error(`Organic research should reject target body input: ${JSON.stringify(legacyOrganicTarget)}`);
+  }
   if (
     organicOverview.source === "provider-not-configured" &&
     (organicOverview.organicKeywords !== null ||
@@ -746,7 +767,7 @@ try {
   });
   const backlinkOverview = await request("/api/backlinks/overview", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, target: "example.com" }),
+    body: JSON.stringify({ siteId: project.id, domain: "example.com" }),
   });
   if (
     backlinkOverview.source === "provider-not-configured" &&
@@ -830,7 +851,7 @@ try {
   }
   await request("/api/backlinks/profile", {
     method: "POST",
-    body: JSON.stringify({ siteId: project.id, target: "example.com", tab: "domains", pageSize: 10 }),
+    body: JSON.stringify({ siteId: project.id, domain: "example.com", tab: "domains", pageSize: 10 }),
   });
   const tracker = await request("/api/rank-trackers", {
     method: "POST",
@@ -988,8 +1009,11 @@ try {
       throw new Error("Global scan ledger should show every saved scan across sites until the user deletes it.");
     }
   }
-  if (!allSavedAudits.some((row: any) => row.id === otherHistoryAudit.id && row.project_name === "Other History Site")) {
+  if (!allSavedAudits.some((row: any) => row.id === otherHistoryAudit.id && row.site_name === "Other History Site")) {
     throw new Error("Global scan ledger should include the saved site name for each scan.");
+  }
+  if (allSavedAudits.some((row: any) => "project_id" in row || "project_name" in row || "project_domain" in row)) {
+    throw new Error(`Public scan ledger should expose site fields, not project fields: ${JSON.stringify(allSavedAudits[0])}`);
   }
   const scanHistoryDb = new Database(serverDbPath);
   try {
@@ -1136,6 +1160,20 @@ try {
   });
   if (!legacyMcp.error || !/Unknown tool/i.test(String(legacyMcp.error.message || ""))) {
     throw new Error(`MCP legacy list_projects alias should be unavailable: ${JSON.stringify(legacyMcp)}`);
+  }
+  const legacyMcpProjectId = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({ jsonrpc: "2.0", id: 198, method: "tools/call", params: { name: "get_site_summary", arguments: { projectId: project.id } } }),
+  });
+  if (!legacyMcpProjectId.error || !/Use siteId/i.test(String(legacyMcpProjectId.error.message || ""))) {
+    throw new Error(`MCP should reject projectId input: ${JSON.stringify(legacyMcpProjectId)}`);
+  }
+  const legacyMcpTarget = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({ jsonrpc: "2.0", id: 197, method: "tools/call", params: { name: "get_domain_overview", arguments: { siteId: project.id, target: "example.com" } } }),
+  });
+  if (!legacyMcpTarget.error || !/Use domain/i.test(String(legacyMcpTarget.error.message || ""))) {
+    throw new Error(`MCP should reject target input: ${JSON.stringify(legacyMcpTarget)}`);
   }
   const legacyDescriptionTool = (mcp.result?.tools || []).find((tool: any) =>
     /^Legacy alias:/i.test(tool.description || "") || /workspace|target domain|project|selected-site/i.test(tool.description || ""),

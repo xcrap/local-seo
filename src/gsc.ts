@@ -216,14 +216,13 @@ export function setGscSite(siteId: string, siteUrl: string) {
 
 export async function queryGscPerformance(input: {
   siteId?: string;
-  projectId?: string;
   siteUrl?: string;
   startDate: string;
   endDate: string;
   dimensions?: string[];
   rowLimit?: number;
 }) {
-  const siteId = String(input.siteId || input.projectId || "");
+  const siteId = String(input.siteId || "");
   if (!siteId) throw new Error("Site id is required.");
   const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
     siteId,
@@ -413,14 +412,13 @@ export function listGscImports(siteId: string) {
 
 export function importGscPerformance(input: {
   siteId?: string;
-  projectId?: string;
   siteUrl?: string;
   sourceName?: string;
   dimensions?: string[] | string;
   csv?: string;
   rows?: Record<string, unknown>[];
 }) {
-  const siteId = String(input.siteId || input.projectId || "");
+  const siteId = String(input.siteId || "");
   if (!siteId) throw new Error("Site id is required.");
   const project = getProject(siteId);
   if (!project) throw new Error("Site not found.");
@@ -462,7 +460,6 @@ export function importGscPerformance(input: {
 }
 
 export async function getGscPerformance(input: {
-  projectId?: string;
   siteId?: string;
   siteUrl?: string;
   startDate?: string;
@@ -470,7 +467,7 @@ export async function getGscPerformance(input: {
   dimensions?: string[];
   rowLimit?: number;
 }) {
-  const siteId = String(input.siteId || input.projectId || "");
+  const siteId = String(input.siteId || "");
   if (!siteId) throw new Error("Site id is required.");
   const status = gscStatus(siteId);
   if (status.connected && (input.siteUrl || status.connection?.siteUrl)) {
@@ -519,11 +516,10 @@ export function disconnectGsc(siteId: string) {
 
 export async function inspectGscUrls(input: {
   siteId?: string;
-  projectId?: string;
   urls: string[] | string;
   siteUrl?: string;
 }) {
-  const siteId = String(input.siteId || input.projectId || "");
+  const siteId = String(input.siteId || "");
   if (!siteId) throw new Error("Site id is required.");
   const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
     siteId,

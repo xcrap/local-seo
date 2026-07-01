@@ -425,11 +425,11 @@ export async function handleMcp(c: Context) {
 }
 
 async function callTool(name: string, args: any) {
-  if (args?.siteId && !args.projectId) {
-    args = { ...args, projectId: args.siteId };
-  }
+  if ("projectId" in (args || {})) throw new Error("Use siteId.");
+  if ("target" in (args || {})) throw new Error("Use domain.");
+  args = args?.siteId ? { ...args, projectId: args.siteId } : args;
   const withDomainAsTarget = (input: any) => {
-    const domain = input?.domain || input?.domainOrUrl || input?.url || input?.target;
+    const domain = input?.domain || input?.domainOrUrl || input?.url;
     return domain ? { ...input, domain, target: domain } : input;
   };
   switch (name) {
@@ -440,7 +440,7 @@ async function callTool(name: string, args: any) {
     case "create_site":
       return createProject(args);
     case "get_site_summary":
-      return projectSummary(args.siteId || args.projectId);
+      return projectSummary(args.siteId);
     case "research_keywords":
       return researchKeywords(args);
     case "analyze_serp":
@@ -472,7 +472,7 @@ async function callTool(name: string, args: any) {
     case "start_audit":
       return startAudit(args.projectId, args.url);
     case "scan_site": {
-      const siteId = args.siteId || args.projectId;
+      const siteId = args.siteId;
       const site = getProject(siteId);
       if (!site) throw new Error("Site not found.");
       const candidateUrls = args.url ? [String(args.url)] : site.domain ? siteScanCandidates(site) : [];
@@ -496,7 +496,7 @@ async function callTool(name: string, args: any) {
     case "get_gsc_performance":
       return getGscPerformance(args);
     case "inspect_urls":
-      return inspectGscUrls({ ...args, siteId: args.siteId || args.projectId });
+      return inspectGscUrls(args);
     case "brand_lookup":
       return brandLookup(args);
     case "prompt_explorer":

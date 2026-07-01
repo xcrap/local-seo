@@ -1443,10 +1443,22 @@ export function listBacklinkSnapshots(projectId: string) {
   ).map((row) => ({ ...row, result: jsonParse(row.result_json, {}) }));
 }
 
+function publicAuditRow(row: any) {
+  if (!row) return null;
+  const { project_id, project_name, project_domain, result_json, ...rest } = row;
+  return {
+    ...rest,
+    site_id: project_id,
+    ...(project_name ? { site_name: project_name } : {}),
+    ...(project_domain ? { site_domain: project_domain } : {}),
+    result: jsonParse(result_json, null),
+  };
+}
+
 export function listAudits(projectId: string) {
   return all<any>("SELECT * FROM audits WHERE project_id = ? ORDER BY created_at DESC", [
     projectId,
-  ]).map((row) => ({ ...row, result: jsonParse(row.result_json, null) }));
+  ]).map(publicAuditRow);
 }
 
 export function listAllAudits() {
@@ -1458,12 +1470,12 @@ export function listAllAudits() {
     FROM audits
     LEFT JOIN projects ON projects.id = audits.project_id
     ORDER BY audits.created_at DESC
-  `).map((row) => ({ ...row, result: jsonParse(row.result_json, null) }));
+  `).map(publicAuditRow);
 }
 
 export function getAudit(auditId: string) {
   const row = get<any>("SELECT * FROM audits WHERE id = ?", [auditId]);
-  return row ? { ...row, result: jsonParse(row.result_json, null) } : null;
+  return publicAuditRow(row);
 }
 
 export function deleteAudit(projectId: string, auditId: string) {

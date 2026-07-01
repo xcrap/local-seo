@@ -164,8 +164,6 @@ function defaultCrawlHostFromConfig(config?: any): Site["crawl_host"] {
 }
 
 const activeSiteStorageKey = "local-seo:site";
-const legacySiteStorageKey = "local-seo:project";
-const legacySelectedAuditStorageKey = "local-seo:selected-audit";
 const selectedAuditStoragePrefix = "local-seo:selected-audit";
 
 function selectedAuditStorageKey(siteId: string) {
@@ -173,17 +171,15 @@ function selectedAuditStorageKey(siteId: string) {
 }
 
 function getSelectedAuditId(siteId: string) {
-  return localStorage.getItem(selectedAuditStorageKey(siteId)) || localStorage.getItem(legacySelectedAuditStorageKey) || "";
+  return localStorage.getItem(selectedAuditStorageKey(siteId)) || "";
 }
 
 function setSelectedAuditId(siteId: string, auditId: string) {
   localStorage.setItem(selectedAuditStorageKey(siteId), auditId);
-  localStorage.removeItem(legacySelectedAuditStorageKey);
 }
 
 function clearSelectedAuditId(siteId?: string) {
   if (siteId) localStorage.removeItem(selectedAuditStorageKey(siteId));
-  localStorage.removeItem(legacySelectedAuditStorageKey);
 }
 
 function marketLabel(code: number) {
@@ -285,11 +281,11 @@ function hostFromUrl(value?: string) {
 }
 
 function auditSiteName(row: any) {
-  return row.project_name || row.project_domain || hostFromUrl(row.url) || "Unlinked saved site";
+  return row.site_name || row.site_domain || hostFromUrl(row.url) || "Unlinked saved site";
 }
 
 function auditSiteDetail(row: any) {
-  if (row.project_domain) return row.project_domain;
+  if (row.site_domain) return row.site_domain;
   const host = hostFromUrl(row.url);
   return host ? `Scan URL host: ${host}` : "Saved site record unavailable";
 }
@@ -1158,7 +1154,7 @@ function AppWorkspace() {
 function AppShell() {
   const [sites, setSites] = useState<Site[]>([]);
   const [activeSiteId, setActiveSiteId] = useState(
-    localStorage.getItem(activeSiteStorageKey) || localStorage.getItem(legacySiteStorageKey) || "",
+    localStorage.getItem(activeSiteStorageKey) || "",
   );
   const [sitesLoading, setSitesLoading] = useState(true);
   const [sitesError, setSitesError] = useState("");
@@ -1179,14 +1175,12 @@ function AppShell() {
       if (rows.length === 0) {
         setActiveSiteId("");
         localStorage.removeItem(activeSiteStorageKey);
-        localStorage.removeItem(legacySiteStorageKey);
         return;
       }
       if (rows.length > 0 && !rows.some((site) => site.id === activeSiteId)) {
         const nextActive = rows[0];
         setActiveSiteId(nextActive.id);
         localStorage.setItem(activeSiteStorageKey, nextActive.id);
-        localStorage.removeItem(legacySiteStorageKey);
       }
     } catch (err) {
       setSitesError(err instanceof Error ? err.message : "Could not load local sites");
@@ -1203,7 +1197,6 @@ function AppShell() {
   function selectSite(id: string) {
     setActiveSiteId(id);
     localStorage.setItem(activeSiteStorageKey, id);
-    localStorage.removeItem(legacySiteStorageKey);
     setShellScanError("");
   }
 
@@ -1432,7 +1425,7 @@ function Overview({
   }
 
   function openAuditReport(auditId: string, row?: any) {
-    setSelectedAuditId(row?.project_id || site.id, auditId);
+    setSelectedAuditId(row?.site_id || site.id, auditId);
     navigate(`/audits/${auditId}`);
   }
 
@@ -2846,7 +2839,7 @@ function DomainPage({ site }: { site: Site }) {
     event?.preventDefault();
     setLoading(true);
     setError("");
-    const body = { siteId: site.id, domain: target, target, pageSize: 50 };
+    const body = { siteId: site.id, domain: target, pageSize: 50 };
     try {
       const [overviewData, keywordData, pageData] = await Promise.all([
         api.domainOverview(body),
@@ -3243,7 +3236,7 @@ function BacklinksPage({ site }: { site: Site }) {
     }
     setLoading(true);
     setError("");
-    const body = { siteId: site.id, target, tab: nextTab, pageSize: 50 };
+    const body = { siteId: site.id, domain: target, tab: nextTab, pageSize: 50 };
     try {
       const [overviewData, profileData] = await Promise.all([
         api.backlinksOverview(body),
@@ -3981,7 +3974,7 @@ function AuditReportRoute() {
             }
             return;
           }
-          setSelectedAuditId(row.project_id, row.id);
+          setSelectedAuditId(row.site_id, row.id);
           if (row.status !== "queued" && row.status !== "running" && interval) {
             window.clearInterval(interval);
             interval = undefined;
@@ -4049,7 +4042,7 @@ function AuditsPage({ site }: { site: Site }) {
     setAudits(rows);
     setAllAudits(ledger);
     const currentDetail = detail?.id ? ledger.find((row) => row.id === detail.id) : null;
-    const currentDetailBelongsToSite = currentDetail?.project_id === site.id;
+    const currentDetailBelongsToSite = currentDetail?.site_id === site.id;
     const manualAudit = manualLedgerAuditId && manualLedgerSiteId === site.id
       ? ledger.find((row) => row.id === manualLedgerAuditId)
       : null;
@@ -4057,7 +4050,7 @@ function AuditsPage({ site }: { site: Site }) {
     const selectedAudit = selectedAuditId ? rows.find((row) => row.id === selectedAuditId) : null;
     const nextDetail = manualAudit || (currentDetailBelongsToSite ? currentDetail : null) || selectedAudit || rows[0] || null;
     setDetail(nextDetail);
-    if (nextDetail?.id) setSelectedAuditId(nextDetail.project_id || site.id, nextDetail.id);
+    if (nextDetail?.id) setSelectedAuditId(nextDetail.site_id || site.id, nextDetail.id);
     else clearSelectedAuditId(site.id);
     if (manualLedgerAuditId && !manualAudit) {
       setManualLedgerAuditId("");
@@ -4145,11 +4138,11 @@ function AuditsPage({ site }: { site: Site }) {
   async function inspect(id: string, row?: any) {
     setManualLedgerAuditId(id);
     setManualLedgerSiteId(site.id);
-    setSelectedAuditId(row?.project_id || site.id, id);
+    setSelectedAuditId(row?.site_id || site.id, id);
     setDetail(await api.audit(id));
   }
   async function remove(id: string, row?: any) {
-    const siteId = row?.project_id || site.id;
+    const siteId = row?.site_id || site.id;
     await api.deleteAudit(siteId, id);
     if (getSelectedAuditId(siteId) === id) {
       clearSelectedAuditId(siteId);
@@ -4411,7 +4404,7 @@ function AuditTable({
                         to={`/audits/${row.id}`}
                         onClick={(event) => {
                           event.stopPropagation();
-                          if (row.project_id) setSelectedAuditId(row.project_id, row.id);
+                          if (row.site_id) setSelectedAuditId(row.site_id, row.id);
                         }}
                       >
                         <FileSearch /> Open report

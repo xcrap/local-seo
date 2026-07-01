@@ -99,7 +99,8 @@ async function readJson(c: any) {
 }
 
 function siteScopedBody(body: Record<string, any>) {
-  if (body.siteId && !body.projectId) return { ...body, projectId: body.siteId };
+  if ("projectId" in body) throw new Error("Use siteId.");
+  if (body.siteId) return { ...body, projectId: body.siteId };
   return body;
 }
 
@@ -107,12 +108,25 @@ async function readSiteScopedJson(c: any) {
   return siteScopedBody(await readJson(c));
 }
 
+function domainScopedBody(body: Record<string, any>) {
+  if ("target" in body) throw new Error("Use domain.");
+  const scoped = siteScopedBody(body);
+  const domain = body.domain || body.domainOrUrl || body.url;
+  return domain ? { ...scoped, domain, target: domain } : scoped;
+}
+
+async function readDomainScopedJson(c: any) {
+  return domainScopedBody(await readJson(c));
+}
+
 function siteQueryId(c: any) {
-  return c.req.query("siteId") || c.req.query("projectId");
+  if (c.req.query("projectId")) throw new Error("Use siteId.");
+  return c.req.query("siteId");
 }
 
 function siteBodyId(body: Record<string, any>) {
-  return String(body.siteId || body.projectId || "");
+  if ("projectId" in body) throw new Error("Use siteId.");
+  return String(body.siteId || "");
 }
 
 function baseUrl(c: any) {
@@ -418,26 +432,26 @@ app.post(
   safe(async (c) => c.json(await runRankCheck(c.req.param("id")))),
 );
 
-app.post("/api/domain/overview", safe(async (c) => c.json(await domainOverview((await readSiteScopedJson(c)) as any))));
+app.post("/api/domain/overview", safe(async (c) => c.json(await domainOverview((await readDomainScopedJson(c)) as any))));
 app.get(
   "/api/sites/:id/domain-snapshots",
   safe((c) => c.json(listDomainSnapshots(c.req.param("id")))),
 );
 app.post(
   "/api/domain/keyword-suggestions",
-  safe(async (c) => c.json(await getDomainKeywordSuggestions((await readSiteScopedJson(c)) as any))),
+  safe(async (c) => c.json(await getDomainKeywordSuggestions((await readDomainScopedJson(c)) as any))),
 );
 app.post(
   "/api/domain/keywords",
-  safe(async (c) => c.json(await getDomainKeywordsPage((await readSiteScopedJson(c)) as any))),
+  safe(async (c) => c.json(await getDomainKeywordsPage((await readDomainScopedJson(c)) as any))),
 );
 app.post(
   "/api/domain/pages",
-  safe(async (c) => c.json(await getDomainPagesPage((await readSiteScopedJson(c)) as any))),
+  safe(async (c) => c.json(await getDomainPagesPage((await readDomainScopedJson(c)) as any))),
 );
 app.post(
   "/api/backlinks/overview",
-  safe(async (c) => c.json(await backlinksOverview((await readSiteScopedJson(c)) as any))),
+  safe(async (c) => c.json(await backlinksOverview((await readDomainScopedJson(c)) as any))),
 );
 app.get(
   "/api/sites/:id/backlink-snapshots",
@@ -445,7 +459,7 @@ app.get(
 );
 app.post(
   "/api/backlinks/profile",
-  safe(async (c) => c.json(await getBacklinksProfile((await readSiteScopedJson(c)) as any))),
+  safe(async (c) => c.json(await getBacklinksProfile((await readDomainScopedJson(c)) as any))),
 );
 app.get(
   "/api/sites/:id/brand-lookup",
@@ -475,7 +489,7 @@ app.delete(
 app.post(
   "/api/audits",
   safe(async (c) => {
-    const body = await readSiteScopedJson(c);
+    const body = await readJson(c);
     return c.json(startAudit(siteBodyId(body), String(body.url)));
   }),
 );
@@ -501,7 +515,7 @@ app.get("/api/gsc/imports/:siteId", safe((c) => c.json(listGscImports(c.req.para
 app.post(
   "/api/gsc/start",
   safe(async (c) => {
-    const body = await readSiteScopedJson(c);
+    const body = await readJson(c);
     return c.json({ url: createGscAuthUrl(siteBodyId(body), baseUrl(c)) });
   }),
 );
@@ -521,7 +535,7 @@ app.get("/api/gsc/sites/:siteId", safe(async (c) => c.json(await listGscSites(c.
 app.post(
   "/api/gsc/site",
   safe(async (c) => {
-    const body = await readSiteScopedJson(c);
+    const body = await readJson(c);
     return c.json(setGscSite(siteBodyId(body), String(body.siteUrl)));
   }),
 );
@@ -540,7 +554,7 @@ app.post(
 app.post(
   "/api/gsc/disconnect",
   safe(async (c) => {
-    const body = await readSiteScopedJson(c);
+    const body = await readJson(c);
     return c.json(disconnectGsc(siteBodyId(body)));
   }),
 );
