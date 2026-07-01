@@ -379,7 +379,8 @@ try {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(webUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Site control/i }).waitFor();
-    await page.getByRole("button", { name: /^Scan website$/ }).waitFor();
+    await page.getByRole("banner").getByRole("button", { name: /^Scan website$/ }).waitFor();
+    await page.getByRole("main").getByRole("button", { name: /^Scan website$/ }).waitFor();
     await page.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
     await page
       .locator("section", { hasText: "Scan history" })

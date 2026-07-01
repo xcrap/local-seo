@@ -1336,10 +1336,10 @@ function AppShell() {
             <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={selectSite} />
             {activeSite?.domain ? (
               <Button size="sm" onClick={scanActiveSite} disabled={shellScanning}>
-                <FileSearch /> {shellScanning ? "Starting" : "Scan"}
+                <FileSearch /> {shellScanning ? "Starting scan" : "Scan website"}
               </Button>
             ) : (
-              <Button asChild size="sm"><Link to="/sites"><Plus /> Add</Link></Button>
+              <Button asChild size="sm"><Link to="/sites"><Plus /> Add site</Link></Button>
             )}
           </div>
           <div className="mt-2">

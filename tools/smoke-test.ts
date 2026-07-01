@@ -524,6 +524,9 @@ try {
       throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
     }
   }
+  if (webAppClient.includes('shellScanning ? "Starting" : "Scan"') || webAppClient.includes('><Plus /> Add</Link>')) {
+    throw new Error("Mobile app shell should use explicit Scan website and Add site actions.");
+  }
   if (!webAppClient.includes("<Trash2 /> Delete scan")) {
     throw new Error("Scan history deletion should be a visible Delete scan button, not an icon-only control.");
   }
