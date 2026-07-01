@@ -11,51 +11,6 @@ process.env.SEO_METRICS_API_KEY = "";
 process.env.CODEX_MODEL = "";
 process.env.CODEX_REASONING_EFFORT = "";
 
-const legacyAuditDbPath = path.join(tempDir, "legacy-audits.sqlite");
-const legacyAuditDb = new Database(legacyAuditDbPath);
-legacyAuditDb.exec(`
-  CREATE TABLE audits (
-    id TEXT PRIMARY KEY,
-    site_id TEXT NOT NULL,
-    url TEXT NOT NULL,
-    status TEXT NOT NULL,
-    score INTEGER NOT NULL DEFAULT 0,
-    pages_crawled INTEGER NOT NULL DEFAULT 0,
-    issue_count INTEGER NOT NULL DEFAULT 0,
-    result_json TEXT,
-    error TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-  INSERT INTO audits (id, site_id, url, status, score, pages_crawled, issue_count, result_json)
-  VALUES ('legacy-scan-row', 'legacy-site', 'https://example.com', 'completed', 91, 1, 0, '{}');
-`);
-legacyAuditDb.close();
-const legacyMigration = Bun.spawnSync([process.execPath, "-e", "await import('./src/db.ts')"], {
-  cwd: rootDir,
-  env: { ...process.env, DB_PATH: legacyAuditDbPath },
-  stdout: "pipe",
-  stderr: "pipe",
-});
-if (legacyMigration.exitCode !== 0) {
-  throw new Error(`Legacy scan table migration failed: ${legacyMigration.stderr.toString()}`);
-}
-const migratedDb = new Database(legacyAuditDbPath, { readonly: true });
-try {
-  const migratedTables = new Set(
-    migratedDb.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name),
-  );
-  if (migratedTables.has("audits") || !migratedTables.has("scans")) {
-    throw new Error(`Legacy audits table should be renamed to scans: ${JSON.stringify([...migratedTables].sort())}`);
-  }
-  const migratedRow = migratedDb.query<{ count: number }, []>("SELECT count(*) AS count FROM scans WHERE id = 'legacy-scan-row'").get();
-  if (migratedRow?.count !== 1) {
-    throw new Error("Legacy scan row was not preserved while renaming audits to scans.");
-  }
-} finally {
-  migratedDb.close();
-}
-
 const { sameSiteUrl } = await import("../src/seo");
 const { codexModel, codexReasoningEffort } = await import("../src/config");
 if (codexModel() !== "") {
@@ -327,6 +282,8 @@ try {
     "idx_sites_active",
     "archived_at",
     "local-fallback",
+    "ALTER TABLE audits",
+    "CREATE TABLE audits",
   ]) {
     if (dbSource.includes(removedSchemaBridge)) {
       throw new Error(`Fresh app database startup should not keep compatibility code: ${removedSchemaBridge}`);
@@ -367,6 +324,12 @@ try {
   }
   if (/domainOrUrl|body\.domain\s*\|\|\s*body\.url/.test(apiServerSource)) {
     throw new Error("Domain APIs should require domain explicitly instead of keeping old domainOrUrl/url aliases.");
+  }
+  if (apiServerSource.includes("/api/audits") || apiServerSource.includes("/audits")) {
+    throw new Error("Backend routes should expose scans only, with no old audit endpoint aliases.");
+  }
+  if (mcpSource.includes('case "start_audit"') || mcpSource.includes('case "get_audit"')) {
+    throw new Error("MCP runtime should not keep hidden audit-named tool aliases.");
   }
   const seoSource = await readFile(path.join(rootDir, "src/seo.ts"), "utf8");
   if (!seoSource.includes("activeSite:") || !/^\s*sites:/m.test(seoSource)) {
@@ -738,14 +701,17 @@ try {
     throw new Error(`Config should expose the local SQLite source of truth and counts: ${JSON.stringify(localConfigStatus)}`);
   }
   const siteScan = await request(`/api/sites/${site.id}/scan`, { method: "POST" });
-  if (!siteScan.audit?.id) throw new Error("Site scan did not return an audit.");
+  if (!siteScan.scan?.id) throw new Error("Site scan did not return a scan.");
+  if ("audit" in siteScan) {
+    throw new Error("Site scan response should not expose legacy audit fields.");
+  }
   if (!Array.isArray(siteScan.candidateUrls) || !siteScan.candidateUrls.includes("https://example.com")) {
     throw new Error(`Site scan should return its scan-plan candidate URLs: ${JSON.stringify(siteScan)}`);
   }
-  if (!siteScan.related?.some((row: any) => row.key === "technical-audit" && row.label === "Technical scan" && row.route === `/scans/${siteScan.audit.id}`) || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
+  if (!siteScan.related?.some((row: any) => row.key === "technical-scan" && row.label === "Technical scan" && row.route === `/scans/${siteScan.scan.id}`) || !siteScan.related?.some((row: any) => row.key === "links" && row.label === "Links")) {
     throw new Error("Site scan did not return related report statuses.");
   }
-  if (!siteScan.related?.some((row: any) => row.key === "page-speed" && row.route === `/scans/${siteScan.audit.id}?tab=speed`)) {
+  if (!siteScan.related?.some((row: any) => row.key === "page-speed" && row.route === `/scans/${siteScan.scan.id}?tab=speed`)) {
     throw new Error(`Site scan should return a direct speed-report follow-up: ${JSON.stringify(siteScan.related)}`);
   }
   if (!siteScan.related?.some((row: any) => row.key === "links" && row.route === "/links")) {
@@ -756,7 +722,10 @@ try {
     body: JSON.stringify({ name: "Local fixture", domain: `localhost:${fixtureServer.port}`, crawlProtocol: "http", crawlHost: "root" }),
   });
   const localSiteScan = await request(`/api/sites/${localSite.id}/scan`, { method: "POST" });
-  if (!localSiteScan.audit?.id) throw new Error("Local saved-site scan did not return an audit.");
+  if (!localSiteScan.scan?.id) throw new Error("Local saved-site scan did not return a scan.");
+  if ("audit" in localSiteScan) {
+    throw new Error("Local saved-site scan response should not expose legacy audit fields.");
+  }
   if (!String(localSiteScan.scanUrl || "").startsWith(fixtureUrl)) {
     throw new Error(`Local saved-site scan did not resolve to the reachable HTTP fixture: ${localSiteScan.scanUrl}`);
   }
@@ -773,9 +742,12 @@ try {
     }),
   });
   const mcpScan = localMcpScan.result?.structuredContent || {};
-  const mcpAuditUrl = mcpScan.audit?.url || mcpScan.scanUrl || "";
-  if (!mcpScan.audit?.id || !String(mcpAuditUrl).startsWith(fixtureUrl)) {
-    throw new Error(`MCP site scan did not resolve through site preferences: ${mcpAuditUrl}`);
+  if ("audit" in mcpScan) {
+    throw new Error("MCP scan_site response should not expose legacy audit fields.");
+  }
+  const mcpScanUrl = mcpScan.scan?.url || mcpScan.scanUrl || "";
+  if (!mcpScan.scan?.id || !String(mcpScanUrl).startsWith(fixtureUrl)) {
+    throw new Error(`MCP site scan did not resolve through site preferences: ${mcpScanUrl}`);
   }
   if (!Array.isArray(mcpScan.candidateUrls) || mcpScan.candidateUrls[0] !== fixtureUrl) {
     throw new Error(`MCP site scan should return the saved site's scan plan: ${JSON.stringify(mcpScan.candidateUrls)}`);
@@ -784,7 +756,7 @@ try {
   if (missingSite.data?.error !== "Site not found.") {
     throw new Error(`Unexpected missing site error: ${JSON.stringify(missingSite.data)}`);
   }
-  const scanAudit = await waitForAudit(siteScan.audit.id);
+  const scanAudit = await waitForAudit(siteScan.scan.id);
   if (!scanAudit.result || scanAudit.pages_crawled == null || scanAudit.issue_count == null) {
     throw new Error("Site scan audit report was not readable.");
   }
@@ -797,7 +769,7 @@ try {
   ) {
     throw new Error("Site scan audit report is missing detailed SEO evidence.");
   }
-  const fixtureAudit = await waitForAudit(localSiteScan.audit.id);
+  const fixtureAudit = await waitForAudit(localSiteScan.scan.id);
   const fixturePages = Array.isArray(fixtureAudit.result?.pages) ? fixtureAudit.result.pages : [];
   const fixtureSummary = fixtureAudit.result?.summary || {};
   const indexableRows = fixturePages.filter((page: any) => page.indexable === true).length;
@@ -827,7 +799,7 @@ try {
     body: JSON.stringify({ siteId: localSite.id, domain: `localhost:${fixtureServer.port}`, pageSize: 10 }),
   });
   if (
-    localOrganicPages.source !== "local-audit" ||
+    localOrganicPages.source !== "local-scan" ||
     localOrganicPages.pages?.length !== fixturePages.length ||
     localOrganicPages.pages.some((row: any) => row.organicTraffic !== null || row.keywords !== null)
   ) {
@@ -886,7 +858,7 @@ try {
   if (!fixtureAudit.result?.summary?.cssImageResources || !fixtureAudit.result?.summary?.pictureSourceImages) {
     throw new Error("Fixture audit did not check CSS image URLs and picture source URLs.");
   }
-  const mcpFixtureAuditId = localMcpScan.result?.structuredContent?.audit?.id;
+  const mcpFixtureAuditId = localMcpScan.result?.structuredContent?.scan?.id;
   if (mcpFixtureAuditId) {
     await waitForAudit(mcpFixtureAuditId);
   }
@@ -903,7 +875,7 @@ try {
     throw new Error("Clear history did not remove all fixture scans from local SQLite.");
   }
   const siteAudits = await request(`/api/sites/${site.id}/scans`);
-  if (!siteAudits.some((row: any) => row.id === siteScan.audit.id)) {
+  if (!siteAudits.some((row: any) => row.id === siteScan.scan.id)) {
     throw new Error("Site scans endpoint did not return the scan.");
   }
   const keywordResearch = await request("/api/keywords/research", {
@@ -1261,7 +1233,7 @@ try {
   const siteAuditsAfterSecondScan = await request(`/api/sites/${site.id}/scans`);
   if (
     siteAuditsAfterSecondScan.length < 2 ||
-    !siteAuditsAfterSecondScan.some((row: any) => row.id === siteScan.audit.id) ||
+    !siteAuditsAfterSecondScan.some((row: any) => row.id === siteScan.scan.id) ||
     !siteAuditsAfterSecondScan.some((row: any) => row.id === audit.id)
   ) {
     throw new Error("Site scans endpoint should keep every scan for the site until the user deletes it.");
@@ -1276,7 +1248,7 @@ try {
   });
   const allSavedAudits = await request("/api/scans");
   const allSavedAuditIds = new Set((allSavedAudits || []).map((row: any) => row.id));
-  for (const id of [siteScan.audit.id, audit.id, otherHistoryAudit.id]) {
+  for (const id of [siteScan.scan.id, audit.id, otherHistoryAudit.id]) {
     if (!allSavedAuditIds.has(id)) {
       throw new Error("Global scan ledger should show every saved scan across sites until the user deletes it.");
     }
@@ -1298,13 +1270,16 @@ try {
       insertAudit.run(id, site.id, `https://example.com/history-${index}`, timestamp, timestamp);
     }
     const dashboardWithFullHistory = await request(`/api/dashboard?siteId=${site.id}`);
-    const dashboardAuditIds = new Set((dashboardWithFullHistory.latestAudits || []).map((row: any) => row.id));
-    for (const id of [siteScan.audit.id, audit.id, ...insertedAuditIds]) {
+    if ("latestAudits" in dashboardWithFullHistory || "allAudits" in dashboardWithFullHistory || "auditCount" in dashboardWithFullHistory) {
+      throw new Error("Dashboard should expose scan-named fields, not legacy audit fields.");
+    }
+    const dashboardAuditIds = new Set((dashboardWithFullHistory.latestScans || []).map((row: any) => row.id));
+    for (const id of [siteScan.scan.id, audit.id, ...insertedAuditIds]) {
       if (!dashboardAuditIds.has(id)) {
         throw new Error("Dashboard scan history should include every saved scan until the user deletes it.");
       }
     }
-    const dashboardLedgerIds = new Set((dashboardWithFullHistory.allAudits || []).map((row: any) => row.id));
+    const dashboardLedgerIds = new Set((dashboardWithFullHistory.allScans || []).map((row: any) => row.id));
     if (!dashboardLedgerIds.has(otherHistoryAudit.id)) {
       throw new Error("Dashboard should expose the full local scan ledger, including scans for other saved sites.");
     }

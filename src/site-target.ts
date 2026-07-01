@@ -25,7 +25,7 @@ async function probeScanUrl(url: string) {
         redirect: "follow",
         signal: controller.signal,
         headers: {
-          "user-agent": "LocalSEO/0.1 (+local audit)",
+          "user-agent": "LocalSEO/0.1 (+local scan)",
           accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           ...(method === "GET" ? { range: "bytes=0-2048" } : {}),
         },

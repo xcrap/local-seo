@@ -263,7 +263,7 @@ async function startSavedSiteScan(c: any) {
   if (!site.domain) return c.json({ error: "Set a site domain first." }, 400);
   const candidateUrls = siteScanCandidates(site);
   const url = await resolveSavedSiteScanUrl(site);
-  const audit = startAudit(site.id, url);
+  const scan = startAudit(site.id, url);
   const config = listPublicConfig();
   queueMicrotask(() => {
     Promise.allSettled([
@@ -273,20 +273,20 @@ async function startSavedSiteScan(c: any) {
   });
   return c.json({
     site: site.domain,
-    audit,
+    scan,
     related: [
       {
-        key: "technical-audit",
+        key: "technical-scan",
         label: "Technical scan",
         status: "running",
-        route: `/scans/${audit.id}`,
+        route: `/scans/${scan.id}`,
         message: `Local crawler is checking ${url} for pages, metadata, links, images, assets, robots, and sitemap.`,
       },
       {
         key: "page-speed",
         label: "Page speed",
         status: "running",
-        route: `/scans/${audit.id}?tab=speed`,
+        route: `/scans/${scan.id}?tab=speed`,
         message: "Crawler response timings, HTML weight, compression, and CSS/JS evidence are saved in this scan.",
       },
       {
@@ -505,16 +505,6 @@ app.get("/api/scans/:id", getScanHandler);
 app.delete("/api/sites/:id/scans", clearSiteScansHandler);
 app.delete("/api/sites/:siteId/scans/:id", deleteSiteScanHandler);
 app.post("/api/scans", startScanHandler);
-
-app.get("/api/sites/:id/audits", listSiteScansHandler);
-app.get("/api/audits", listAllScansHandler);
-app.get("/api/audits/:id", getScanHandler);
-app.delete("/api/sites/:id/audits", clearSiteScansHandler);
-app.delete(
-  "/api/sites/:siteId/audits/:id",
-  deleteSiteScanHandler,
-);
-app.post("/api/audits", startScanHandler);
 
 app.get("/api/ai/prompts", safe((c) => c.json(listAiPrompts())));
 app.put(

@@ -23,18 +23,6 @@ export const db = new Database(DB_PATH);
 db.exec("PRAGMA journal_mode = WAL");
 db.exec("PRAGMA foreign_keys = ON");
 
-function tableExists(name: string) {
-  return Boolean(
-    db.query<{ name: string }, [string]>(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-    ).get(name),
-  );
-}
-
-if (tableExists("audits") && !tableExists("scans")) {
-  db.exec("ALTER TABLE audits RENAME TO scans");
-}
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS admin_users (
     id TEXT PRIMARY KEY,

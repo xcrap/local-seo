@@ -465,7 +465,6 @@ async function callTool(name: string, args: any) {
       return args.trackerId ? trackers.find((tracker) => tracker.id === args.trackerId) || null : trackers;
     }
     case "start_scan":
-    case "start_audit":
       return startAudit(args.siteId, args.url);
     case "scan_site": {
       const siteId = args.siteId;
@@ -474,10 +473,10 @@ async function callTool(name: string, args: any) {
       const candidateUrls = args.url ? [String(args.url)] : site.domain ? siteScanCandidates(site) : [];
       const url = args.url || (site.domain ? await resolveSavedSiteScanUrl(site) : "");
       if (!url) throw new Error("Set a site domain or pass a URL.");
-      const audit = startAudit(site.id, url);
+      const scan = startAudit(site.id, url);
       return {
         site: site.domain,
-        audit,
+        scan,
         scanUrl: url,
         candidateUrls,
         scanPreferences: {
@@ -488,8 +487,7 @@ async function callTool(name: string, args: any) {
       };
     }
     case "get_scan":
-    case "get_audit":
-      return getAudit(args.scanId || args.auditId);
+      return getAudit(args.scanId);
     case "get_gsc_performance":
       return getGscPerformance(args);
     case "inspect_urls":

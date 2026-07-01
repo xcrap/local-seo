@@ -17,7 +17,7 @@
     "admin:create": "bun run tools/create-admin.ts",
     "admin:password": "bun run tools/set-password.ts",
     "test:smoke": "bun run tools/smoke-test.ts",
-    "test:waka": "bun run tools/waka-audit-test.ts",
+    "test:waka": "bun run tools/waka-scan-test.ts",
     "test:ui": "bun run tools/ui-smoke-test.ts"
   },
   "dependencies": {

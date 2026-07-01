@@ -15,7 +15,7 @@ try {
   expect(seo.sameSiteUrl("https://www.waka.pt/about/", "https://waka.pt"), "Root and www Waka URLs must share crawl scope.");
 
   const site = seo.createSite({
-    name: "Waka live audit",
+    name: "Waka live scan",
     domain: "waka.pt",
     locationCode: 2620,
     languageCode: "pt",
@@ -28,19 +28,19 @@ try {
     `Expected saved-site scan resolver to prefer Waka's live www HTTPS URL, got ${resolvedScanUrl}.`,
   );
   const started = seo.startAudit(site.id, resolvedScanUrl);
-  expect(started?.id, "Could not start Waka audit.");
+  expect(started?.id, "Could not start Waka scan.");
 
   const startedAt = Date.now();
-  let audit = started;
+  let scan = started;
   while (Date.now() - startedAt < 120_000) {
-    audit = seo.getAudit(started.id);
-    if (audit?.status === "completed" || audit?.status === "failed") break;
+    scan = seo.getAudit(started.id);
+    if (scan?.status === "completed" || scan?.status === "failed") break;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
-  expect(audit?.status === "completed", `Waka audit did not complete: ${audit?.status || "missing"} ${audit?.error || ""}`);
+  expect(scan?.status === "completed", `Waka scan did not complete: ${scan?.status || "missing"} ${scan?.error || ""}`);
 
-  const result = audit.result || {};
+  const result = scan.result || {};
   const summary = result.summary || {};
   const sitemapUrls = result.sitemap?.urls || [];
   const pages = result.pages || [];
@@ -65,10 +65,10 @@ try {
   expect(Number(summary.p95PageLoadMs) >= Number(summary.medianPageLoadMs), "Expected Waka p95 response timing to be at least the median.");
 
   console.log(JSON.stringify({
-    status: audit.status,
-    score: audit.score,
-    pagesCrawled: audit.pages_crawled,
-    issues: audit.issue_count,
+    status: scan.status,
+    score: scan.score,
+    pagesCrawled: scan.pages_crawled,
+    issues: scan.issue_count,
     sitemapUrls: sitemapUrls.length,
     sitemapListedPages: summary.sitemapUrls,
     linkTags: summary.linkTags,
@@ -84,7 +84,7 @@ try {
     startedUrl: result.startUrl,
     finalHomeUrl: pages[0]?.finalUrl,
   }, null, 2));
-  console.log("Waka live audit test passed.");
+  console.log("Waka live scan test passed.");
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

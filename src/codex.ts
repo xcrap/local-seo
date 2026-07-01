@@ -39,7 +39,7 @@ export const promptTemplates = [
       "Cluster these keywords by search intent and suggest one target page for each cluster. Return JSON with clusters.\n\n{{context}}",
   },
   {
-    key: "audit.prioritize",
+    key: "scan.prioritize",
     label: "Scan prioritization",
     template:
       "Prioritize these technical SEO scan issues by likely impact, effort, and dependency order. Return concise markdown.\n\n{{context}}",

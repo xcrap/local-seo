@@ -1145,9 +1145,9 @@ function mapDomainRankedKeyword(item: any, target: string) {
   };
 }
 
-function localAuditPagesForDomain(siteId: string, domain: string, page: number, pageSize: number, search: string) {
+function localScanPagesForDomain(siteId: string, domain: string, page: number, pageSize: number, search: string) {
   const scope = `https://${domain}`;
-  const audits = all<any>(
+  const scans = all<any>(
     `
     SELECT * FROM scans
     WHERE site_id = ? AND status = 'completed' AND result_json IS NOT NULL
@@ -1157,8 +1157,8 @@ function localAuditPagesForDomain(siteId: string, domain: string, page: number, 
     [siteId],
   );
 
-  for (const audit of audits) {
-    const result = jsonParse<any>(audit.result_json, null);
+  for (const scan of scans) {
+    const result = jsonParse<any>(scan.result_json, null);
     const pages = Array.isArray(result?.pages) ? result.pages : [];
     const rows = pages
       .filter((row: any) => sameSiteUrl(String(row.finalUrl || row.url || ""), scope))
@@ -1171,9 +1171,9 @@ function localAuditPagesForDomain(siteId: string, domain: string, page: number, 
           keywords: null,
           title: String(row.title || ""),
           issues: Array.isArray(row.issues) ? row.issues.length : 0,
-          source: "local-audit",
-          auditId: audit.id,
-          auditedAt: audit.updated_at || audit.created_at,
+          source: "local-scan",
+          scanId: scan.id,
+          scannedAt: scan.updated_at || scan.created_at,
         };
       });
     if (!rows.length) continue;
@@ -1192,7 +1192,7 @@ function localAuditPagesForDomain(siteId: string, domain: string, page: number, 
       hasMore: offset + pageSize < filtered.length,
       pages: filtered.slice(offset, offset + pageSize),
       fetchedAt: nowIso(),
-      warning: "Showing real pages from the latest local audit. Traffic and keyword counts stay unavailable without a connected organic dataset.",
+      warning: "Showing real pages from the latest local scan. Traffic and keyword counts stay unavailable without a connected organic dataset.",
     };
   }
 
@@ -1371,9 +1371,9 @@ export async function getDomainPagesPage(input: {
 
   const search = String(input.search || "").trim().toLowerCase();
   if (source === "provider-not-configured" && sameSiteUrl(`https://${target}`, `https://${site.domain}`)) {
-    const localPages = localAuditPagesForDomain(site.id, target, page, pageSize, search);
+    const localPages = localScanPagesForDomain(site.id, target, page, pageSize, search);
     if (localPages) {
-      return { source: "local-audit", ...localPages };
+      return { source: "local-scan", ...localPages };
     }
   }
   if (search) {
@@ -4162,14 +4162,14 @@ export function dashboardSummary(siteId?: string) {
       sites: [],
       savedKeywordCount: 0,
       trackerCount: 0,
-      auditCount: 0,
+      scanCount: 0,
       serpRunCount: 0,
       brandLookupCount: 0,
       promptExplorerCount: 0,
       gscImportCount: 0,
       latestGscImport: null,
-      latestAudits: [],
-      allAudits: [],
+      latestScans: [],
+      allScans: [],
       latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC"),
     };
   }
@@ -4188,7 +4188,7 @@ export function dashboardSummary(siteId?: string) {
       get<{ count: number }>("SELECT count(*) AS count FROM rank_trackers WHERE site_id = ?", [
         site.id,
       ])?.count || 0,
-    auditCount:
+    scanCount:
       get<{ count: number }>("SELECT count(*) AS count FROM scans WHERE site_id = ?", [
         site.id,
       ])?.count || 0,
@@ -4220,8 +4220,8 @@ export function dashboardSummary(siteId?: string) {
           createdAt: latestGscImport.created_at,
         }
       : null,
-    latestAudits: listAudits(site.id),
-    allAudits: listAllAudits(),
+    latestScans: listAudits(site.id),
+    allScans: listAllAudits(),
     latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC"),
   };
 }
@@ -4233,7 +4233,7 @@ export function siteSummary(siteId: string) {
     site: site,
     savedKeywords: listSavedKeywords(siteId),
     rankTrackers: listRankTrackers(siteId),
-    audits: listAudits(siteId),
+    scans: listAudits(siteId),
     domainSnapshots: listDomainSnapshots(siteId),
     backlinkSnapshots: listBacklinkSnapshots(siteId),
     serpRuns: listSerpRuns(siteId),

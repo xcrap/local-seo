@@ -480,9 +480,11 @@ try {
       await page.getByRole("heading", { name: /^Page speed tracking$/ }).waitFor();
     }
     await page.goto(`${webUrl}/audits`, { waitUntil: "networkidle" });
-    if (new URL(page.url()).pathname !== "/scans") {
-      throw new Error(`Legacy /audits should redirect to /scans, got ${page.url()}.`);
+    if (new URL(page.url()).pathname !== "/audits") {
+      throw new Error(`Old /audits route should not redirect, got ${page.url()}.`);
     }
+    await page.getByRole("heading", { name: /^Page not found$/ }).waitFor();
+    await page.goto(`${webUrl}/scans`, { waitUntil: "networkidle" });
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
     await page.getByRole("heading", { name: /^Delete scans for this site\?$/ }).waitFor();
     await page.getByRole("button", { name: /^Delete scans for this site$/ }).click();
