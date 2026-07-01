@@ -112,7 +112,7 @@ function domainScopedBody(body: Record<string, any>) {
   if ("target" in body) throw new Error("Use domain.");
   const scoped = siteScopedBody(body);
   const domain = body.domain || body.domainOrUrl || body.url;
-  return domain ? { ...scoped, domain, target: domain } : scoped;
+  return domain ? { ...scoped, domain } : scoped;
 }
 
 async function readDomainScopedJson(c: any) {

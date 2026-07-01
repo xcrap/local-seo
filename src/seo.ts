@@ -1552,6 +1552,7 @@ function emptySerpResult(keyword: string, target: string) {
 export async function getSerpAnalysis(input: {
   projectId: string;
   keyword: string;
+  domain?: string;
   target?: string;
   depth?: number;
 }) {
@@ -1559,7 +1560,7 @@ export async function getSerpAnalysis(input: {
   if (!project) throw new Error("Site not found.");
   const keyword = input.keyword.trim();
   if (!keyword) throw new Error("Keyword is required.");
-  const target = normalizeDomain(input.target || project.domain);
+  const target = normalizeDomain(input.domain || input.target || project.domain);
   const depth = Math.max(10, Math.min(100, input.depth || 20));
   let source = "duckduckgo";
   let result: any = emptySerpResult(keyword, target);

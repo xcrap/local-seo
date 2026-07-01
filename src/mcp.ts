@@ -430,9 +430,9 @@ async function callTool(name: string, args: any) {
   if ("projectId" in (args || {})) throw new Error("Use siteId.");
   if ("target" in (args || {})) throw new Error("Use domain.");
   args = args?.siteId ? { ...args, projectId: args.siteId } : args;
-  const withDomainAsTarget = (input: any) => {
+  const withDomainInput = (input: any) => {
     const domain = input?.domain || input?.domainOrUrl || input?.url;
-    return domain ? { ...input, domain, target: domain } : input;
+    return domain ? { ...input, domain } : input;
   };
   switch (name) {
     case "whoami":
@@ -446,7 +446,7 @@ async function callTool(name: string, args: any) {
     case "research_keywords":
       return researchKeywords(args);
     case "analyze_serp":
-      return getSerpAnalysis(withDomainAsTarget(args));
+      return getSerpAnalysis(withDomainInput(args));
     case "list_saved_keywords":
       return listSavedKeywords(args.projectId);
     case "query_saved_keywords":
@@ -456,17 +456,17 @@ async function callTool(name: string, args: any) {
     case "update_saved_keyword_tags":
       return updateSavedKeywordTags(args);
     case "get_domain_overview":
-      return domainOverview(withDomainAsTarget(args));
+      return domainOverview(withDomainInput(args));
     case "get_domain_keyword_suggestions":
       return getDomainKeywordSuggestions(args);
     case "get_domain_keywords_page":
-      return getDomainKeywordsPage(withDomainAsTarget(args));
+      return getDomainKeywordsPage(withDomainInput(args));
     case "get_domain_pages_page":
-      return getDomainPagesPage(withDomainAsTarget(args));
+      return getDomainPagesPage(withDomainInput(args));
     case "get_backlinks_overview":
-      return backlinksOverview(withDomainAsTarget(args));
+      return backlinksOverview(withDomainInput(args));
     case "get_backlinks_profile":
-      return getBacklinksProfile(withDomainAsTarget(args));
+      return getBacklinksProfile(withDomainInput(args));
     case "get_rank_tracker": {
       const trackers = listRankTrackers(args.projectId);
       return args.trackerId ? trackers.find((tracker) => tracker.id === args.trackerId) || null : trackers;
