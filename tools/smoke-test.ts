@@ -356,6 +356,13 @@ try {
   if (webAppClient.includes("rounded-md border bg-background p-3 text-sm") || !webAppClient.includes("HistoryTable")) {
     throw new Error("Local history widgets should render as readable tables instead of mini card stacks.");
   }
+  if (
+    webAppClient.includes("grid divide-y md:grid-cols-2") ||
+    webAppClient.includes("flex min-h-24 items-center justify-between") ||
+    webAppClient.includes('columns="lg:grid-cols')
+  ) {
+    throw new Error("Metric summaries should render as readable evidence tables instead of mini card grids.");
+  }
   for (const pattern of [
     "row.searchVolume || \"-\"",
     "formatNumber(row.search_volume)",

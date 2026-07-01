@@ -497,12 +497,10 @@ function StatsBand({
   title,
   text,
   items,
-  columns = "lg:grid-cols-3 2xl:grid-cols-4",
 }: {
   title?: string;
   text?: string;
   items: StatItem[];
-  columns?: string;
 }) {
   return (
     <section className="rounded-md border bg-background">
@@ -512,23 +510,36 @@ function StatsBand({
           {text ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p> : null}
         </div>
       ) : null}
-      <div className={cn("grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0", columns)}>
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <div key={item.title} className="flex min-h-24 items-center justify-between gap-5 p-5">
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-muted-foreground">{item.title}</div>
-                <div className="nums mt-2 text-3xl font-semibold leading-none">{formatNumber(item.value)}</div>
-                {item.detail ? <div className="mt-2 text-sm text-muted-foreground">{item.detail}</div> : null}
-              </div>
-              {Icon ? (
-                <Icon className="size-5 shrink-0 text-muted-foreground" />
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Metric</TableHead>
+            <TableHead>Value</TableHead>
+            <TableHead>Evidence</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <TableRow key={item.title}>
+                <TableCell className="min-w-56">
+                  <div className="flex items-center gap-2 font-medium">
+                    {Icon ? <Icon className="size-4 text-muted-foreground" /> : null}
+                    {item.title}
+                  </div>
+                </TableCell>
+                <TableCell className="min-w-40">
+                  <span className="nums text-2xl font-semibold">{formatNumber(item.value)}</span>
+                </TableCell>
+                <TableCell className="min-w-80 text-sm leading-6 text-muted-foreground">
+                  {item.detail || "Measured from the saved run."}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </section>
   );
 }
@@ -2819,7 +2830,6 @@ function DomainPage({ project }: { project: Project }) {
                 { title: "Traffic value", value: metricValue(overview.estimatedValue), icon: Gauge },
                 { title: "Top pages", value: metricValue(pages?.pages?.length, overview.topPages?.length), icon: Globe2 },
               ]}
-              columns="lg:grid-cols-4"
             />
           ) : null}
           <Tabs value={tab} onValueChange={setTab}>
@@ -3240,7 +3250,6 @@ function BacklinksPage({ project }: { project: Project }) {
                 { title: "Ref. domains", value: metricValue(overview.referringDomains, overview.summary?.referringDomains), icon: Globe2 },
                 { title: "Dofollow %", value: metricValue(overview.dofollowRatio), icon: CheckCircle2 },
               ]}
-              columns="lg:grid-cols-3"
             />
           ) : null}
           <Tabs value={tab} onValueChange={changeTab}>
@@ -3612,7 +3621,6 @@ function BrandLookupResult({ result }: { result: any }) {
             value: `${platform.visibility}%`,
             detail: `${platform.mentions} mentions`,
           }))}
-          columns="lg:grid-cols-3"
         />
       ) : null}
       <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_460px]">
@@ -6141,7 +6149,6 @@ function GscPerformanceSummary({ rows }: { rows: any[] }) {
         { title: "CTR %", value: Number((ctr * 100).toFixed(1)), icon: Gauge },
         { title: "Avg. position", value: Number(position.toFixed(1)), icon: Target },
       ]}
-      columns="lg:grid-cols-4"
     />
   );
 }
