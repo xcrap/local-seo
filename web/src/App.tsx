@@ -6449,19 +6449,24 @@ function McpToolTable({ rows }: { rows: any[] }) {
       <TableHeader>
         <TableRow>
           <TableHead>Tool</TableHead>
-          <TableHead>Required inputs</TableHead>
+          <TableHead>Inputs</TableHead>
           <TableHead>Description</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((tool) => {
-          const required = Array.isArray(tool.inputSchema?.required) ? tool.inputSchema.required : [];
+          const required = new Set(Array.isArray(tool.inputSchema?.required) ? tool.inputSchema.required : []);
+          const properties = Object.keys(tool.inputSchema?.properties || {});
           return (
             <TableRow key={tool.name}>
               <TableCell className="min-w-52 font-medium">{tool.name}</TableCell>
-              <TableCell className="min-w-44">
+              <TableCell className="min-w-64">
                 <div className="flex flex-wrap gap-1">
-                  {required.length ? required.map((name: string) => <Badge key={name} variant="outline">{name}</Badge>) : <Badge variant="outline">none</Badge>}
+                  {properties.length ? properties.map((name: string) => (
+                    <Badge key={name} variant={required.has(name) ? "good" : "outline"}>
+                      {name}{required.has(name) ? " required" : ""}
+                    </Badge>
+                  )) : <Badge variant="outline">none</Badge>}
                 </div>
               </TableCell>
               <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{tool.description}</TableCell>

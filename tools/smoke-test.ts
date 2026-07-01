@@ -353,6 +353,9 @@ try {
   if (!webAppClient.includes("<TableHead>URL</TableHead>") || !webAppClient.includes("<TableHead>Window</TableHead>")) {
     throw new Error("Audit link tables should label URL columns and HTML target-window attributes clearly.");
   }
+  if (!webAppClient.includes("<TableHead>Inputs</TableHead>") || !webAppClient.includes('required.has(name) ? " required" : ""')) {
+    throw new Error("MCP tools table should show all inputs and mark required ones inline.");
+  }
   if (!webAppClient.includes("Issue results") || !webAppClient.includes("Show {formatNumber")) {
     throw new Error("Audit issue actions should show an explicit filtered issue result count instead of generic Review buttons.");
   }

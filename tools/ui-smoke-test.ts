@@ -327,7 +327,7 @@ try {
 
     await page.getByRole("navigation").getByRole("link", { name: /^MCP$/ }).click();
     await page.getByRole("heading", { name: /^MCP$/ }).waitFor();
-    await page.getByRole("columnheader", { name: /Required inputs/i }).first().waitFor();
+    await page.getByRole("columnheader", { name: /^Inputs$/i }).first().waitFor();
     await page.getByRole("cell", { name: "scan_site" }).waitFor();
     if (await page.getByText(/\bprojectId\b/).count()) {
       throw new Error("MCP page exposes legacy projectId wording.");
@@ -341,6 +341,7 @@ try {
     if (await page.getByText(/\btarget\b/i).count()) {
       throw new Error("MCP page exposes target wording instead of domain/site/url inputs.");
     }
+    await page.getByRole("row", { name: /analyze_serp.*domain/i }).waitFor();
     await page.getByRole("row", { name: /get_domain_overview.*domain/i }).waitFor();
     await page.getByRole("row", { name: /get_backlinks_profile.*domain/i }).waitFor();
 
