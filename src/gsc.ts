@@ -420,8 +420,8 @@ export function importGscPerformance(input: {
 }) {
   const siteId = String(input.siteId || "");
   if (!siteId) throw new Error("Site id is required.");
-  const project = getSite(siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
   const rawRows = input.csv ? parseGscCsv(input.csv) : input.rows || [];
   if (!rawRows.length) {
     throw new Error("Import file has no Search Console rows.");
@@ -435,7 +435,7 @@ export function importGscPerformance(input: {
   }
   const id = randomUUID();
   const sourceName = String(input.sourceName || "Search Console CSV").trim().slice(0, 180);
-  const siteUrl = String(input.siteUrl || project.domain || "").trim();
+  const siteUrl = String(input.siteUrl || site.domain || "").trim();
   const totals = computeGscTotals(rows);
   run(
     `
@@ -445,7 +445,7 @@ export function importGscPerformance(input: {
     `,
     [
       id,
-      project.id,
+      site.id,
       siteUrl,
       sourceName,
       JSON.stringify(dimensions),

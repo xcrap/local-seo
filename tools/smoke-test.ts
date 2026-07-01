@@ -314,6 +314,9 @@ try {
     throw new Error("Domain APIs should require domain explicitly instead of keeping old domainOrUrl/url aliases.");
   }
   const seoSource = await readFile(path.join(rootDir, "src/seo.ts"), "utf8");
+  if (/\bconst\s+project\s*=\s*getSite\b/.test(seoSource) || /\bconst\s+project\s*=\s*getSite\b/.test(gscSource)) {
+    throw new Error("Site service code should use site naming internally, not project variables around getSite.");
+  }
   for (const legacySeoName of ["type Project", "createProject", "getProject", "listProjects", "updateProject", "deleteProject", "projectSummary"]) {
     if (seoSource.includes(legacySeoName)) {
       throw new Error(`SEO service should use site-named exports, not ${legacySeoName}.`);

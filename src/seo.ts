@@ -454,12 +454,12 @@ export async function researchKeywords(input: {
   languageCode?: string;
   limit?: number;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const query = input.query.trim();
   if (!query) throw new Error("Keyword query is required.");
-  const locationCode = input.locationCode || project.location_code;
-  const languageCode = input.languageCode || project.language_code;
+  const locationCode = input.locationCode || site.location_code;
+  const languageCode = input.languageCode || site.language_code;
   const limit = Math.max(5, Math.min(100, input.limit || 25));
   let source = "duckduckgo-suggest";
   let rows: KeywordRow[] = [];
@@ -497,9 +497,9 @@ export async function researchKeywords(input: {
       (id, site_id, query, location_code, language_code, source, result_json)
     VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
-    [id, project.id, query, locationCode, languageCode, source, JSON.stringify(rows)],
+    [id, site.id, query, locationCode, languageCode, source, JSON.stringify(rows)],
   );
-  return { id, siteId: project.id, query, source, rows, warning, createdAt: nowIso() };
+  return { id, siteId: site.id, query, source, rows, warning, createdAt: nowIso() };
 }
 
 export function saveKeywords(input: {
@@ -509,10 +509,10 @@ export function saveKeywords(input: {
   tagMode?: "append" | "replace";
   source?: string;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const tagNames = parseList(input.tags).map(normalizeTagName).filter(Boolean);
-  for (const tag of tagNames) ensureSavedKeywordTag(project.id, tag);
+  for (const tag of tagNames) ensureSavedKeywordTag(site.id, tag);
   const saved = [];
   for (const row of input.keywords) {
     const keywordRow: KeywordRow =
@@ -529,7 +529,7 @@ export function saveKeywords(input: {
     const id = randomUUID();
     const existing = get<any>(
       "SELECT * FROM saved_keywords WHERE site_id = ? AND keyword = ? AND location_code = ? AND language_code = ?",
-      [project.id, keywordRow.keyword, project.location_code, project.language_code],
+      [site.id, keywordRow.keyword, site.location_code, site.language_code],
     );
     const existingTags = jsonParse<string[]>(existing?.tags, []);
     const nextTags =
@@ -551,10 +551,10 @@ export function saveKeywords(input: {
       `,
       [
         id,
-        project.id,
+        site.id,
         keywordRow.keyword,
-        project.location_code,
-        project.language_code,
+        site.location_code,
+        site.language_code,
         keywordRow.searchVolume,
         keywordRow.difficulty,
         keywordRow.cpc,
@@ -623,13 +623,13 @@ export function querySavedKeywords(input: {
   sort?: string;
   order?: string;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const search = String(input.search || "").trim().toLowerCase();
   const includeTerms = parseList(input.includeTerms).map((item) => item.toLowerCase());
   const excludeTerms = parseList(input.excludeTerms).map((item) => item.toLowerCase());
   const tagNames = parseList(input.tagNames).map(normalizeTagName);
-  let rows = listSavedKeywords(project.id);
+  let rows = listSavedKeywords(site.id);
 
   rows = rows.filter((row) => {
     const keyword = String(row.keyword || "").toLowerCase();
@@ -680,7 +680,7 @@ export function querySavedKeywords(input: {
     total,
     page,
     pageSize,
-    tags: listSavedKeywordTags(project.id),
+    tags: listSavedKeywordTags(site.id),
   };
 }
 
@@ -691,18 +691,18 @@ export function updateSavedKeywordTags(input: {
   removeTagNames?: string[] | string;
   removeTagIds?: string[];
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const addTags = parseList(input.addTags).map(normalizeTagName).filter(Boolean);
   const removeTagNames = new Set(parseList(input.removeTagNames).map(normalizeTagName));
   for (const tagId of input.removeTagIds || []) {
-    const tag = get<any>("SELECT * FROM saved_keyword_tags WHERE id = ? AND site_id = ?", [tagId, project.id]);
+    const tag = get<any>("SELECT * FROM saved_keyword_tags WHERE id = ? AND site_id = ?", [tagId, site.id]);
     if (tag) removeTagNames.add(tag.name);
   }
-  for (const tag of addTags) ensureSavedKeywordTag(project.id, tag);
+  for (const tag of addTags) ensureSavedKeywordTag(site.id, tag);
   let updated = 0;
   for (const id of input.savedKeywordIds || []) {
-    const row = get<any>("SELECT * FROM saved_keywords WHERE id = ? AND site_id = ?", [id, project.id]);
+    const row = get<any>("SELECT * FROM saved_keywords WHERE id = ? AND site_id = ?", [id, site.id]);
     if (!row) continue;
     const current = new Set(jsonParse<string[]>(row.tags, []));
     for (const tag of addTags) current.add(tag);
@@ -710,7 +710,7 @@ export function updateSavedKeywordTags(input: {
     run("UPDATE saved_keywords SET tags = ? WHERE id = ?", [JSON.stringify(Array.from(current)), id]);
     updated += 1;
   }
-  return { updated, tags: listSavedKeywordTags(project.id) };
+  return { updated, tags: listSavedKeywordTags(site.id) };
 }
 
 export function updateSavedKeywordTag(input: {
@@ -719,11 +719,11 @@ export function updateSavedKeywordTag(input: {
   name?: string;
   color?: string | null;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const tag = get<any>("SELECT * FROM saved_keyword_tags WHERE id = ? AND site_id = ?", [
     input.tagId,
-    project.id,
+    site.id,
   ]);
   if (!tag) throw new Error("Tag not found.");
   const nextName = input.name ? normalizeTagName(input.name) : tag.name;
@@ -733,7 +733,7 @@ export function updateSavedKeywordTag(input: {
     [nextName, nextColor, input.tagId],
   );
   if (nextName !== tag.name) {
-    for (const keyword of listSavedKeywords(project.id)) {
+    for (const keyword of listSavedKeywords(site.id)) {
       if (!keyword.tags.includes(tag.name)) continue;
       const tags = keyword.tags.map((item: string) => (item === tag.name ? nextName : item));
       run("UPDATE saved_keywords SET tags = ? WHERE id = ?", [JSON.stringify(Array.from(new Set(tags))), keyword.id]);
@@ -743,28 +743,28 @@ export function updateSavedKeywordTag(input: {
 }
 
 export function deleteSavedKeywordTag(input: { siteId: string; tagId: string }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const tag = get<any>("SELECT * FROM saved_keyword_tags WHERE id = ? AND site_id = ?", [
     input.tagId,
-    project.id,
+    site.id,
   ]);
   if (!tag) throw new Error("Tag not found.");
-  for (const keyword of listSavedKeywords(project.id)) {
+  for (const keyword of listSavedKeywords(site.id)) {
     if (!keyword.tags.includes(tag.name)) continue;
     const tags = keyword.tags.filter((item: string) => item !== tag.name);
     run("UPDATE saved_keywords SET tags = ? WHERE id = ?", [JSON.stringify(tags), keyword.id]);
   }
-  run("DELETE FROM saved_keyword_tags WHERE id = ? AND site_id = ?", [input.tagId, project.id]);
+  run("DELETE FROM saved_keyword_tags WHERE id = ? AND site_id = ?", [input.tagId, site.id]);
   return { deleted: true };
 }
 
 export function removeSavedKeywords(siteId: string, savedKeywordIds: string[]) {
-  const project = getSite(siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
   let removed = 0;
   for (const id of savedKeywordIds || []) {
-    const info = run("DELETE FROM saved_keywords WHERE id = ? AND site_id = ?", [id, project.id]);
+    const info = run("DELETE FROM saved_keywords WHERE id = ? AND site_id = ?", [id, site.id]);
     removed += Number(info.changes || 0);
   }
   return { removed };
@@ -811,8 +811,8 @@ export function createRankTracker(input: {
   device?: string;
   depth?: number;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const id = randomUUID();
   run(
     `
@@ -822,16 +822,16 @@ export function createRankTracker(input: {
     `,
     [
       id,
-      project.id,
-      normalizeDomain(input.domain || project.domain),
-      input.locationCode || project.location_code,
-      input.languageCode || project.language_code,
+      site.id,
+      normalizeDomain(input.domain || site.domain),
+      input.locationCode || site.location_code,
+      input.languageCode || site.language_code,
       input.device || "desktop",
       input.depth || 50,
     ],
   );
   addRankKeywords(id, input.keywords);
-  return listRankTrackers(project.id).find((tracker) => tracker.id === id);
+  return listRankTrackers(site.id).find((tracker) => tracker.id === id);
 }
 
 export function addRankKeywords(trackerId: string, keywords: string[]) {
@@ -1068,9 +1068,9 @@ export async function runRankCheck(trackerId: string) {
 }
 
 export async function domainOverview(input: { siteId: string; domain?: string }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
-  const domain = normalizeDomain(input.domain || project.domain);
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
+  const domain = normalizeDomain(input.domain || site.domain);
   if (!domain) throw new Error("Domain is required.");
   if (!dataForSeoReady()) {
     return emptyProviderResult("Organic research", {
@@ -1086,7 +1086,7 @@ export async function domainOverview(input: { siteId: string; domain?: string })
   let result: any;
   try {
     const data = await dataForSeo("/v3/dataforseo_labs/google/domain_rank_overview/live", [
-      { target: domain, location_code: project.location_code, language_code: project.language_code },
+      { target: domain, location_code: site.location_code, language_code: site.language_code },
     ]);
     const raw = data.tasks?.[0]?.result?.[0] || {};
     const metrics = raw.metrics?.organic || raw.metrics || {};
@@ -1113,7 +1113,7 @@ export async function domainOverview(input: { siteId: string; domain?: string })
   }
   run(
     "INSERT INTO domain_snapshots (id, site_id, domain, source, result_json) VALUES (?, ?, ?, ?, ?)",
-    [randomUUID(), project.id, domain, "dataforseo", JSON.stringify(result)],
+    [randomUUID(), site.id, domain, "dataforseo", JSON.stringify(result)],
   );
   return { source: "dataforseo", ...result };
 }
@@ -1150,12 +1150,12 @@ export async function getDomainKeywordSuggestions(input: {
   domain?: string;
   limit?: number;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.domain || project.domain);
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
+  const target = normalizeDomain(input.domain || site.domain);
   const limit = Math.max(5, Math.min(100, input.limit || 25));
   const page = await getDomainKeywordsPage({
-    siteId: project.id,
+    siteId: site.id,
     domain: target,
     page: 1,
     pageSize: limit,
@@ -1175,9 +1175,9 @@ export async function getDomainKeywordsPage(input: {
   sortOrder?: string;
   search?: string;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.domain || project.domain);
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
+  const target = normalizeDomain(input.domain || site.domain);
   if (!target) throw new Error("Domain is required.");
   const page = Math.max(1, Number(input.page || 1));
   const pageSize = Math.max(10, Math.min(200, Number(input.pageSize || 50)));
@@ -1208,8 +1208,8 @@ export async function getDomainKeywordsPage(input: {
       const data = await dataForSeo("/v3/dataforseo_labs/google/ranked_keywords/live", [
         {
           target,
-          location_code: project.location_code,
-          language_code: project.language_code,
+          location_code: site.location_code,
+          language_code: site.language_code,
           limit: pageSize,
           offset: (page - 1) * pageSize,
           order_by: [`${orderField},${input.sortOrder === "asc" ? "asc" : "desc"}`],
@@ -1253,9 +1253,9 @@ export async function getDomainPagesPage(input: {
   sortOrder?: string;
   search?: string;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
-  const target = normalizeDomain(input.domain || project.domain);
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
+  const target = normalizeDomain(input.domain || site.domain);
   if (!target) throw new Error("Domain is required.");
   const page = Math.max(1, Number(input.page || 1));
   const pageSize = Math.max(10, Math.min(200, Number(input.pageSize || 50)));
@@ -1277,8 +1277,8 @@ export async function getDomainPagesPage(input: {
       const data = await dataForSeo("/v3/dataforseo_labs/google/relevant_pages/live", [
         {
           target,
-          location_code: project.location_code,
-          language_code: project.language_code,
+          location_code: site.location_code,
+          language_code: site.language_code,
           limit: pageSize,
           offset: (page - 1) * pageSize,
           order_by: [`${orderField},${input.sortOrder === "asc" ? "asc" : "desc"}`],
@@ -1330,9 +1330,9 @@ export function listDomainSnapshots(siteId: string) {
 }
 
 export async function backlinksOverview(input: { siteId: string; domain?: string }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
-  const domain = normalizeDomain(input.domain || project.domain);
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
+  const domain = normalizeDomain(input.domain || site.domain);
   if (!domain) throw new Error("Domain is required.");
   if (!dataForSeoReady()) {
     return emptyProviderResult("Backlink index data", {
@@ -1371,7 +1371,7 @@ export async function backlinksOverview(input: { siteId: string; domain?: string
   }
   run(
     "INSERT INTO backlink_snapshots (id, site_id, domain, source, result_json) VALUES (?, ?, ?, ?, ?)",
-    [randomUUID(), project.id, domain, "dataforseo", JSON.stringify(result)],
+    [randomUUID(), site.id, domain, "dataforseo", JSON.stringify(result)],
   );
   return { source: "dataforseo", ...result };
 }
@@ -1387,9 +1387,9 @@ export async function getBacklinksProfile(input: {
   sortOrder?: string;
   mode?: string;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
-  const domain = normalizeDomain(input.domain || project.domain);
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
+  const domain = normalizeDomain(input.domain || site.domain);
   if (!domain) throw new Error("Domain is required.");
   const tab = input.tab || "backlinks";
   const page = Math.max(1, Number(input.page || 1));
@@ -1529,26 +1529,26 @@ export function getAudit(auditId: string) {
 }
 
 export function deleteAudit(siteId: string, auditId: string) {
-  const project = getSite(siteId);
-  if (!project) throw new Error("Site not found.");
-  const info = run("DELETE FROM audits WHERE id = ? AND site_id = ?", [auditId, project.id]);
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
+  const info = run("DELETE FROM audits WHERE id = ? AND site_id = ?", [auditId, site.id]);
   return { deleted: Number(info.changes || 0) > 0 };
 }
 
 export function clearAudits(siteId: string) {
-  const project = getSite(siteId);
-  if (!project) throw new Error("Site not found.");
-  const info = run("DELETE FROM audits WHERE site_id = ?", [project.id]);
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
+  const info = run("DELETE FROM audits WHERE site_id = ?", [site.id]);
   return { deleted: Number(info.changes || 0) };
 }
 
 export function startAudit(siteId: string, url: string) {
-  const project = getSite(siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
   const auditId = randomUUID();
   run(
     "INSERT INTO audits (id, site_id, url, status, updated_at) VALUES (?, ?, ?, 'queued', CURRENT_TIMESTAMP)",
-    [auditId, project.id, url.trim()],
+    [auditId, site.id, url.trim()],
   );
   queueMicrotask(() => {
     runLocalAudit(auditId).catch((error) => {
@@ -1585,11 +1585,11 @@ export async function getSerpAnalysis(input: {
   domain?: string;
   depth?: number;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const keyword = input.keyword.trim();
   if (!keyword) throw new Error("Keyword is required.");
-  const domain = normalizeDomain(input.domain || project.domain);
+  const domain = normalizeDomain(input.domain || site.domain);
   const depth = Math.max(10, Math.min(100, input.depth || 20));
   let source = "duckduckgo";
   let result: any = emptySerpResult(keyword, domain);
@@ -1599,8 +1599,8 @@ export async function getSerpAnalysis(input: {
       const data = await dataForSeo("/v3/serp/google/organic/live/advanced", [
         {
           keyword,
-          location_code: project.location_code,
-          language_code: project.language_code,
+          location_code: site.location_code,
+          language_code: site.language_code,
           depth,
         },
       ]);
@@ -1658,11 +1658,11 @@ export async function getSerpAnalysis(input: {
     `,
     [
       id,
-      project.id,
+      site.id,
       keyword,
       domain,
-      project.location_code,
-      project.language_code,
+      site.location_code,
+      site.language_code,
       source,
       JSON.stringify(result),
     ],
@@ -1690,9 +1690,9 @@ export async function brandLookup(input: {
   query: string;
   competitors?: string[] | string;
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
-  const query = (input.query || project.domain || project.name).trim();
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
+  const query = (input.query || site.domain || site.name).trim();
   if (!query) throw new Error("Brand or domain is required.");
   const competitors = splitCompetitors(input.competitors);
   let source = "web-search";
@@ -1758,7 +1758,7 @@ export async function brandLookup(input: {
       (id, site_id, query, competitors, source, result_json)
     VALUES (?, ?, ?, ?, ?, ?)
     `,
-    [id, project.id, query, JSON.stringify(competitors), source, JSON.stringify(result)],
+    [id, site.id, query, JSON.stringify(competitors), source, JSON.stringify(result)],
   );
   return { id, source, ...publicBrandLookupResult(result) };
 }
@@ -1780,11 +1780,11 @@ export async function promptExplorer(input: {
   highlightBrand?: string;
   models?: string[];
 }) {
-  const project = getSite(input.siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(input.siteId);
+  if (!site) throw new Error("Site not found.");
   const prompt = input.prompt.trim();
   if (!prompt) throw new Error("Prompt is required.");
-  const highlightBrand = input.highlightBrand?.trim() || project.domain || project.name;
+  const highlightBrand = input.highlightBrand?.trim() || site.domain || site.name;
   const models = input.models?.length ? input.models : ["chat_gpt", "claude", "gemini", "perplexity"];
   let source = "codex";
   const result: any = {
@@ -1839,7 +1839,7 @@ export async function promptExplorer(input: {
         "Do not invent rankings, citations, traffic, or model mentions.",
         `Prompt: ${prompt}`,
         `Brand/domain to watch: ${highlightBrand}`,
-        `Site domain: ${project.domain || "not set"}`,
+        `Site domain: ${site.domain || "not set"}`,
       ].join("\n"),
     });
     result.jobId = job.id;
@@ -1866,7 +1866,7 @@ export async function promptExplorer(input: {
       (id, site_id, prompt, highlight_brand, models, source, result_json)
     VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
-    [id, project.id, prompt, highlightBrand, JSON.stringify(models), source, JSON.stringify(result)],
+    [id, site.id, prompt, highlightBrand, JSON.stringify(models), source, JSON.stringify(result)],
   );
   return { id, source, ...result };
 }
@@ -4092,8 +4092,8 @@ async function runLocalAudit(auditId: string) {
 
 export function dashboardSummary(siteId?: string) {
   const sites = listSites();
-  const project = siteId ? getSite(siteId) || sites[0] : sites[0];
-  if (!project) {
+  const site = siteId ? getSite(siteId) || sites[0] : sites[0];
+  if (!site) {
     return {
       activeSite: null,
       sites: [],
@@ -4112,40 +4112,40 @@ export function dashboardSummary(siteId?: string) {
   }
   const latestGscImport = get<any>(
     "SELECT * FROM gsc_imports WHERE site_id = ? ORDER BY created_at DESC LIMIT 1",
-    [project.id],
+    [site.id],
   );
   return {
-    activeSite: project,
+    activeSite: site,
     sites: sites,
     savedKeywordCount: get<{ count: number }>(
       "SELECT count(*) AS count FROM saved_keywords WHERE site_id = ?",
-      [project.id],
+      [site.id],
     )?.count || 0,
     trackerCount:
       get<{ count: number }>("SELECT count(*) AS count FROM rank_trackers WHERE site_id = ?", [
-        project.id,
+        site.id,
       ])?.count || 0,
     auditCount:
       get<{ count: number }>("SELECT count(*) AS count FROM audits WHERE site_id = ?", [
-        project.id,
+        site.id,
       ])?.count || 0,
     serpRunCount:
       get<{ count: number }>("SELECT count(*) AS count FROM serp_runs WHERE site_id = ?", [
-        project.id,
+        site.id,
       ])?.count || 0,
     brandLookupCount:
       get<{ count: number }>(
         "SELECT count(*) AS count FROM brand_lookup_runs WHERE site_id = ?",
-        [project.id],
+        [site.id],
       )?.count || 0,
     promptExplorerCount:
       get<{ count: number }>(
         "SELECT count(*) AS count FROM prompt_explorer_runs WHERE site_id = ?",
-        [project.id],
+        [site.id],
       )?.count || 0,
     gscImportCount:
       get<{ count: number }>("SELECT count(*) AS count FROM gsc_imports WHERE site_id = ?", [
-        project.id,
+        site.id,
       ])?.count || 0,
     latestGscImport: latestGscImport
       ? {
@@ -4157,17 +4157,17 @@ export function dashboardSummary(siteId?: string) {
           createdAt: latestGscImport.created_at,
         }
       : null,
-    latestAudits: listAudits(project.id),
+    latestAudits: listAudits(site.id),
     allAudits: listAllAudits(),
     latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC"),
   };
 }
 
 export function siteSummary(siteId: string) {
-  const project = getSite(siteId);
-  if (!project) throw new Error("Site not found.");
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
   return {
-    site: project,
+    site: site,
     savedKeywords: listSavedKeywords(siteId),
     rankTrackers: listRankTrackers(siteId),
     audits: listAudits(siteId),
