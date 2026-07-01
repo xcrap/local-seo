@@ -3043,9 +3043,9 @@ function OrganicSnapshot({ result, target, keywordRows, pageRows }: { result: an
     >
       <StatusEvidenceTable
         rows={[
-          { title: "Target", status: target || result.target || "-", tone: "good", text: "The selected site or competitor target analyzed in this run." },
+          { title: "Research site", status: target || result.target || "-", tone: "good", text: "The selected site or competitor domain analyzed in this run." },
           { title: "Keyword rows", status: formatNumber(keywordRows), tone: keywordRows ? "good" : "warn", text: "Rows returned by the real organic search dataset." },
-          { title: "Page rows", status: formatNumber(pageRows), tone: pageRows ? "good" : "warn", text: "Top pages returned for this target." },
+          { title: "Page rows", status: formatNumber(pageRows), tone: pageRows ? "good" : "warn", text: "Top pages returned for this domain." },
           { title: "Organic keywords", status: formatMetricStatus(organicKeywords), tone: hasMetric(organicKeywords) ? "good" : "warn", text: "Metric returned by the connected organic dataset." },
           { title: "Organic traffic", status: formatMetricStatus(organicTraffic), tone: hasMetric(organicTraffic) ? "good" : "warn", text: "Estimate from the connected organic dataset." },
           { title: "Traffic value", status: formatMetricStatus(estimatedValue), tone: hasMetric(estimatedValue) ? "good" : "warn", text: "Estimate from the connected organic dataset." },
@@ -3261,7 +3261,7 @@ function BacklinksPage({ project }: { project: Project }) {
             </TabsList>
             <TabsContent value="backlinks">
               <ReportSection title="External backlinks" description={profile ? <SourceBadge source={profile.source} /> : "Connect a real backlink index, then run a check."}>
-                {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title={backlinkIndexConnected ? "No backlink rows" : "No external backlink index connected"} text={profile?.warning || (backlinkIndexConnected ? "Check a target to load real backlink rows." : "Local audits do not invent web-wide backlinks. Use the local link graph above until a real backlink index is connected.")} />}
+                {profile?.tab === "backlinks" && profile.rows?.length ? <BacklinksRowsTable rows={profile.rows} /> : <EmptyState title={backlinkIndexConnected ? "No backlink rows" : "No external backlink index connected"} text={profile?.warning || (backlinkIndexConnected ? "Check a domain to load real backlink rows." : "Local audits do not invent web-wide backlinks. Use the local link graph above until a real backlink index is connected.")} />}
               </ReportSection>
             </TabsContent>
             <TabsContent value="domains">
@@ -3318,7 +3318,7 @@ function LocalLinkEvidence({
           <div>
             <h2 className="text-lg font-semibold">Local link graph</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Real internal links, external links, and failing targets from the selected saved audit.
+              Real internal links, external links, and failing URLs from the selected saved audit.
             </p>
           </div>
           <AuditRunPicker label="Saved scan for link evidence" audits={audits} selectedAuditId={selectedAuditId} onAuditChange={onAuditChange} />
@@ -3369,7 +3369,7 @@ function LocalLinkEvidence({
                 {externalLinks.length ? <LocalExternalLinksTable rows={externalLinks} checkedByUrl={checkedByUrl} /> : <EmptyState title="No external links" text="The selected scan did not find external links." />}
               </TabsContent>
               <TabsContent value="broken">
-                {brokenLinks.length ? <AuditLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="The selected scan did not find failing link targets." />}
+                {brokenLinks.length ? <AuditLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="The selected scan did not find failing link URLs." />}
               </TabsContent>
               <TabsContent value="internal">
                 {pageRows.length ? <LocalInternalGraphTable rows={pageRows} /> : <EmptyState title="No internal graph" text="The selected scan did not save page link rows." />}
@@ -3387,7 +3387,7 @@ function LocalExternalLinksTable({ rows, checkedByUrl }: { rows: any[]; checkedB
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Target</TableHead>
+          <TableHead>URL</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Anchor</TableHead>
           <TableHead>Rel</TableHead>
@@ -3467,7 +3467,7 @@ function BacklinkSnapshot({ result, target, rows, tab }: { result: any; target: 
     >
       <StatusEvidenceTable
         rows={[
-          { title: "Target", status: target || result.target || "-", tone: "good", text: "The domain or URL analyzed in this run." },
+          { title: "Backlink index site", status: target || result.target || "-", tone: "good", text: "The domain or URL checked in this run." },
           { title: "Visible rows", status: formatNumber(rows), tone: rows ? "good" : "warn", text: `Rows currently loaded in the ${tab} tab.` },
           { title: "Backlinks", status: formatMetricStatus(backlinks), tone: hasMetric(backlinks) ? "good" : "warn", text: "Total backlinks from the connected index." },
           { title: "Referring domains", status: formatMetricStatus(referringDomains), tone: hasMetric(referringDomains) ? "good" : "warn", text: "Unique linking domains from the connected index." },
@@ -3594,7 +3594,7 @@ function BrandLookupResult({ result }: { result: any }) {
       {result.warning ? <ProviderNotice title="Lookup warning" text={result.warning} source={result.source} /> : null}
       <ReportSection
         title="Share of voice"
-        description={<><SourceBadge source={result.source} /> {result.resolvedTarget ? <span className="ml-2">Target: {result.resolvedTarget}</span> : null}</>}
+        description={<><SourceBadge source={result.source} /> {result.resolvedTarget ? <span className="ml-2">Resolved entity: {result.resolvedTarget}</span> : null}</>}
       >
         <div className="space-y-3">
           {shareRows.length ? shareRows.map((row: any) => {
@@ -4621,7 +4621,7 @@ function AuditDetail({ audit }: { audit: any }) {
         <TabsContent value="links">
           <div className="space-y-4">
             {links.length ? (
-              <AuditSection title="Checked links" text="Every unique HTTP link target that the crawler verified. Broken and redirecting links are highlighted in the Status column.">
+              <AuditSection title="Checked links" text="Every unique HTTP URL that the crawler verified. Broken and redirecting links are highlighted in the Status column.">
                 <AuditLinksTable rows={links} />
               </AuditSection>
             ) : <EmptyState title="No links checked yet" text="Links are checked after the page crawl finishes." />}
@@ -4706,7 +4706,7 @@ function AuditCrawlEvidence({
       area: "Sitemap URLs found",
       status: formatNumber(result.sitemap?.urls?.length || 0),
       tone: result.sitemap?.urls?.length ? "good" : "warn",
-      evidence: "URLs loaded from sitemap files and used as crawl discovery targets.",
+      evidence: "URLs loaded from sitemap files and used for crawl discovery.",
     },
   ];
   const coverageRows = [
@@ -4716,7 +4716,7 @@ function AuditCrawlEvidence({
     { metric: "Noindex in sitemap", count: coverage.noindexPagesInSitemap, detail: "Non-indexable pages that still appear in XML sitemaps", problem: true },
     { metric: "Orphan pages", count: coverage.orphanPages, detail: "Sitemap-discovered pages with no internal inlinks", problem: true },
     { metric: "Deep pages", count: coverage.deepPages, detail: "Pages at crawl depth 4 or deeper", problem: true },
-    { metric: "Link tags found", count: coverage.linkTags, detail: `${formatNumber(coverage.checkedLinks)} unique link targets checked` },
+    { metric: "Link tags found", count: coverage.linkTags, detail: `${formatNumber(coverage.checkedLinks)} unique link URLs checked` },
     { metric: "Image tags found", count: coverage.imageTags, detail: `${formatNumber(coverage.checkedImages)} image URLs checked` },
     { metric: "CSS/JS refs found", count: coverage.assetTags, detail: `${formatNumber(coverage.checkedAssets)} CSS/JS assets checked` },
   ];
@@ -4926,7 +4926,7 @@ function AuditProgressPanel({
     },
     {
       label: "Check links",
-      detail: `${formatNumber(coverage.checkedLinks)} unique targets checked`,
+      detail: `${formatNumber(coverage.checkedLinks)} unique URLs checked`,
       evidence: `${formatNumber(coverage.brokenLinks)} failing · ${formatNumber(coverage.redirectedLinks)} redirecting.`,
     },
     {
@@ -5046,7 +5046,7 @@ function AuditReportOverview({
     {
       area: "Resources",
       status: `${formatNumber(coverage.linkTags)} links · ${formatNumber(coverage.imageTags)} images · ${formatNumber(coverage.assetTags)} CSS/JS`,
-      evidence: `${formatNumber(coverage.checkedLinks)} link targets checked (${formatNumber(coverage.brokenLinks)} failing) · ${formatNumber(coverage.checkedImages)} image URLs checked (${formatNumber(coverage.brokenImages)} failing) · ${formatNumber(coverage.checkedAssets)} CSS/JS checked (${formatNumber(coverage.brokenAssets)} failing).`,
+      evidence: `${formatNumber(coverage.checkedLinks)} link URLs checked (${formatNumber(coverage.brokenLinks)} failing) · ${formatNumber(coverage.checkedImages)} image URLs checked (${formatNumber(coverage.brokenImages)} failing) · ${formatNumber(coverage.checkedAssets)} CSS/JS checked (${formatNumber(coverage.brokenAssets)} failing).`,
       action: <Badge variant={coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets ? "bad" : "good"}>{coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets ? "failures" : "reachable"}</Badge>,
     },
     {
@@ -5304,7 +5304,7 @@ function AuditCheckMatrix({
     },
     {
       title: "Links",
-      text: "Targets, anchors, redirects",
+      text: "URLs, anchors, redirects",
       rows: [
         { label: "Links found", value: coverage.linkTags },
         { label: "Checked links", value: coverage.checkedLinks },
@@ -5698,7 +5698,7 @@ function AuditImageSummaryTable({ rows }: { rows: any[] }) {
 function AuditLinksTable({ rows }: { rows: any[] }) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>Target</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Anchor</TableHead><TableHead>Final URL</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>URL</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Anchor</TableHead><TableHead>Final URL</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
       <TableBody>
         {rows.map((row, index) => (
           <TableRow key={`${row.url}:${index}`}>
@@ -5802,7 +5802,7 @@ function AuditImageInventoryTable({ rows }: { rows: any[] }) {
 function AuditLinkInventoryTable({ rows }: { rows: any[] }) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>Target</TableHead><TableHead>Type</TableHead><TableHead>Anchor</TableHead><TableHead>Rel</TableHead><TableHead>Target</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>URL</TableHead><TableHead>Type</TableHead><TableHead>Anchor</TableHead><TableHead>Rel</TableHead><TableHead>Window</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
       <TableBody>
         {rows.map((row, index) => (
           <TableRow key={`${row.from}:${row.href}:${index}`}>

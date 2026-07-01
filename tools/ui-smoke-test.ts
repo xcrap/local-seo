@@ -272,7 +272,7 @@ try {
     await page.getByRole("heading", { name: /^Search Console$/ }).waitFor();
     await page.getByRole("tab", { name: /^URL inspection$/ }).click();
     if (await page.getByPlaceholder("https://example.com/page").inputValue() !== `${fixtureUrl}/`) {
-      throw new Error("Search Console inspection URL did not use the selected site's saved crawl target.");
+      throw new Error("Search Console inspection URL did not use the selected site's saved crawl URL.");
     }
     await page.getByRole("tab", { name: /^Local import$/ }).click();
     await page.getByLabel("CSV file").setInputFiles(gscCsvPath);
@@ -395,12 +395,12 @@ try {
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByLabel("Organic research site").waitFor();
     if (await page.getByLabel("Organic research site").inputValue() !== "second.test") {
-      throw new Error("Organic research target did not follow the newly selected site.");
+      throw new Error("Organic research domain field did not follow the newly selected site.");
     }
     await page.getByRole("navigation").getByRole("link", { name: /^Links$/ }).click();
     await page.getByLabel("Backlink index site").waitFor();
     if (await page.getByLabel("Backlink index site").inputValue() !== "second.test") {
-      throw new Error("Links target did not follow the newly selected site.");
+      throw new Error("Links domain field did not follow the newly selected site.");
     }
     await page.getByRole("navigation").getByRole("link", { name: /^SERP analysis$/ }).click();
     await page.getByLabel("SERP ownership site").waitFor();

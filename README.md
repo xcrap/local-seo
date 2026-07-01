@@ -20,7 +20,7 @@ auth service.
 
 - **Sites:** saved websites with domain, crawl URL preferences, search market/language locale, and notes.
 - **Keyword research:** real DuckDuckGo suggestions, with DataForSEO metrics when configured.
-- **SERP analysis:** live web result snapshots, target ownership, ranking-page tables, and history.
+- **SERP analysis:** live web result snapshots, selected-site ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
 - **Rank tracking:** local trackers, tracked keyword CRUD, manual checks from real search results, run history, and historical snapshots.
 - **Organic research:** ranked keywords and top pages for the selected site or a comparison site when a real organic dataset is connected; otherwise no generated traffic/ranking numbers are shown.

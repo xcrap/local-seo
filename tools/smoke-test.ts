@@ -260,7 +260,7 @@ try {
     }
   }
   const readmeSource = await readFile(path.join(rootDir, "README.md"), "utf8");
-  if (/target domain|crawl target preferences/i.test(readmeSource)) {
+  if (/target domain|target ownership|crawl target preferences/i.test(readmeSource)) {
     throw new Error("README should explain selected-site/comparison-site workflows with clear site and crawl URL wording.");
   }
   const envExampleSource = await readFile(path.join(rootDir, ".env.example"), "utf8");
@@ -327,8 +327,28 @@ try {
   if (webAppClient.includes("target domain")) {
     throw new Error("SERP analysis should not expose vague target-domain placeholder copy.");
   }
+  for (const vagueTargetCopy of [
+    "competitor target analyzed",
+    "Top pages returned for this target",
+    "Check a target to load real backlink rows",
+    "failing targets from the selected saved audit",
+    "failing link targets",
+    "HTTP link target",
+    "unique link targets checked",
+    "unique targets checked",
+    "link targets checked",
+    "Targets, anchors, redirects",
+    "Target: {result.resolvedTarget}",
+  ]) {
+    if (webAppClient.includes(vagueTargetCopy)) {
+      throw new Error(`User-facing copy should name domains, URLs, or HTML windows instead of vague target wording: ${vagueTargetCopy}`);
+    }
+  }
   if (!webAppClient.includes("Organic research site") || !webAppClient.includes("Backlink index site") || !webAppClient.includes("SERP ownership site")) {
     throw new Error("Competitive pages should label their domain inputs as site-specific controls.");
+  }
+  if (!webAppClient.includes("<TableHead>URL</TableHead>") || !webAppClient.includes("<TableHead>Window</TableHead>")) {
+    throw new Error("Audit link tables should label URL columns and HTML target-window attributes clearly.");
   }
   if (!webAppClient.includes("Issue results") || !webAppClient.includes("Show {formatNumber")) {
     throw new Error("Audit issue actions should show an explicit filtered issue result count instead of generic Review buttons.");
