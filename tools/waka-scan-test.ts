@@ -27,13 +27,13 @@ try {
     resolvedScanUrl.startsWith("https://www.waka.pt"),
     `Expected saved-site scan resolver to prefer Waka's live www HTTPS URL, got ${resolvedScanUrl}.`,
   );
-  const started = seo.startAudit(site.id, resolvedScanUrl);
+  const started = seo.startScan(site.id, resolvedScanUrl);
   expect(started?.id, "Could not start Waka scan.");
 
   const startedAt = Date.now();
   let scan = started;
   while (Date.now() - startedAt < 120_000) {
-    scan = seo.getAudit(started.id);
+    scan = seo.getScan(started.id);
     if (scan?.status === "completed" || scan?.status === "failed") break;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }

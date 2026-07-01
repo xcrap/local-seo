@@ -11,7 +11,7 @@ import {
   getDomainPagesPage,
   getSerpAnalysis,
   domainOverview,
-  getAudit,
+  getScan,
   getSite,
   listRankTrackers,
   listSites,
@@ -21,7 +21,7 @@ import {
   siteSummary,
   researchKeywords,
   saveKeywords,
-  startAudit,
+  startScan,
   updateSavedKeywordTags,
 } from "./seo";
 import { getGscPerformance, inspectGscUrls } from "./gsc";
@@ -465,7 +465,7 @@ async function callTool(name: string, args: any) {
       return args.trackerId ? trackers.find((tracker) => tracker.id === args.trackerId) || null : trackers;
     }
     case "start_scan":
-      return startAudit(args.siteId, args.url);
+      return startScan(args.siteId, args.url);
     case "scan_site": {
       const siteId = args.siteId;
       const site = getSite(siteId);
@@ -473,7 +473,7 @@ async function callTool(name: string, args: any) {
       const candidateUrls = args.url ? [String(args.url)] : site.domain ? siteScanCandidates(site) : [];
       const url = args.url || (site.domain ? await resolveSavedSiteScanUrl(site) : "");
       if (!url) throw new Error("Set a site domain or pass a URL.");
-      const scan = startAudit(site.id, url);
+      const scan = startScan(site.id, url);
       return {
         site: site.domain,
         scan,
@@ -487,7 +487,7 @@ async function callTool(name: string, args: any) {
       };
     }
     case "get_scan":
-      return getAudit(args.scanId);
+      return getScan(args.scanId);
     case "get_gsc_performance":
       return getGscPerformance(args);
     case "inspect_urls":

@@ -34,16 +34,16 @@ import {
   addRankKeywords,
   backlinksOverview,
   brandLookup,
-  clearAudits,
+  clearScans,
   createSite,
   createRankTracker,
   dashboardSummary,
-  deleteAudit,
+  deleteScan,
   deleteSite,
   deleteSavedKeywordTag,
   domainOverview,
   exportSavedKeywordsCsv,
-  getAudit,
+  getScan,
   getBacklinksProfile,
   getDomainKeywordSuggestions,
   getDomainKeywordsPage,
@@ -53,8 +53,8 @@ import {
   getSerpAnalysis,
   getSite,
   listBacklinkSnapshots,
-  listAllAudits,
-  listAudits,
+  listAllScans,
+  listScans,
   listBrandLookupRuns,
   listDomainSnapshots,
   listPromptExplorerRuns,
@@ -72,7 +72,7 @@ import {
   removeSavedKeywords,
   runRankCheck,
   saveKeywords,
-  startAudit,
+  startScan,
   updateSavedKeywordTag,
   updateSavedKeywordTags,
   updateSite,
@@ -263,7 +263,7 @@ async function startSavedSiteScan(c: any) {
   if (!site.domain) return c.json({ error: "Set a site domain first." }, 400);
   const candidateUrls = siteScanCandidates(site);
   const url = await resolveSavedSiteScanUrl(site);
-  const scan = startAudit(site.id, url);
+  const scan = startScan(site.id, url);
   const config = listPublicConfig();
   queueMicrotask(() => {
     Promise.allSettled([
@@ -489,14 +489,14 @@ app.post(
   safe(async (c) => c.json(await promptExplorer((await readSiteScopedJson(c)) as any))),
 );
 
-const listSiteScansHandler = safe((c: any) => c.json(listAudits(c.req.param("id"))));
-const listAllScansHandler = safe((c: any) => c.json(listAllAudits()));
-const getScanHandler = safe((c: any) => c.json(getAudit(c.req.param("id"))));
-const clearSiteScansHandler = safe((c: any) => c.json(clearAudits(c.req.param("id"))));
-const deleteSiteScanHandler = safe((c: any) => c.json(deleteAudit(c.req.param("siteId"), c.req.param("id"))));
+const listSiteScansHandler = safe((c: any) => c.json(listScans(c.req.param("id"))));
+const listAllScansHandler = safe((c: any) => c.json(listAllScans()));
+const getScanHandler = safe((c: any) => c.json(getScan(c.req.param("id"))));
+const clearSiteScansHandler = safe((c: any) => c.json(clearScans(c.req.param("id"))));
+const deleteSiteScanHandler = safe((c: any) => c.json(deleteScan(c.req.param("siteId"), c.req.param("id"))));
 const startScanHandler = safe(async (c: any) => {
   const body = await readJson(c);
-  return c.json(startAudit(siteBodyId(body), String(body.url)));
+  return c.json(startScan(siteBodyId(body), String(body.url)));
 });
 
 app.get("/api/sites/:id/scans", listSiteScansHandler);

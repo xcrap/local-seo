@@ -1553,7 +1553,7 @@ export function listBacklinkSnapshots(siteId: string) {
   ).map(publicDomainSnapshotRow);
 }
 
-function publicAuditRow(row: any) {
+function publicScanRow(row: any) {
   if (!row) return null;
   const { site_id: siteId, site_name: siteName, site_domain: siteDomain, result_json, ...rest } = row;
   return {
@@ -1565,13 +1565,13 @@ function publicAuditRow(row: any) {
   };
 }
 
-export function listAudits(siteId: string) {
+export function listScans(siteId: string) {
   return all<any>("SELECT * FROM scans WHERE site_id = ? ORDER BY created_at DESC", [
     siteId,
-  ]).map(publicAuditRow);
+  ]).map(publicScanRow);
 }
 
-export function listAllAudits() {
+export function listAllScans() {
   return all<any>(`
     SELECT
       scans.*,
@@ -1580,45 +1580,45 @@ export function listAllAudits() {
     FROM scans
     LEFT JOIN sites ON sites.id = scans.site_id
     ORDER BY scans.created_at DESC
-  `).map(publicAuditRow);
+  `).map(publicScanRow);
 }
 
-export function getAudit(auditId: string) {
-  const row = get<any>("SELECT * FROM scans WHERE id = ?", [auditId]);
-  return publicAuditRow(row);
+export function getScan(scanId: string) {
+  const row = get<any>("SELECT * FROM scans WHERE id = ?", [scanId]);
+  return publicScanRow(row);
 }
 
-export function deleteAudit(siteId: string, auditId: string) {
+export function deleteScan(siteId: string, scanId: string) {
   const site = getSite(siteId);
   if (!site) throw new Error("Site not found.");
-  const info = run("DELETE FROM scans WHERE id = ? AND site_id = ?", [auditId, site.id]);
+  const info = run("DELETE FROM scans WHERE id = ? AND site_id = ?", [scanId, site.id]);
   return { deleted: Number(info.changes || 0) > 0 };
 }
 
-export function clearAudits(siteId: string) {
+export function clearScans(siteId: string) {
   const site = getSite(siteId);
   if (!site) throw new Error("Site not found.");
   const info = run("DELETE FROM scans WHERE site_id = ?", [site.id]);
   return { deleted: Number(info.changes || 0) };
 }
 
-export function startAudit(siteId: string, url: string) {
+export function startScan(siteId: string, url: string) {
   const site = getSite(siteId);
   if (!site) throw new Error("Site not found.");
-  const auditId = randomUUID();
+  const scanId = randomUUID();
   run(
     "INSERT INTO scans (id, site_id, url, status, updated_at) VALUES (?, ?, ?, 'queued', CURRENT_TIMESTAMP)",
-    [auditId, site.id, url.trim()],
+    [scanId, site.id, url.trim()],
   );
   queueMicrotask(() => {
-    runLocalAudit(auditId).catch((error) => {
+    runLocalScan(scanId).catch((error) => {
       run(
         "UPDATE scans SET status = 'failed', error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        [error instanceof Error ? error.message : "Audit failed", auditId],
+        [error instanceof Error ? error.message : "Scan failed", scanId],
       );
     });
   });
-  return getAudit(auditId);
+  return getScan(scanId);
 }
 
 function emptySerpResult(keyword: string, domain: string) {
@@ -2577,13 +2577,13 @@ function auditResult(input: {
   };
 }
 
-async function runLocalAudit(auditId: string) {
-  const audit = get<any>("SELECT * FROM scans WHERE id = ?", [auditId]);
-  if (!audit) return;
+async function runLocalScan(scanId: string) {
+  const scan = get<any>("SELECT * FROM scans WHERE id = ?", [scanId]);
+  if (!scan) return;
   run("UPDATE scans SET status = 'running', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [
-    auditId,
+    scanId,
   ]);
-  const startUrl = /^https?:\/\//i.test(audit.url) ? audit.url : `https://${audit.url}`;
+  const startUrl = /^https?:\/\//i.test(scan.url) ? scan.url : `https://${scan.url}`;
   const origin = new URL(startUrl).origin;
   const startKey = normalizedUrlKey(startUrl);
   const visited = new Set<string>();
@@ -2641,7 +2641,7 @@ async function runLocalAudit(auditId: string) {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
       `,
-      [status, pages.length, issues.length, JSON.stringify(result), auditId],
+      [status, pages.length, issues.length, JSON.stringify(result), scanId],
     );
   };
 
@@ -4149,7 +4149,7 @@ async function runLocalAudit(auditId: string) {
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
     `,
-    [score, pages.length, issues.length, JSON.stringify(result), auditId],
+    [score, pages.length, issues.length, JSON.stringify(result), scanId],
   );
 }
 
@@ -4220,8 +4220,8 @@ export function dashboardSummary(siteId?: string) {
           createdAt: latestGscImport.created_at,
         }
       : null,
-    latestScans: listAudits(site.id),
-    allScans: listAllAudits(),
+    latestScans: listScans(site.id),
+    allScans: listAllScans(),
     latestAiJobs: all<any>("SELECT * FROM ai_jobs ORDER BY created_at DESC"),
   };
 }
@@ -4233,7 +4233,7 @@ export function siteSummary(siteId: string) {
     site: site,
     savedKeywords: listSavedKeywords(siteId),
     rankTrackers: listRankTrackers(siteId),
-    scans: listAudits(siteId),
+    scans: listScans(siteId),
     domainSnapshots: listDomainSnapshots(siteId),
     backlinkSnapshots: listBacklinkSnapshots(siteId),
     serpRuns: listSerpRuns(siteId),
