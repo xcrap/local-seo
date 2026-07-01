@@ -1972,8 +1972,8 @@ export function exportSavedKeywordsCsv(siteId: string) {
   ].join("\n");
 }
 
-type AuditSeverity = "high" | "medium" | "low";
-type AuditCategory =
+type ScanIssueSeverity = "high" | "medium" | "low";
+type ScanIssueCategory =
   | "indexability"
   | "metadata"
   | "headings"
@@ -1991,7 +1991,7 @@ type AuditCategory =
   | "robots"
   | "crawl";
 
-const auditLimits = {
+const scanLimits = {
   maxPages: 100,
   maxQueuedUrls: 300,
   maxLinksToCheck: 700,
@@ -2209,17 +2209,17 @@ function severityCounts(rows: any[]) {
   };
 }
 
-function issuePriority(severity: AuditSeverity) {
+function issuePriority(severity: ScanIssueSeverity) {
   return severity === "high" ? 3 : severity === "medium" ? 2 : 1;
 }
 
-function pushAuditIssue(
+function pushScanIssue(
   issues: any[],
   pageIssues: any[] | undefined,
   issue: {
     url: string;
-    severity: AuditSeverity;
-    category: AuditCategory;
+    severity: ScanIssueSeverity;
+    category: ScanIssueCategory;
     type: string;
     message: string;
     recommendation: string;
@@ -2439,7 +2439,7 @@ async function readSitemaps(origin: string, robotsSitemaps: string[]) {
   return { sitemaps, urls: [...urls] };
 }
 
-function auditSummary(
+function scanSummary(
   issues: any[],
   pages: any[],
   checkedLinks: any[],
@@ -2533,7 +2533,7 @@ function auditSummary(
   };
 }
 
-function auditResult(input: {
+function scanResult(input: {
   startUrl: string;
   origin: string;
   phase: string;
@@ -2546,7 +2546,7 @@ function auditResult(input: {
   linkInventory: any[];
   robots: any;
   sitemap: any;
-  limits: typeof auditLimits;
+  limits: typeof scanLimits;
 }) {
   const sortedIssues = [...input.issues].sort((a, b) => issuePriority(b.severity) - issuePriority(a.severity));
   return {
@@ -2554,7 +2554,7 @@ function auditResult(input: {
     origin: input.origin,
     phase: input.phase,
     limits: input.limits,
-    summary: auditSummary(
+    summary: scanSummary(
       sortedIssues,
       input.pages,
       input.checkedLinks,
@@ -2616,7 +2616,7 @@ async function runLocalScan(scanId: string) {
   };
 
   const persistProgress = (status = "running") => {
-    const result = auditResult({
+    const result = scanResult({
       startUrl,
       origin,
       phase,
@@ -2629,7 +2629,7 @@ async function runLocalScan(scanId: string) {
       linkInventory,
       robots,
       sitemap,
-      limits: auditLimits,
+      limits: scanLimits,
     });
     run(
       `
@@ -2657,7 +2657,7 @@ async function runLocalScan(scanId: string) {
       sameSiteUrl(absolute, startUrl) &&
       absoluteKey !== startKey &&
       !queued.has(absoluteKey) &&
-      queue.length + visited.size < auditLimits.maxQueuedUrls
+      queue.length + visited.size < scanLimits.maxQueuedUrls
     ) {
       queued.add(absoluteKey);
       queue.push(absolute);
@@ -2666,7 +2666,7 @@ async function runLocalScan(scanId: string) {
     }
   }
   if (!robots.exists) {
-    pushAuditIssue(issues, undefined, {
+    pushScanIssue(issues, undefined, {
       url: `${origin}/robots.txt`,
       severity: "low",
       category: "robots",
@@ -2676,7 +2676,7 @@ async function runLocalScan(scanId: string) {
       evidence: { status: robots.status, error: robots.error },
     });
   } else if (robots.blocksAll) {
-    pushAuditIssue(issues, undefined, {
+    pushScanIssue(issues, undefined, {
       url: robots.url,
       severity: "high",
       category: "robots",
@@ -2687,7 +2687,7 @@ async function runLocalScan(scanId: string) {
     });
   }
   if (robots.exists && !(robots.sitemaps || []).length) {
-    pushAuditIssue(issues, undefined, {
+    pushScanIssue(issues, undefined, {
       url: robots.url,
       severity: "low",
       category: "robots",
@@ -2699,7 +2699,7 @@ async function runLocalScan(scanId: string) {
   }
   for (const item of sitemap.sitemaps || []) {
     if (!item.ok) {
-      pushAuditIssue(issues, undefined, {
+      pushScanIssue(issues, undefined, {
         url: item.url,
         severity: "medium",
         category: "sitemap",
@@ -2711,7 +2711,7 @@ async function runLocalScan(scanId: string) {
     }
   }
   if (!sitemap.urls.length) {
-    pushAuditIssue(issues, undefined, {
+    pushScanIssue(issues, undefined, {
       url: `${origin}/sitemap.xml`,
       severity: "medium",
       category: "sitemap",
@@ -2721,21 +2721,21 @@ async function runLocalScan(scanId: string) {
       evidence: { sitemaps: sitemap.sitemaps },
     });
   }
-  if ((sitemap.urls || []).length > auditLimits.maxQueuedUrls) {
-    pushAuditIssue(issues, undefined, {
+  if ((sitemap.urls || []).length > scanLimits.maxQueuedUrls) {
+    pushScanIssue(issues, undefined, {
       url: `${origin}/sitemap.xml`,
       severity: "low",
       category: "sitemap",
       type: "sitemap-larger-than-crawl-limit",
       message: `Sitemap has more URLs than this local scan will crawl (${(sitemap.urls || []).length})`,
       recommendation: "Raise the local crawl limit for a full-site run, or scan important sections separately.",
-      evidence: { sitemapUrls: (sitemap.urls || []).length, crawlLimit: auditLimits.maxQueuedUrls },
+      evidence: { sitemapUrls: (sitemap.urls || []).length, crawlLimit: scanLimits.maxQueuedUrls },
     });
   }
   persistProgress();
 
   phase = "crawling";
-  while (queue.length > 0 && visited.size < auditLimits.maxPages) {
+  while (queue.length > 0 && visited.size < scanLimits.maxPages) {
     const current = queue.shift()!;
     const currentKey = normalizedUrlKey(current);
     queued.delete(currentKey);
@@ -2797,7 +2797,7 @@ async function runLocalScan(scanId: string) {
       const ogDescription = cleanText($('meta[property="og:description"]').attr("content") || "");
       const ogImageRaw = cleanText($('meta[property="og:image"]').attr("content") || "");
       const ogImage = ogImageRaw ? absoluteHttpUrl(ogImageRaw, response.url || current) || ogImageRaw : "";
-      if (/^https?:\/\//i.test(ogImage) && imagesToCheck.size < auditLimits.maxImagesToCheck && !imagesToCheck.has(ogImage)) {
+      if (/^https?:\/\//i.test(ogImage) && imagesToCheck.size < scanLimits.maxImagesToCheck && !imagesToCheck.has(ogImage)) {
         imagesToCheck.set(ogImage, { url: ogImage, from: current, purpose: "og:image" });
       }
       const twitterCard = cleanText($('meta[name="twitter:card"]').attr("content") || "");
@@ -2812,12 +2812,12 @@ async function runLocalScan(scanId: string) {
       const assetRows: any[] = [];
 
       const addAsset = (url: string, type: "css" | "js", meta: Record<string, unknown> = {}) => {
-        if (assetsToCheck.size >= auditLimits.maxAssetsToCheck || assetsToCheck.has(url)) return;
+        if (assetsToCheck.size >= scanLimits.maxAssetsToCheck || assetsToCheck.has(url)) return;
         assetsToCheck.set(url, { url, from: current, type, ...meta });
       };
 
       const addImageToCheck = (url: string, meta: Record<string, unknown> = {}) => {
-        if (imagesToCheck.size >= auditLimits.maxImagesToCheck || imagesToCheck.has(url)) return;
+        if (imagesToCheck.size >= scanLimits.maxImagesToCheck || imagesToCheck.has(url)) return;
         imagesToCheck.set(url, { url, from: current, ...meta });
       };
 
@@ -2874,7 +2874,7 @@ async function runLocalScan(scanId: string) {
         if (row.classification === "content" && Number.parseInt(row.width || "0", 10) >= 600 && row.srcsetCount === 0) row.issues.push("missing srcset");
         if (row.src && isHttpOnHttpsPage(row.src, current)) row.issues.push("mixed content");
         imageRows.push(row);
-        if (imageInventory.length < auditLimits.maxImageInventory) imageInventory.push(row);
+        if (imageInventory.length < scanLimits.maxImageInventory) imageInventory.push(row);
         for (const imageUrl of [absolute, ...srcsetUrls].filter(Boolean) as string[]) {
           addImageToCheck(imageUrl, { purpose: pictureSrcsetUrls.includes(imageUrl) ? "picture-source" : "img" });
         }
@@ -2914,8 +2914,8 @@ async function runLocalScan(scanId: string) {
           type: isInternal ? "internal" : "external",
         };
         linkRows.push(row);
-        if (linkInventory.length < auditLimits.maxLinkInventory) linkInventory.push(row);
-        if (linksToCheck.size < auditLimits.maxLinksToCheck && !linksToCheck.has(absolute)) {
+        if (linkInventory.length < scanLimits.maxLinkInventory) linkInventory.push(row);
+        if (linksToCheck.size < scanLimits.maxLinksToCheck && !linksToCheck.has(absolute)) {
           linksToCheck.set(absolute, { url: absolute, from: current, type: row.type, anchor: row.anchor, rel: row.rel });
         }
         const absoluteKey = normalizedUrlKey(absolute);
@@ -2931,7 +2931,7 @@ async function runLocalScan(scanId: string) {
           isInternal &&
           !visited.has(absoluteKey) &&
           !queued.has(absoluteKey) &&
-          queue.length + visited.size < auditLimits.maxQueuedUrls
+          queue.length + visited.size < scanLimits.maxQueuedUrls
         ) {
           queued.add(absoluteKey);
           queue.push(absolute);
@@ -2964,7 +2964,7 @@ async function runLocalScan(scanId: string) {
       const wordCount = bodyText ? bodyText.split(/\s+/).filter(Boolean).length : 0;
 
       if (response.status >= 400) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
           category: "crawl",
@@ -2975,7 +2975,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!isHtml) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "crawl",
@@ -2986,7 +2986,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (response.url && response.url !== current) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "crawl",
@@ -2997,7 +2997,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (current.length > 115) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: current.length > 160 ? "medium" : "low",
           category: "crawl",
@@ -3008,7 +3008,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (metaRefresh) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "crawl",
@@ -3019,7 +3019,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (new URL(current).protocol !== "https:") {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
           category: "security",
@@ -3030,7 +3030,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (isLikelyTrackingUrl(current)) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "crawl",
@@ -3041,7 +3041,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (currentDepth > 3) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "crawl",
@@ -3052,7 +3052,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!title) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
           category: "metadata",
@@ -3061,7 +3061,7 @@ async function runLocalScan(scanId: string) {
           recommendation: "Add a unique title tag that describes the page and primary search intent.",
         });
       } else if (titleCount > 1) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "metadata",
@@ -3071,7 +3071,7 @@ async function runLocalScan(scanId: string) {
           evidence: { titleCount },
         });
       } else if (title.length > 60 || title.length < 30) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: title.length > 70 ? "medium" : "low",
           category: "metadata",
@@ -3082,7 +3082,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!description) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
           category: "metadata",
@@ -3091,7 +3091,7 @@ async function runLocalScan(scanId: string) {
           recommendation: "Add a unique meta description that summarizes the page and includes the main value.",
         });
       } else if (descriptionCount > 1) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "metadata",
@@ -3101,7 +3101,7 @@ async function runLocalScan(scanId: string) {
           evidence: { descriptionCount },
         });
       } else if (description.length > 160 || description.length < 70) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "metadata",
@@ -3112,7 +3112,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (h1s.length === 0 || h1s.length > 1) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "headings",
@@ -3123,7 +3123,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (emptyH1Count > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "headings",
@@ -3134,7 +3134,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (emptyHeadingCount > emptyH1Count) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "headings",
@@ -3145,7 +3145,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (headingJumps.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "headings",
@@ -3156,7 +3156,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (wordCount > 300 && h2Count === 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "headings",
@@ -3167,7 +3167,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!canonical) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "canonicals",
@@ -3176,7 +3176,7 @@ async function runLocalScan(scanId: string) {
           recommendation: "Add a canonical URL so crawlers understand the preferred version.",
         });
       } else if (canonicalRaw && !absoluteHttpUrl(canonicalRaw, response.url || current)) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "canonicals",
@@ -3186,7 +3186,7 @@ async function runLocalScan(scanId: string) {
           evidence: { canonical: canonicalRaw },
         });
       } else if (canonicalCount > 1) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "canonicals",
@@ -3196,7 +3196,7 @@ async function runLocalScan(scanId: string) {
           evidence: { canonicalCount },
         });
       } else if (isHttpOnHttpsPage(canonical, current)) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "canonicals",
@@ -3206,7 +3206,7 @@ async function runLocalScan(scanId: string) {
           evidence: { canonical },
         });
       } else if (!sameSiteUrl(canonical, startUrl)) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "canonicals",
@@ -3216,7 +3216,7 @@ async function runLocalScan(scanId: string) {
           evidence: { canonical },
         });
       } else if (indexable && normalizedUrl(canonical) !== normalizedUrl(response.url || current)) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "canonicals",
@@ -3227,7 +3227,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!indexable) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
           category: "indexability",
@@ -3238,7 +3238,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (robotDirectives.includes("nofollow")) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "indexability",
@@ -3249,7 +3249,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (robotDirectives.includes("noarchive") || robotDirectives.includes("nosnippet")) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "indexability",
@@ -3260,7 +3260,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!lang) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "indexability",
@@ -3269,7 +3269,7 @@ async function runLocalScan(scanId: string) {
           recommendation: "Set the page language on the html element.",
         });
       } else if (!isValidLangCode(lang)) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "localization",
@@ -3280,7 +3280,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!charset) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "indexability",
@@ -3290,7 +3290,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!faviconCount) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "metadata",
@@ -3300,7 +3300,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!viewport) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "performance",
@@ -3309,7 +3309,7 @@ async function runLocalScan(scanId: string) {
           recommendation: "Add a responsive viewport meta tag for mobile rendering.",
         });
       } else if (!/width\s*=\s*device-width/i.test(viewport)) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "performance",
@@ -3320,7 +3320,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (loadMs > 4000) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "performance",
@@ -3330,7 +3330,7 @@ async function runLocalScan(scanId: string) {
           evidence: { loadMs },
         });
       } else if (loadMs > 2000) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "performance",
@@ -3341,7 +3341,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (response.contentLength && response.contentLength > 1000000) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "performance",
@@ -3352,7 +3352,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (wordCount < 150) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "content",
@@ -3369,7 +3369,7 @@ async function runLocalScan(scanId: string) {
       const emptyAlt = imageRows.filter((image) => image.classification === "content" && image.altState === "empty").length;
       const missingDimensions = imageRows.filter((image) => image.src && (!image.width || !image.height)).length;
       if (imageMissingSrc > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
           category: "images",
@@ -3380,7 +3380,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (missingFallbackSrc > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "images",
@@ -3391,7 +3391,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (invalidSrcset > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "images",
@@ -3402,7 +3402,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (missingAlt > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "images",
@@ -3413,7 +3413,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (emptyAlt > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "images",
@@ -3425,7 +3425,7 @@ async function runLocalScan(scanId: string) {
       }
       const genericAlt = imageRows.filter((image) => image.classification === "content" && image.issues.includes("generic alt"));
       if (genericAlt.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "images",
@@ -3437,7 +3437,7 @@ async function runLocalScan(scanId: string) {
       }
       const longAlt = imageRows.filter((image) => image.classification === "content" && image.issues.includes("alt too long"));
       if (longAlt.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "images",
@@ -3452,7 +3452,7 @@ async function runLocalScan(scanId: string) {
         .map((image) => image.altPreview.toLowerCase())
         .filter((alt, index, alts) => alts.indexOf(alt) !== index))];
       if (duplicateAltTexts.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "images",
@@ -3463,7 +3463,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (missingDimensions > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "images",
@@ -3475,7 +3475,7 @@ async function runLocalScan(scanId: string) {
       }
       const missingSrcset = imageRows.filter((image) => image.issues.includes("missing srcset"));
       if (missingSrcset.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "images",
@@ -3487,7 +3487,7 @@ async function runLocalScan(scanId: string) {
       }
       const missingLazyLoading = imageRows.filter((image) => image.issues.includes("not lazy loaded"));
       if (missingLazyLoading.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "performance",
@@ -3499,7 +3499,7 @@ async function runLocalScan(scanId: string) {
       }
       const mixedImages = imageRows.filter((image) => image.src && isHttpOnHttpsPage(image.src, current));
       if (mixedImages.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "images",
@@ -3511,7 +3511,7 @@ async function runLocalScan(scanId: string) {
       }
       const mixedLinks = linkRows.filter((link) => isHttpOnHttpsPage(link.href, current));
       if (mixedLinks.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "links",
@@ -3523,7 +3523,7 @@ async function runLocalScan(scanId: string) {
       }
       const emptyAnchorLinks = linkRows.filter((link) => !link.anchor && !link.accessibleName);
       if (emptyAnchorLinks.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "links",
@@ -3535,7 +3535,7 @@ async function runLocalScan(scanId: string) {
       }
       const internalNofollowLinks = linkRows.filter((link) => link.type === "internal" && /\bnofollow\b/i.test(link.rel));
       if (internalNofollowLinks.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "links",
@@ -3547,7 +3547,7 @@ async function runLocalScan(scanId: string) {
       }
       const unsafeBlankLinks = linkRows.filter((link) => link.type === "external" && link.target.toLowerCase() === "_blank" && !/\b(noopener|noreferrer)\b/i.test(link.rel));
       if (unsafeBlankLinks.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "security",
@@ -3558,7 +3558,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (linkRows.filter((link) => link.type === "internal").length === 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "links",
@@ -3568,7 +3568,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (linkRows.length > 150) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "links",
@@ -3580,7 +3580,7 @@ async function runLocalScan(scanId: string) {
       }
       const trackingInternalLinks = linkRows.filter((link) => link.type === "internal" && isLikelyTrackingUrl(link.href));
       if (trackingInternalLinks.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "links",
@@ -3591,7 +3591,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!schemaCount) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "structured-data",
@@ -3601,7 +3601,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (schemaParseErrors.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "structured-data",
@@ -3612,7 +3612,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!ogTitle || !ogDescription) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "social",
@@ -3623,7 +3623,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!ogImage) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "social",
@@ -3632,7 +3632,7 @@ async function runLocalScan(scanId: string) {
           recommendation: "Add og:image for pages that may be shared or discovered socially.",
         });
       } else if (!/^https?:\/\//i.test(ogImage)) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "social",
@@ -3643,7 +3643,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (!twitterCard) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "social",
@@ -3654,7 +3654,7 @@ async function runLocalScan(scanId: string) {
       }
       const invalidHreflangs = hreflangs.filter((item) => !item.lang || !absoluteHttpUrl(item.href, response.url || current));
       if (invalidHreflangs.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "localization",
@@ -3666,7 +3666,7 @@ async function runLocalScan(scanId: string) {
       }
       const malformedHreflangs = hreflangs.filter((item) => item.lang && item.lang.toLowerCase() !== "x-default" && !isValidLangCode(item.lang));
       if (malformedHreflangs.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "localization",
@@ -3678,7 +3678,7 @@ async function runLocalScan(scanId: string) {
       }
       const duplicateHreflangCodes = [...new Set(hreflangCodes.filter((code, index) => hreflangCodes.indexOf(code) !== index))];
       if (duplicateHreflangCodes.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "localization",
@@ -3689,7 +3689,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (hreflangCount > 1 && !hreflangCodes.includes("x-default")) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "localization",
@@ -3701,7 +3701,7 @@ async function runLocalScan(scanId: string) {
       }
       const mixedAssets = assetRows.filter((asset) => isHttpOnHttpsPage(asset.url, current));
       if (mixedAssets.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
           category: "assets",
@@ -3719,7 +3719,7 @@ async function runLocalScan(scanId: string) {
         !asset.module
       );
       if (renderBlockingScripts.length > 0) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "performance",
@@ -3730,7 +3730,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (assetRows.length > 60) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "performance",
@@ -3741,7 +3741,7 @@ async function runLocalScan(scanId: string) {
         });
       }
       if (response.contentLength && response.contentLength > 50000 && !response.contentEncoding) {
-        pushAuditIssue(issues, pageIssues, {
+        pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "performance",
@@ -3814,7 +3814,7 @@ async function runLocalScan(scanId: string) {
       pages.push(page);
       persistProgress();
     } catch (error) {
-      pushAuditIssue(issues, pageIssues, {
+      pushScanIssue(issues, pageIssues, {
         url: current,
         severity: "high",
         category: "crawl",
@@ -3849,7 +3849,7 @@ async function runLocalScan(scanId: string) {
     const row = { ...candidate, ...result };
     checkedLinks.push(row);
     if (!row.ok) {
-      pushAuditIssue(issues, pageBucket(candidate.from), {
+      pushScanIssue(issues, pageBucket(candidate.from), {
         url: candidate.from,
         severity: candidate.type === "internal" ? "high" : "medium",
         category: "links",
@@ -3859,7 +3859,7 @@ async function runLocalScan(scanId: string) {
         evidence: { target: candidate.url, status: row.status, error: row.error },
       });
     } else if (row.redirected || (row.finalUrl && row.finalUrl !== candidate.url)) {
-      pushAuditIssue(issues, pageBucket(candidate.from), {
+      pushScanIssue(issues, pageBucket(candidate.from), {
         url: candidate.from,
         severity: candidate.type === "internal" ? "medium" : "low",
         category: "links",
@@ -3881,7 +3881,7 @@ async function runLocalScan(scanId: string) {
       const row = { ...candidate, ...result };
       checkedImages.push(row);
       if (!row.ok) {
-        pushAuditIssue(issues, pageBucket(candidate.from), {
+        pushScanIssue(issues, pageBucket(candidate.from), {
           url: candidate.from,
           severity: "high",
           category: "images",
@@ -3891,7 +3891,7 @@ async function runLocalScan(scanId: string) {
           evidence: { image: candidate.url, status: row.status, error: row.error, purpose: candidate.purpose },
         });
       } else if (row.redirected || (row.finalUrl && row.finalUrl !== candidate.url)) {
-        pushAuditIssue(issues, pageBucket(candidate.from), {
+        pushScanIssue(issues, pageBucket(candidate.from), {
           url: candidate.from,
           severity: "low",
           category: "images",
@@ -3901,7 +3901,7 @@ async function runLocalScan(scanId: string) {
           evidence: { image: candidate.url, finalUrl: row.finalUrl, status: row.status, purpose: candidate.purpose },
         });
       } else if (row.contentType && !/^image\//i.test(row.contentType)) {
-        pushAuditIssue(issues, pageBucket(candidate.from), {
+        pushScanIssue(issues, pageBucket(candidate.from), {
           url: candidate.from,
           severity: "medium",
           category: "images",
@@ -3913,7 +3913,7 @@ async function runLocalScan(scanId: string) {
       } else {
         const expectedMime = expectedImageMime(candidate.url);
         if (expectedMime && row.contentType && !row.contentType.toLowerCase().includes(expectedMime)) {
-          pushAuditIssue(issues, pageBucket(candidate.from), {
+          pushScanIssue(issues, pageBucket(candidate.from), {
             url: candidate.from,
             severity: "low",
             category: "images",
@@ -3924,7 +3924,7 @@ async function runLocalScan(scanId: string) {
           });
         }
         if (row.contentLength && row.contentLength > 500000) {
-          pushAuditIssue(issues, pageBucket(candidate.from), {
+          pushScanIssue(issues, pageBucket(candidate.from), {
             url: candidate.from,
             severity: "low",
             category: "images",
@@ -3948,7 +3948,7 @@ async function runLocalScan(scanId: string) {
     const row = { ...candidate, ...result };
     checkedAssets.push(row);
     if (!row.ok) {
-      pushAuditIssue(issues, pageBucket(candidate.from), {
+      pushScanIssue(issues, pageBucket(candidate.from), {
         url: candidate.from,
         severity: "high",
         category: "assets",
@@ -3958,7 +3958,7 @@ async function runLocalScan(scanId: string) {
         evidence: { asset: candidate.url, status: row.status, error: row.error },
       });
     } else if (candidate.type === "css" && row.contentType && !/(text\/css|octet-stream)/i.test(row.contentType)) {
-      pushAuditIssue(issues, pageBucket(candidate.from), {
+      pushScanIssue(issues, pageBucket(candidate.from), {
         url: candidate.from,
         severity: "medium",
         category: "assets",
@@ -3968,7 +3968,7 @@ async function runLocalScan(scanId: string) {
         evidence: { asset: candidate.url, contentType: row.contentType },
       });
     } else if (candidate.type === "js" && row.contentType && !/(javascript|ecmascript|octet-stream|text\/plain)/i.test(row.contentType)) {
-      pushAuditIssue(issues, pageBucket(candidate.from), {
+      pushScanIssue(issues, pageBucket(candidate.from), {
         url: candidate.from,
         severity: "medium",
         category: "assets",
@@ -3978,7 +3978,7 @@ async function runLocalScan(scanId: string) {
         evidence: { asset: candidate.url, contentType: row.contentType },
       });
     } else if (row.contentLength && row.contentLength > 500000) {
-      pushAuditIssue(issues, pageBucket(candidate.from), {
+      pushScanIssue(issues, pageBucket(candidate.from), {
         url: candidate.from,
         severity: "low",
         category: "assets",
@@ -3997,7 +3997,7 @@ async function runLocalScan(scanId: string) {
       const cssResponse = await fetchText(candidate.url, 8000).catch(() => null);
       if (cssResponse?.ok) {
         for (const imageUrl of cssUrlValues(cssResponse.text, cssResponse.url || candidate.url)) {
-          if (imagesToCheck.size >= auditLimits.maxImagesToCheck || imagesToCheck.has(imageUrl)) continue;
+          if (imagesToCheck.size >= scanLimits.maxImagesToCheck || imagesToCheck.has(imageUrl)) continue;
           imagesToCheck.set(imageUrl, { url: imageUrl, from: candidate.from, purpose: "external-css-url", css: candidate.url });
         }
       }
@@ -4011,7 +4011,7 @@ async function runLocalScan(scanId: string) {
   phase = "deduplicating";
   for (const [title, rows] of groupDuplicateValues(pages, "title")) {
     for (const page of rows) {
-      pushAuditIssue(issues, pageBucket(page.url), {
+      pushScanIssue(issues, pageBucket(page.url), {
         url: page.url,
         severity: "medium",
         category: "metadata",
@@ -4024,7 +4024,7 @@ async function runLocalScan(scanId: string) {
   }
   for (const [description, rows] of groupDuplicateValues(pages, "description")) {
     for (const page of rows) {
-      pushAuditIssue(issues, pageBucket(page.url), {
+      pushScanIssue(issues, pageBucket(page.url), {
         url: page.url,
         severity: "low",
         category: "metadata",
@@ -4038,7 +4038,7 @@ async function runLocalScan(scanId: string) {
   for (const [h1, rows] of groupDuplicateValues(pages, "h1")) {
     if (!firstH1Fingerprint(h1)) continue;
     for (const page of rows) {
-      pushAuditIssue(issues, pageBucket(page.url), {
+      pushScanIssue(issues, pageBucket(page.url), {
         url: page.url,
         severity: "low",
         category: "headings",
@@ -4051,7 +4051,7 @@ async function runLocalScan(scanId: string) {
   }
   for (const [, rows] of groupDuplicateValues(pages.filter((page) => page.wordCount >= 120), "contentFingerprint")) {
     for (const page of rows) {
-      pushAuditIssue(issues, pageBucket(page.url), {
+      pushScanIssue(issues, pageBucket(page.url), {
         url: page.url,
         severity: "medium",
         category: "content",
@@ -4065,7 +4065,7 @@ async function runLocalScan(scanId: string) {
   if (sitemapUrlSet.size > 0) {
     for (const page of pages.filter((item) => item.indexable)) {
       if (!sitemapUrlSet.has(normalizedUrlKey(page.finalUrl || page.url)) && !sitemapUrlSet.has(normalizedUrlKey(page.url))) {
-        pushAuditIssue(issues, pageBucket(page.url), {
+        pushScanIssue(issues, pageBucket(page.url), {
           url: page.url,
           severity: "low",
           category: "sitemap",
@@ -4077,7 +4077,7 @@ async function runLocalScan(scanId: string) {
     }
     for (const page of pages.filter((item) => !item.indexable)) {
       if (sitemapUrlSet.has(normalizedUrlKey(page.finalUrl || page.url)) || sitemapUrlSet.has(normalizedUrlKey(page.url))) {
-        pushAuditIssue(issues, pageBucket(page.url), {
+        pushScanIssue(issues, pageBucket(page.url), {
           url: page.url,
           severity: "medium",
           category: "sitemap",
@@ -4090,7 +4090,7 @@ async function runLocalScan(scanId: string) {
   }
   for (const page of pages.filter((item) => item.indexable && item.discovery === "sitemap" && Number(item.internalInlinks || 0) === 0)) {
     if (normalizedUrlKey(page.url) === normalizedUrlKey(startUrl)) continue;
-    pushAuditIssue(issues, pageBucket(page.url), {
+    pushScanIssue(issues, pageBucket(page.url), {
       url: page.url,
       severity: "medium",
       category: "crawl",
@@ -4101,7 +4101,7 @@ async function runLocalScan(scanId: string) {
     });
   }
   if (pages.length === 0) {
-    pushAuditIssue(issues, pageBucket(startUrl), {
+    pushScanIssue(issues, pageBucket(startUrl), {
       url: startUrl,
       severity: "high",
       category: "crawl",
@@ -4123,7 +4123,7 @@ async function runLocalScan(scanId: string) {
   const medium = issues.filter((issue) => issue.severity === "medium").length;
   const low = issues.filter((issue) => issue.severity === "low").length;
   const score = pages.length === 0 ? 0 : Math.max(0, Math.min(100, 100 - high * 8 - medium * 3 - low));
-  const result = auditResult({
+  const result = scanResult({
     startUrl,
     origin,
     phase,
@@ -4136,7 +4136,7 @@ async function runLocalScan(scanId: string) {
     linkInventory,
     robots,
     sitemap,
-    limits: auditLimits,
+    limits: scanLimits,
   });
   run(
     `

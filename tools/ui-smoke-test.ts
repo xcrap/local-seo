@@ -9,7 +9,7 @@ const apiPort = 4510 + Math.floor(Math.random() * 300);
 const webPort = apiPort + 700;
 const webUrl = `http://127.0.0.1:${webPort}`;
 let fixtureUrl = "";
-let auditReportPath = "";
+let scanReportPath = "";
 
 const fixtureServer = Bun.serve({
   port: 0,
@@ -177,9 +177,9 @@ try {
     await page.getByRole("button", { name: /Add site and scan/i }).click();
 
     await page.getByRole("heading", { name: /Scan report/i }).waitFor({ timeout: 20_000 });
-    auditReportPath = new URL(page.url()).pathname;
-    if (!auditReportPath.startsWith("/scans/")) {
-      throw new Error(`First scan should open on the /scans route, got ${auditReportPath}.`);
+    scanReportPath = new URL(page.url()).pathname;
+    if (!scanReportPath.startsWith("/scans/")) {
+      throw new Error(`First scan should open on the /scans route, got ${scanReportPath}.`);
     }
     await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
     if (await page.getByRole("heading", { name: /^Scan health$/ }).count()) {
@@ -188,7 +188,7 @@ try {
     await page.getByRole("tab", { name: /^Overview$/ }).click();
     await page.getByRole("heading", { name: /^Scan health$/ }).waitFor();
     if (await page.getByRole("heading", { name: /^Audit snapshot$/ }).count()) {
-      throw new Error("Overview should not duplicate the audit snapshot table.");
+      throw new Error("Overview should not duplicate the old audit snapshot table.");
     }
     await page.getByRole("tab", { name: /^Progress$/ }).click();
     await page.getByRole("heading", { name: /Scan progress/i }).waitFor();
@@ -234,10 +234,10 @@ try {
     await page.getByRole("tab", { name: /^Checks$/ }).click();
     await page.getByRole("heading", { name: /^Scan checks$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Issue types$/ }).waitFor();
-    const clearAuditCheckRow = page.getByRole("row").filter({ hasText: "No issues" }).first();
-    await clearAuditCheckRow.waitFor();
-    if (await clearAuditCheckRow.getByRole("button", { name: /Show \d+ issues/i }).count()) {
-      throw new Error("Clear audit checks should not expose an issue-opening button.");
+    const clearScanCheckRow = page.getByRole("row").filter({ hasText: "No issues" }).first();
+    await clearScanCheckRow.waitFor();
+    if (await clearScanCheckRow.getByRole("button", { name: /Show \d+ issues/i }).count()) {
+      throw new Error("Clear scan checks should not expose an issue-opening button.");
     }
     await page.getByRole("row", { name: /Broken links/i }).getByRole("button", { name: /Show \d+ issues/i }).click();
     await page.getByText("Showing Broken links").waitFor();
@@ -469,12 +469,12 @@ try {
     ) {
       throw new Error(`Scan history table should fit the viewport, got ${JSON.stringify(scanHistoryBox)} in ${JSON.stringify(scanHistoryViewport)}.`);
     }
-    if (auditReportPath) {
+    if (scanReportPath) {
       await page.setViewportSize({ width: 390, height: 844 });
-      await page.goto(`${webUrl}${auditReportPath}`, { waitUntil: "networkidle" });
+      await page.goto(`${webUrl}${scanReportPath}`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: /Scan report/i }).waitFor();
       await page.getByRole("heading", { name: /^Scan health$|^Scan progress$/ }).waitFor();
-      await assertNoHorizontalOverflow(page, "Mobile audit report");
+      await assertNoHorizontalOverflow(page, "Mobile scan report");
       await page.setViewportSize({ width: 1600, height: 1000 });
       await page.goto(`${webUrl}/scans`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: /^Page speed tracking$/ }).waitFor();

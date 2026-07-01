@@ -1,8 +1,8 @@
 # Local SEO
 
-Local SEO is a local-first React + SQLite SEO app inspired by OpenSEO.
-It has no Cloudflare runtime, no D1/KV/R2, no hosted billing, and no external
-auth service.
+Local SEO is a local-first React + SQLite SEO workstation. It runs as a single
+local app with SQLite storage, one local admin account, and optional external
+data connectors only when you configure them.
 
 ## Features
 
@@ -17,7 +17,7 @@ auth service.
 - Local MCP JSON-RPC endpoint at `/mcp`
 - Shadcn-style React UI with a warm Tracking-inspired design system
 
-## OpenSEO-Inspired Local Workflows
+## Local Workflows
 
 - **Sites:** saved websites with domain, crawl URL preferences, optional keyword tool defaults, and notes.
 - **Keyword research:** real DuckDuckGo suggestions, with metrics only when a real metrics source or import is configured.
@@ -72,11 +72,10 @@ scans still feed technical pages, internal/external links, images, assets,
 sitemap, robots, and response timing into reports. The app shows not-connected
 states instead of invented rows.
 
-This app is local-first and intentionally removes OpenSEO hosted features:
-billing, teams/orgs, hosted auth, Cloudflare Workers, D1, KV, R2, queues, and
-hosted cron workflows. The local replacements are SQLite tables, real local
-crawls, manual run buttons, Google OAuth stored locally, and a custom local MCP
-endpoint.
+This app is local-first. Hosted product concerns such as billing, teams/orgs,
+hosted auth, queues, and hosted cron workflows are not part of this fresh local
+app. The product uses SQLite tables, real local crawls, manual run buttons,
+Google OAuth stored locally, and a custom local MCP endpoint.
 
 ## MCP
 

@@ -51,7 +51,7 @@ const fixtureServer = Bun.serve({
             <script src="/missing.js"></script>
           </head>
           <body>
-            <h1>Fixture SEO Audit</h1>
+            <h1>Fixture SEO Scan</h1>
 	            <p>This local fixture intentionally includes broken scan signals so smoke tests can verify real crawler evidence.</p>
 	            <img alt="Missing source example">
 	            <img src="/broken-image.png">
@@ -95,7 +95,7 @@ const fixtureServer = Bun.serve({
             <meta name="description" content="This orphan page exists only in the sitemap for local scan coverage testing.">
           </head>
           <body>
-            <h1>Fixture SEO Audit</h1>
+            <h1>Fixture SEO Scan</h1>
             <p>This page is indexable, sitemap-listed, and intentionally has no internal inlinks from the start page.</p>
           </body>
         </html>`,
@@ -337,11 +337,14 @@ try {
       throw new Error(`Scan service should not keep old audit-era function names: ${oldScanServiceName}`);
     }
   }
+  if (/\bAudit[A-Za-z0-9_]*\b|\baudit[A-Za-z0-9_]*\b/.test(seoSource)) {
+    throw new Error("Crawler service internals should use scan naming, not audit-era identifiers.");
+  }
   if (!seoSource.includes("activeSite:") || !/^\s*sites:/m.test(seoSource)) {
     throw new Error("Dashboard API should return activeSite/sites terminology.");
   }
   if (/slice\(0,\s*5\)/.test(seoSource)) {
-    throw new Error("Crawler audit issues should keep full local evidence arrays instead of five-item samples.");
+    throw new Error("Crawler scan issues should keep full local evidence arrays instead of five-item samples.");
   }
   if (!seoSource.includes("function searchSearxng") || !seoSource.includes("process.env.SEARXNG_URL")) {
     throw new Error("SERP/rank search should support self-hosted SearXNG before falling back to DuckDuckGo.");
@@ -358,6 +361,9 @@ try {
     throw new Error("Grid children should be allowed to shrink so table evidence scrolls internally on mobile.");
   }
   const webAppClient = await readFile(path.join(rootDir, "web/src/App.tsx"), "utf8");
+  if (/\bAudit[A-Za-z0-9_]*\b|\baudit[A-Za-z0-9_]*\b|\baudits\b|\bAudits\b/.test(webAppClient)) {
+    throw new Error("React app internals should use scan naming, not audit-era identifiers.");
+  }
   if (!webAppClient.includes("One local admin account for this install.") || !webAppClient.includes("SQLite is the source of truth on this machine.") || !webAppClient.includes("No hosted auth service is required.")) {
     throw new Error("First-run setup should explain the single local admin, SQLite source of truth, and no hosted auth model.");
   }
@@ -386,7 +392,7 @@ try {
     throw new Error("Date controls should use the shadcn Calendar/Popover date picker instead of native date inputs.");
   }
   if (!webAppClient.includes("function EvidenceValue") || !webAppClient.includes("more in saved evidence")) {
-    throw new Error("Audit issue evidence should summarize long sample lists without crushing table columns.");
+    throw new Error("Scan issue evidence should summarize long sample lists without crushing table columns.");
   }
   if (webAppClient.includes("absolute bottom-5") || !webAppClient.includes("min-h-0 flex-1 space-y-1 overflow-y-auto")) {
     throw new Error("Desktop sidebar navigation should scroll above a real footer instead of overlapping the sign-out button.");
@@ -398,7 +404,7 @@ try {
     throw new Error("The app shell should use React Router navigation instead of full-page window.location.href route changes.");
   }
   if (webAppClient.includes("rows[0] || ledger[0]")) {
-    throw new Error("Audit report selection should not hide context by auto-opening the newest global scan.");
+    throw new Error("Scan report selection should not hide context by auto-opening the newest global scan.");
   }
   if (/First scan target|target candidates|Resolve target|tries \$\{formatNumber\(candidates\.length\)\} targets|tries \d+ targets/i.test(webAppClient)) {
     throw new Error("The app should present saved-site crawl settings as explicit crawl URLs, not vague target wording.");
@@ -413,10 +419,10 @@ try {
     throw new Error("Site create/edit forms should preview the exact scan plan before starting a scan.");
   }
   if (!webAppClient.includes("Every saved scan is still listed below")) {
-    throw new Error("Audit page should explain that all saved scans remain visible in the local ledger.");
+    throw new Error("Scan page should explain that all saved scans remain visible in the local ledger.");
   }
   if (!webAppClient.includes("total scans visible below")) {
-    throw new Error("Audit history should show the active-site scan count and total visible scan count.");
+    throw new Error("Scan history should show the active-site scan count and total visible scan count.");
   }
   if (!webAppClient.includes("Could not load local sites") || !webAppClient.includes("Your SQLite data was not cleared")) {
     throw new Error("Site loading failures should be visible instead of rendering an empty site list that looks like data loss.");
@@ -425,7 +431,7 @@ try {
     throw new Error("Organic and Links pages should expose saved scan selectors instead of hiding older scans behind latest-only evidence.");
   }
   if (/from the latest (site|local) audit|The latest audit did not/i.test(webAppClient)) {
-    throw new Error("Audit-derived evidence pages should not present local crawl data as latest-only.");
+    throw new Error("Scan-derived evidence pages should not present local crawl data as latest-only.");
   }
   for (const requiredDomainLabel of ["Ranking domain", "Research domain", "Backlink domain", "Comparison domain", "Active site domain:"]) {
     if (!webAppClient.includes(requiredDomainLabel)) {
@@ -538,7 +544,7 @@ try {
     }
   }
   if (!webAppClient.includes("?tab=speed") || !webAppClient.includes("useSearchParams")) {
-    throw new Error("Overview speed action should deep-link directly to the audit Speed tab.");
+    throw new Error("Overview speed action should deep-link directly to the scan Speed tab.");
   }
   for (const vagueDashboardStatus of ['"has keywords"', '"has jobs"', '"ready"', '"manual"', '"needs scan"', '"not run"', '"local graph"']) {
     if (webAppClient.includes(vagueDashboardStatus)) {
@@ -567,25 +573,25 @@ try {
     throw new Error("Page speed evidence should treat 0 ms as a valid measured response time.");
   }
   if (!webAppClient.includes("<TableHead>URL</TableHead>") || !webAppClient.includes("<TableHead>Window</TableHead>")) {
-    throw new Error("Audit link tables should label URL columns and HTML target-window attributes clearly.");
+    throw new Error("Scan link tables should label URL columns and HTML target-window attributes clearly.");
   }
   if (!webAppClient.includes("<TableHead>Inputs</TableHead>") || !webAppClient.includes('required.has(name) ? " required" : ""')) {
     throw new Error("MCP tools table should show all inputs and mark required ones inline.");
   }
   if (!webAppClient.includes("Issue results") || !webAppClient.includes("Show {formatNumber")) {
-    throw new Error("Audit issue actions should show an explicit filtered issue result count instead of generic Review buttons.");
+    throw new Error("Scan issue actions should show an explicit filtered issue result count instead of generic Review buttons.");
   }
   if (webAppClient.includes("Review high") || webAppClient.includes("Use Review to jump") || webAppClient.includes("<ListChecks /> Review")) {
-    throw new Error("Audit report actions should say exactly which issues they open, not generic Review.");
+    throw new Error("Scan report actions should say exactly which issues they open, not generic Review.");
   }
   if (webAppClient.includes("rows.slice(0, 350)") || webAppClient.includes("Showing {formatNumber(visible.length)}")) {
-    throw new Error("Audit evidence tables should not silently cap local link or image inventory rows.");
+    throw new Error("Scan evidence tables should not silently cap local link or image inventory rows.");
   }
   if (webAppClient.includes(".slice(0, 150)") || webAppClient.includes(".slice(0, 100)")) {
-    throw new Error("Local link graph should not silently cap audit-derived local evidence rows.");
+    throw new Error("Local link graph should not silently cap scan-derived local evidence rows.");
   }
   if (webAppClient.includes(".slice(0, 25);")) {
-    throw new Error("Local organic crawl evidence should not silently cap audit-derived page rows.");
+    throw new Error("Local organic crawl evidence should not silently cap scan-derived page rows.");
   }
   if (webAppClient.includes("rows.slice(0, 6)") || webAppClient.includes("runs.slice(0, 8)")) {
     throw new Error("Local history widgets should not silently cap saved history rows.");

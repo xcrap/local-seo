@@ -271,7 +271,7 @@ function localSiteHost(domain: string) {
   return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
 }
 
-function defaultAuditUrl(domain?: string) {
+function defaultScanUrl(domain?: string) {
   const clean = cleanSiteDomain(domain);
   if (!clean) return "";
   return `${localSiteHost(clean) ? "http" : "https"}://${clean}`;
@@ -291,11 +291,11 @@ function hostFromUrl(value?: string) {
   }
 }
 
-function auditSiteName(row: any) {
+function scanSiteName(row: any) {
   return row.site_name || row.site_domain || hostFromUrl(row.url) || "Unlinked saved site";
 }
 
-function auditSiteDetail(row: any) {
+function scanSiteDetail(row: any) {
   if (row.site_domain) return row.site_domain;
   const host = hostFromUrl(row.url);
   return host ? `Scan URL host: ${host}` : "Saved site record unavailable";
@@ -325,7 +325,7 @@ function scanTargetCandidates(site?: ScanPlanTarget | null) {
   return Array.from(new Set(urls));
 }
 
-function preferredAuditUrl(site?: ScanPlanTarget | null) {
+function preferredScanUrl(site?: ScanPlanTarget | null) {
   return scanTargetCandidates(site)[0] || "";
 }
 
@@ -838,12 +838,12 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
-function auditProgress(audit: any) {
-  if (!audit) return 0;
-  if (audit.status === "completed" || audit.status === "failed") return 100;
-  const limit = Number(audit.result?.limits?.maxPages || 100);
-  const pageProgress = Math.min(70, Math.round((Number(audit.pages_crawled || 0) / Math.max(1, limit)) * 70));
-  const phase = audit.result?.phase || "";
+function scanProgress(scan: any) {
+  if (!scan) return 0;
+  if (scan.status === "completed" || scan.status === "failed") return 100;
+  const limit = Number(scan.result?.limits?.maxPages || 100);
+  const pageProgress = Math.min(70, Math.round((Number(scan.pages_crawled || 0) / Math.max(1, limit)) * 70));
+  const phase = scan.result?.phase || "";
   const phaseProgress = phase.includes("links")
     ? 76
     : phase.includes("images")
@@ -856,11 +856,11 @@ function auditProgress(audit: any) {
   return Math.min(96, Math.max(8, pageProgress, phaseProgress));
 }
 
-function auditIsActive(audit: any) {
-  return audit?.status === "queued" || audit?.status === "running";
+function scanIsActive(scan: any) {
+  return scan?.status === "queued" || scan?.status === "running";
 }
 
-function sortAuditRows(rows: any[]) {
+function sortScanRows(rows: any[]) {
   return [...rows].sort((a, b) => {
     const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
     const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
@@ -868,16 +868,16 @@ function sortAuditRows(rows: any[]) {
   });
 }
 
-function upsertAuditRow(rows: any[], audit: any) {
-  if (!audit?.id) return rows;
-  return sortAuditRows([audit, ...rows.filter((row) => row.id !== audit.id)]);
+function upsertScanRow(rows: any[], scan: any) {
+  if (!scan?.id) return rows;
+  return sortScanRows([scan, ...rows.filter((row) => row.id !== scan.id)]);
 }
 
-function auditPhaseKey(audit: any) {
-  const phase = String(audit?.result?.phase || audit?.result?.summary?.phase || "").toLowerCase();
-  if (audit?.status === "queued") return "queued";
-  if (audit?.status === "failed") return "failed";
-  if (audit?.status === "completed" || phase === "completed") return "completed";
+function scanPhaseKey(scan: any) {
+  const phase = String(scan?.result?.phase || scan?.result?.summary?.phase || "").toLowerCase();
+  if (scan?.status === "queued") return "queued";
+  if (scan?.status === "failed") return "failed";
+  if (scan?.status === "completed" || phase === "completed") return "completed";
   if (phase.includes("deduplicating")) return "report";
   if (phase.includes("css images")) return "images";
   if (phase.includes("assets")) return "assets";
@@ -888,7 +888,7 @@ function auditPhaseKey(audit: any) {
   return "target";
 }
 
-function auditPhaseLabel(audit: any) {
+function scanPhaseLabel(scan: any) {
   const labels: Record<string, string> = {
     queued: "Queued",
     failed: "Failed",
@@ -901,13 +901,13 @@ function auditPhaseLabel(audit: any) {
     robots: "Reading robots and sitemap",
     target: "Resolving start URL",
   };
-  return labels[auditPhaseKey(audit)] || "Scanning";
+  return labels[scanPhaseKey(scan)] || "Scanning";
 }
 
-function auditSeverityCounts(audit: any) {
-  const summary = audit?.result?.summary?.bySeverity || {};
-  const flatSummary = audit?.result?.summary || {};
-  const issues = Array.isArray(audit?.result?.issues) ? audit.result.issues : [];
+function scanSeverityCounts(scan: any) {
+  const summary = scan?.result?.summary?.bySeverity || {};
+  const flatSummary = scan?.result?.summary || {};
+  const issues = Array.isArray(scan?.result?.issues) ? scan.result.issues : [];
   return {
     high: Number(summary.high || flatSummary.high || issues.filter((issue: any) => issue.severity === "high").length || 0),
     medium: Number(summary.medium || flatSummary.medium || issues.filter((issue: any) => issue.severity === "medium").length || 0),
@@ -938,7 +938,7 @@ function IndexabilityBadge({ page }: { page: any }) {
   return <Badge variant={page.indexable ? "good" : "bad"}>{page.indexable ? "Yes" : "No"}</Badge>;
 }
 
-function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
+function scanCoverageMetrics(scan: any, result: any = {}, summary: any = {}) {
   const pages = Array.isArray(result.pages) ? result.pages : [];
   const links = Array.isArray(result.links) ? result.links : [];
   const linkInventory = Array.isArray(result.linkInventory) ? result.linkInventory : [];
@@ -958,7 +958,7 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
   const averageLoadMs = loadTimes.length
     ? Math.round(loadTimes.reduce((sum: number, value: number) => sum + value, 0) / loadTimes.length)
     : 0;
-  const pageCount = maxCount(summary.pages, audit?.pages_crawled, pages.length);
+  const pageCount = maxCount(summary.pages, scan?.pages_crawled, pages.length);
   const indexabilityKnownPages = pages.filter(hasIndexabilityEvidence).length;
   const indexablePages = maxCount(summary.indexablePages, pages.filter((page: any) => page.indexable === true).length);
   const nonIndexablePages = maxCount(summary.nonIndexablePages, pages.filter((page: any) => page.indexable === false).length);
@@ -1003,9 +1003,9 @@ function auditCoverageMetrics(audit: any, result: any = {}, summary: any = {}) {
   };
 }
 
-function auditSpeedMetrics(audit: any) {
-  const result = audit?.result || {};
-  const coverage = auditCoverageMetrics(audit, result, result.summary || {});
+function scanSpeedMetrics(scan: any) {
+  const result = scan?.result || {};
+  const coverage = scanCoverageMetrics(scan, result, result.summary || {});
   return {
     measuredPageLoads: Number(coverage.measuredPageLoads || 0),
     averagePageLoadMs: Number(coverage.averagePageLoadMs || 0),
@@ -1017,10 +1017,10 @@ function auditSpeedMetrics(audit: any) {
   };
 }
 
-function auditSpeedHistoryRows(audits: any[]) {
-  return sortAuditRows(audits)
-    .filter((audit) => audit.status === "completed")
-    .map((audit) => ({ audit, metrics: auditSpeedMetrics(audit) }))
+function scanSpeedHistoryRows(scans: any[]) {
+  return sortScanRows(scans)
+    .filter((scan) => scan.status === "completed")
+    .map((scan) => ({ scan, metrics: scanSpeedMetrics(scan) }))
     .filter((row) => row.metrics.measuredPageLoads > 0);
 }
 
@@ -1047,7 +1047,7 @@ function issueTypesCount(issues: any[], types: string[]) {
   return issues.filter((issue) => types.includes(issue.type)).length;
 }
 
-type AuditCheckRowModel = {
+type ScanCheckRowModel = {
   label: string;
   value: unknown;
   problem?: boolean;
@@ -1056,10 +1056,10 @@ type AuditCheckRowModel = {
   types?: string[];
 };
 
-type AuditCheckSectionModel = {
+type ScanCheckSectionModel = {
   title: string;
   text: string;
-  rows: AuditCheckRowModel[];
+  rows: ScanCheckRowModel[];
 };
 
 function pageIssueTypeCount(page: any, type: string) {
@@ -1070,16 +1070,16 @@ function pageIssueTypesCount(page: any, types: string[]) {
   return (page.issues || []).filter((issue: any) => types.includes(issue.type)).length;
 }
 
-function latestCompletedAudit(rows: any[]) {
-  return (rows || []).find((audit) => audit?.status === "completed" && audit?.result) || null;
+function latestCompletedScan(rows: any[]) {
+  return (rows || []).find((scan) => scan?.status === "completed" && scan?.result) || null;
 }
 
 function defaultEvidenceScan(rows: any[]) {
-  const sorted = sortAuditRows(rows || []);
-  return latestCompletedAudit(sorted) || sorted[0] || null;
+  const sorted = sortScanRows(rows || []);
+  return latestCompletedScan(sorted) || sorted[0] || null;
 }
 
-function auditIssueCount(row: any) {
+function scanIssueCount(row: any) {
   return Number(row?.issues?.length || 0);
 }
 
@@ -1414,8 +1414,8 @@ function AppShell() {
                 <Route path="/links" element={<LinksPage site={activeSite} />} />
                 <Route path="/brand" element={<BrandLookupPage site={activeSite} />} />
                 <Route path="/prompts" element={<PromptExplorerPage site={activeSite} />} />
-                <Route path="/scans" element={<AuditsPage site={activeSite} />} />
-                <Route path="/scans/:scanId" element={<AuditReportRoute />} />
+                <Route path="/scans" element={<ScansPage site={activeSite} />} />
+                <Route path="/scans/:scanId" element={<ScanReportRoute />} />
                 <Route path="/gsc" element={<GscPage site={activeSite} />} />
                 <Route path="/ai" element={<AiPage site={activeSite} />} />
                 <Route path="/mcp-tools" element={<McpPage site={activeSite} />} />
@@ -1472,7 +1472,7 @@ function Overview({
 }) {
   const [summary, setSummary] = useState<any>(null);
   const [scan, setScan] = useState<any>(null);
-  const [scanAudit, setScanAudit] = useState<any>(null);
+  const [scanRun, setScanRun] = useState<any>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
   const [firstDomain, setFirstDomain] = useState("");
@@ -1481,7 +1481,7 @@ function Overview({
   const [firstCrawlHost, setFirstCrawlHost] = useState<Site["crawl_host"]>("auto");
   const [firstScanError, setFirstScanError] = useState("");
   const navigate = useNavigate();
-  const scanLedgerRows = sortAuditRows(summary?.allScans || summary?.latestScans || []);
+  const scanLedgerRows = sortScanRows(summary?.allScans || summary?.latestScans || []);
 
   useEffect(() => {
     api.dashboard(site.id).then(setSummary).catch(console.error);
@@ -1507,7 +1507,7 @@ function Overview({
     try {
       const result = await api.scanSite(site.id);
       setScan(result);
-      setScanAudit(result.scan);
+      setScanRun(result.scan);
       if (result.scan?.id) {
         setSelectedScanId(site.id, result.scan.id);
         navigate(`/scans/${result.scan.id}`);
@@ -1554,16 +1554,16 @@ function Overview({
   }
 
   useEffect(() => {
-    if (!scanAudit || (scanAudit.status !== "queued" && scanAudit.status !== "running")) return;
+    if (!scanRun || (scanRun.status !== "queued" && scanRun.status !== "running")) return;
     const interval = window.setInterval(async () => {
-      const nextAudit = await api.scan(scanAudit.id);
-      setScanAudit(nextAudit);
-      if (nextAudit?.status === "completed" || nextAudit?.status === "failed") {
+      const nextScan = await api.scan(scanRun.id);
+      setScanRun(nextScan);
+      if (nextScan?.status === "completed" || nextScan?.status === "failed") {
         setSummary(await api.dashboard(site.id));
       }
     }, 1500);
     return () => window.clearInterval(interval);
-  }, [scanAudit?.id, scanAudit?.status]);
+  }, [scanRun?.id, scanRun?.status]);
 
   const firstScanPlan = {
     domain: firstDomain,
@@ -1625,18 +1625,18 @@ function Overview({
         <section className="mb-6 rounded-md border border-primary/40 bg-background p-5">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">
-              {scanAudit?.status === "completed" ? "Scan complete" : scanAudit?.status === "failed" ? "Scan failed" : "Scan running"} for {scan.scanUrl || scanAudit?.url || scan.site}
+              {scanRun?.status === "completed" ? "Scan complete" : scanRun?.status === "failed" ? "Scan failed" : "Scan running"} for {scan.scanUrl || scanRun?.url || scan.site}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {scanAudit?.pages_crawled || 0} pages scanned · {scanAudit?.issue_count || 0} issues found
+              {scanRun?.pages_crawled || 0} pages scanned · {scanRun?.issue_count || 0} issues found
             </p>
           </div>
           <div className="space-y-4">
-            <ProgressBar value={auditProgress(scanAudit)} />
-            {scan.related?.length ? <ScanCoverageList rows={scan.related} auditStatus={scanAudit?.status} /> : null}
+            <ProgressBar value={scanProgress(scanRun)} />
+            {scan.related?.length ? <ScanCoverageList rows={scan.related} scanStatus={scanRun?.status} /> : null}
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="secondary">
-                <Link to={scanAudit?.id ? `/scans/${scanAudit.id}` : "/scans"}>Open scan report</Link>
+                <Link to={scanRun?.id ? `/scans/${scanRun.id}` : "/scans"}>Open scan report</Link>
               </Button>
               <Button asChild variant="secondary"><Link to="/domain">View organic research</Link></Button>
               <Button asChild variant="secondary"><Link to="/links">View links</Link></Button>
@@ -1655,7 +1655,7 @@ function Overview({
           </div>
           <div className="p-5">
             {scanLedgerRows.length ? (
-              <AuditTable rows={scanLedgerRows} showSite onInspect={openScanReport} />
+              <ScanTable rows={scanLedgerRows} showSite onInspect={openScanReport} />
             ) : (
               <EmptyState
                 title="No scans yet"
@@ -1706,9 +1706,9 @@ function SiteCommandCenter({
   scanning: boolean;
   onScan: () => void;
 }) {
-  const latestAudit = summary?.latestScans?.[0];
-  const latestAuditSummary = latestAudit?.result?.summary || {};
-  const latestAuditSpeed = latestAudit ? auditSpeedMetrics(latestAudit) : null;
+  const latestScan = summary?.latestScans?.[0];
+  const latestScanSummary = latestScan?.result?.summary || {};
+  const latestScanSpeed = latestScan ? scanSpeedMetrics(latestScan) : null;
   const latestGscImport = summary?.latestGscImport;
   const rows = [
     {
@@ -1716,7 +1716,7 @@ function SiteCommandCenter({
       area: "Active site",
       status: site.domain || "Needs website address",
       evidence: site.domain
-        ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredAuditUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
+        ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredScanUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
         : "Add a site before running scans, rankings, Search Console imports, or AI work.",
       action: site.domain ? (
         <Button size="sm" onClick={onScan} disabled={scanning}>
@@ -1730,29 +1730,29 @@ function SiteCommandCenter({
       ) : null,
     },
     {
-      key: "audit",
+      key: "scan",
       area: "Technical scan",
-      status: latestAudit ? scanStatusLabel(latestAudit.status) : "Needs scan",
-      evidence: latestAudit
-        ? `${formatNumber(latestAudit.pages_crawled)} pages · ${formatNumber(latestAudit.issue_count)} issues · ${formatNumber(latestAuditSummary.checkedLinks || 0)} links checked`
+      status: latestScan ? scanStatusLabel(latestScan.status) : "Needs scan",
+      evidence: latestScan
+        ? `${formatNumber(latestScan.pages_crawled)} pages · ${formatNumber(latestScan.issue_count)} issues · ${formatNumber(latestScanSummary.checkedLinks || 0)} links checked`
         : "No crawl evidence saved yet.",
       action: <Button asChild size="sm" variant="secondary"><Link to="/scans"><FileSearch /> Open site scans</Link></Button>,
-      secondary: latestAudit ? (
+      secondary: latestScan ? (
         <Button asChild size="sm" variant="outline">
-          <Link to={`/scans/${latestAudit.id}`}><FileSearch /> Open scan report</Link>
+          <Link to={`/scans/${latestScan.id}`}><FileSearch /> Open scan report</Link>
         </Button>
       ) : null,
     },
     {
       key: "speed",
       area: "Page speed",
-      status: latestAuditSpeed?.measuredPageLoads ? "Timing measured" : "Needs scan",
-      evidence: latestAuditSpeed?.measuredPageLoads
-        ? `${formatNumber(latestAuditSpeed.measuredPageLoads)} pages timed · average ${formatMs(latestAuditSpeed.averagePageLoadMs)} · p95 ${formatMs(latestAuditSpeed.p95PageLoadMs)} · ${formatNumber(latestAuditSpeed.slowPages)} slow`
+      status: latestScanSpeed?.measuredPageLoads ? "Timing measured" : "Needs scan",
+      evidence: latestScanSpeed?.measuredPageLoads
+        ? `${formatNumber(latestScanSpeed.measuredPageLoads)} pages timed · average ${formatMs(latestScanSpeed.averagePageLoadMs)} · p95 ${formatMs(latestScanSpeed.p95PageLoadMs)} · ${formatNumber(latestScanSpeed.slowPages)} slow`
         : "Run a site scan to record response timings for every crawled HTML page.",
-      action: latestAuditSpeed?.measuredPageLoads ? (
+      action: latestScanSpeed?.measuredPageLoads ? (
         <Button asChild size="sm" variant="secondary">
-          <Link to={`/scans/${latestAudit.id}?tab=speed`}><Zap /> Open speed report</Link>
+          <Link to={`/scans/${latestScan.id}?tab=speed`}><Zap /> Open speed report</Link>
         </Button>
       ) : site.domain ? (
         <Button size="sm" variant="secondary" onClick={onScan} disabled={scanning}>
@@ -1761,7 +1761,7 @@ function SiteCommandCenter({
       ) : (
         <Button asChild size="sm" variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
       ),
-      secondary: latestAudit ? (
+      secondary: latestScan ? (
         <Button asChild size="sm" variant="outline"><Link to="/scans"><FileSearch /> Open scan history</Link></Button>
       ) : null,
     },
@@ -1776,9 +1776,9 @@ function SiteCommandCenter({
     {
       key: "links",
       area: "Links",
-      status: latestAudit ? "Local graph ready" : "Needs scan",
-      evidence: latestAudit
-        ? `${formatNumber(latestAuditSummary.linkTags || 0)} link tags · ${formatNumber(latestAuditSummary.brokenLinks || 0)} broken`
+      status: latestScan ? "Local graph ready" : "Needs scan",
+      evidence: latestScan
+        ? `${formatNumber(latestScanSummary.linkTags || 0)} link tags · ${formatNumber(latestScanSummary.brokenLinks || 0)} broken`
         : "Run a site scan to build the local link graph.",
       action: <Button asChild size="sm" variant="secondary"><Link to="/links"><Link2 /> Open local link graph</Link></Button>,
       secondary: null,
@@ -1874,11 +1874,11 @@ function siteCommandStatusVariant(status: string): ComponentProps<typeof Badge>[
   return /^Needs/i.test(status) ? "warn" : "outline";
 }
 
-function ScanCoverageList({ rows, auditStatus }: { rows: any[]; auditStatus?: string }) {
+function ScanCoverageList({ rows, scanStatus }: { rows: any[]; scanStatus?: string }) {
   return (
     <div className="divide-y rounded-md border bg-background">
       {rows.map((row) => {
-        const status = row.key === "technical-scan" && auditStatus ? auditStatus : row.status;
+        const status = row.key === "technical-scan" && scanStatus ? scanStatus : row.status;
         const variant = status === "completed" || status === "queued" || status === "running" || status === "local" ? "good" : status === "needs-provider" ? "warn" : "outline";
         const actionLabel = row.key === "technical-scan"
           ? "Open live report"
@@ -3025,7 +3025,7 @@ function DomainPage({ site }: { site: Site }) {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
   const selectedScan = useMemo(
-    () => scanRows.find((audit) => audit.id === selectedScanId) || defaultEvidenceScan(scanRows),
+    () => scanRows.find((scan) => scan.id === selectedScanId) || defaultEvidenceScan(scanRows),
     [scanRows, selectedScanId],
   );
 
@@ -3038,15 +3038,15 @@ function DomainPage({ site }: { site: Site }) {
   }, [site.id, site.domain]);
 
   async function loadHistory() {
-    const [snapshots, audits] = await Promise.all([
+    const [snapshots, scans] = await Promise.all([
       api.domainSnapshots(site.id),
       api.scans(site.id),
     ]);
     setHistory(snapshots);
-    const rows = sortAuditRows(audits);
+    const rows = sortScanRows(scans);
     setScanRows(rows);
     setSelectedScanIdState((currentId) => {
-      if (currentId && rows.some((audit) => audit.id === currentId)) return currentId;
+      if (currentId && rows.some((scan) => scan.id === currentId)) return currentId;
       return defaultEvidenceScan(rows)?.id || "";
     });
   }
@@ -3118,8 +3118,8 @@ function DomainPage({ site }: { site: Site }) {
       </section>
       <div className="mt-6 space-y-6">
         <LocalOrganicEvidence
-          audit={selectedScan}
-          audits={scanRows}
+          scan={selectedScan}
+          scans={scanRows}
           selectedScanId={selectedScan?.id || ""}
           onScanChange={setSelectedScanIdState}
           siteDomain={site.domain}
@@ -3168,17 +3168,17 @@ function DomainPage({ site }: { site: Site }) {
 
 function ScanRunPicker({
   label,
-  audits,
+  scans,
   selectedScanId,
   onScanChange,
 }: {
   label: string;
-  audits: any[];
+  scans: any[];
   selectedScanId: string;
   onScanChange: (scanId: string) => void;
 }) {
-  if (!audits.length) return null;
-  const selected = audits.find((audit) => audit.id === selectedScanId) || audits[0];
+  if (!scans.length) return null;
+  const selected = scans.find((scan) => scan.id === selectedScanId) || scans[0];
   return (
     <div className="w-full space-y-2 lg:w-[440px]">
       <Label>{label}</Label>
@@ -3188,9 +3188,9 @@ function ScanRunPicker({
             <SelectValue placeholder="Choose saved scan" />
           </SelectTrigger>
           <SelectContent>
-            {audits.map((audit) => (
-              <SelectItem key={audit.id} value={audit.id}>
-                {formatDate(audit.created_at || audit.updated_at)} · {scanStatusLabel(audit.status)} · {formatNumber(audit.pages_crawled || 0)} pages · {audit.url}
+            {scans.map((scan) => (
+              <SelectItem key={scan.id} value={scan.id}>
+                {formatDate(scan.created_at || scan.updated_at)} · {scanStatusLabel(scan.status)} · {formatNumber(scan.pages_crawled || 0)} pages · {scan.url}
               </SelectItem>
             ))}
           </SelectContent>
@@ -3200,32 +3200,32 @@ function ScanRunPicker({
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        {formatNumber(audits.length)} saved scan{audits.length === 1 ? "" : "s"} available for this site.
+        {formatNumber(scans.length)} saved scan{scans.length === 1 ? "" : "s"} available for this site.
       </p>
     </div>
   );
 }
 
 function LocalOrganicEvidence({
-  audit,
-  audits,
+  scan,
+  scans,
   selectedScanId,
   onScanChange,
   siteDomain,
   onScan,
   scanning,
 }: {
-  audit: any;
-  audits: any[];
+  scan: any;
+  scans: any[];
   selectedScanId: string;
   onScanChange: (scanId: string) => void;
   siteDomain: string;
   onScan: () => void;
   scanning: boolean;
 }) {
-  const pages = audit?.result?.pages || [];
+  const pages = scan?.result?.pages || [];
   const rows = [...pages]
-    .sort((a, b) => auditIssueCount(b) - auditIssueCount(a));
+    .sort((a, b) => scanIssueCount(b) - scanIssueCount(a));
   const indexableCount = pages.filter((page: any) => page.indexable === true).length;
   const unknownIndexabilityCount = pages.filter((page: any) => !hasIndexabilityEvidence(page)).length;
   const missingTitleCount = pages.filter((page: any) => !page.title).length;
@@ -3241,11 +3241,11 @@ function LocalOrganicEvidence({
               Real page evidence from the selected saved scan. No external keyword or traffic estimates are generated here.
             </p>
           </div>
-          <ScanRunPicker label="Saved scan for page evidence" audits={audits} selectedScanId={selectedScanId} onScanChange={onScanChange} />
+          <ScanRunPicker label="Saved scan for page evidence" scans={scans} selectedScanId={selectedScanId} onScanChange={onScanChange} />
         </div>
       </div>
       <div className="space-y-4 p-5">
-        {!audit ? (
+        {!scan ? (
           <EmptyState
             title="No local crawl yet"
             text={siteDomain ? "Run a site scan once to fill this page with real crawl evidence." : "Add a website address and run a scan to fill this page."}
@@ -3257,11 +3257,11 @@ function LocalOrganicEvidence({
               <Button asChild variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
             )}
           />
-        ) : !audit.result ? (
+        ) : !scan.result ? (
           <EmptyState
-            title={auditIsActive(audit) ? "Selected scan is still running" : "Selected scan has no crawl evidence"}
-            text={auditIsActive(audit) ? "Open the scan report to watch progress. Evidence appears here after crawl data is saved." : audit.error || "This saved scan did not include crawl rows."}
-            action={<Button asChild variant="secondary"><Link to={`/scans/${audit.id}`}><FileSearch /> Open scan report</Link></Button>}
+            title={scanIsActive(scan) ? "Selected scan is still running" : "Selected scan has no crawl evidence"}
+            text={scanIsActive(scan) ? "Open the scan report to watch progress. Evidence appears here after crawl data is saved." : scan.error || "This saved scan did not include crawl rows."}
+            action={<Button asChild variant="secondary"><Link to={`/scans/${scan.id}`}><FileSearch /> Open scan report</Link></Button>}
           />
         ) : (
           <>
@@ -3273,7 +3273,7 @@ function LocalOrganicEvidence({
                 ["Missing titles", missingTitleCount],
                 ["Missing descriptions", missingDescriptionCount],
                 ["H1 issues", h1IssueCount],
-                ["Total crawl issues", audit.issue_count],
+                ["Total crawl issues", scan.issue_count],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-4 px-4 py-3">
                   <span className="text-sm font-medium">{label}</span>
@@ -3329,7 +3329,7 @@ function LocalOrganicPagesTable({ rows }: { rows: any[] }) {
             <TableCell className="nums">{formatNumber(page.wordCount)}</TableCell>
             <TableCell className="nums">{formatNumber(page.internalInlinks || 0)}</TableCell>
             <TableCell>
-              <Badge variant={auditIssueCount(page) ? "warn" : "good"}>{formatNumber(auditIssueCount(page))}</Badge>
+              <Badge variant={scanIssueCount(page) ? "warn" : "good"}>{formatNumber(scanIssueCount(page))}</Badge>
             </TableCell>
           </TableRow>
         );
@@ -3427,7 +3427,7 @@ function LinksPage({ site }: { site: Site }) {
   const [error, setError] = useState("");
   const backlinkIndexConnected = Boolean(config?.seo_metrics_source_connected);
   const selectedScan = useMemo(
-    () => scanRows.find((audit) => audit.id === selectedScanId) || defaultEvidenceScan(scanRows),
+    () => scanRows.find((scan) => scan.id === selectedScanId) || defaultEvidenceScan(scanRows),
     [scanRows, selectedScanId],
   );
 
@@ -3439,16 +3439,16 @@ function LinksPage({ site }: { site: Site }) {
   }, [site.id, site.domain]);
 
   async function loadHistory() {
-    const [snapshots, audits, appConfig] = await Promise.all([
+    const [snapshots, scans, appConfig] = await Promise.all([
       api.backlinkSnapshots(site.id),
       api.scans(site.id),
       api.config(),
     ]);
     setHistory(snapshots);
-    const rows = sortAuditRows(audits);
+    const rows = sortScanRows(scans);
     setScanRows(rows);
     setSelectedScanIdState((currentId) => {
-      if (currentId && rows.some((audit) => audit.id === currentId)) return currentId;
+      if (currentId && rows.some((scan) => scan.id === currentId)) return currentId;
       return defaultEvidenceScan(rows)?.id || "";
     });
     setConfig(appConfig);
@@ -3550,8 +3550,8 @@ function LinksPage({ site }: { site: Site }) {
       </section>
       <div className="mt-6 space-y-6">
         <LocalLinkEvidence
-          audit={selectedScan}
-          audits={scanRows}
+          scan={selectedScan}
+          scans={scanRows}
           selectedScanId={selectedScan?.id || ""}
           onScanChange={setSelectedScanIdState}
           siteDomain={site.domain}
@@ -3604,23 +3604,23 @@ function LinksPage({ site }: { site: Site }) {
 }
 
 function LocalLinkEvidence({
-  audit,
-  audits,
+  scan,
+  scans,
   selectedScanId,
   onScanChange,
   siteDomain,
   onScan,
   scanning,
 }: {
-  audit: any;
-  audits: any[];
+  scan: any;
+  scans: any[];
   selectedScanId: string;
   onScanChange: (scanId: string) => void;
   siteDomain: string;
   onScan: () => void;
   scanning: boolean;
 }) {
-  const result = audit?.result || {};
+  const result = scan?.result || {};
   const linkInventory = result.linkInventory || [];
   const checkedLinks = result.links || [];
   const pages = result.pages || [];
@@ -3639,11 +3639,11 @@ function LocalLinkEvidence({
               Real internal links, external links, and failing URLs from the selected saved scan.
             </p>
           </div>
-          <ScanRunPicker label="Saved scan for link evidence" audits={audits} selectedScanId={selectedScanId} onScanChange={onScanChange} />
+          <ScanRunPicker label="Saved scan for link evidence" scans={scans} selectedScanId={selectedScanId} onScanChange={onScanChange} />
         </div>
       </div>
       <div className="space-y-4 p-5">
-        {!audit ? (
+        {!scan ? (
           <EmptyState
             title="No local link graph yet"
             text={siteDomain ? "Run a site scan once to collect internal links, external links, and broken link evidence." : "Add a website address and run a scan to collect link evidence."}
@@ -3655,11 +3655,11 @@ function LocalLinkEvidence({
               <Button asChild variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
             )}
           />
-        ) : !audit.result ? (
+        ) : !scan.result ? (
           <EmptyState
-            title={auditIsActive(audit) ? "Selected scan is still running" : "Selected scan has no link evidence"}
-            text={auditIsActive(audit) ? "Open the scan report to watch progress. Link evidence appears here after crawl data is saved." : audit.error || "This saved scan did not include link rows."}
-            action={<Button asChild variant="secondary"><Link to={`/scans/${audit.id}`}><FileSearch /> Open scan report</Link></Button>}
+            title={scanIsActive(scan) ? "Selected scan is still running" : "Selected scan has no link evidence"}
+            text={scanIsActive(scan) ? "Open the scan report to watch progress. Link evidence appears here after crawl data is saved." : scan.error || "This saved scan did not include link rows."}
+            action={<Button asChild variant="secondary"><Link to={`/scans/${scan.id}`}><FileSearch /> Open scan report</Link></Button>}
           />
         ) : (
           <>
@@ -3687,7 +3687,7 @@ function LocalLinkEvidence({
                 {externalLinks.length ? <LocalExternalLinksTable rows={externalLinks} checkedByUrl={checkedByUrl} /> : <EmptyState title="No external links" text="The selected scan did not find external links." />}
               </TabsContent>
               <TabsContent value="broken">
-                {brokenLinks.length ? <AuditLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="The selected scan did not find failing link URLs." />}
+                {brokenLinks.length ? <ScanLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="The selected scan did not find failing link URLs." />}
               </TabsContent>
               <TabsContent value="internal">
                 {pageRows.length ? <LocalInternalGraphTable rows={pageRows} /> : <EmptyState title="No internal graph" text="The selected scan did not save page link rows." />}
@@ -3766,7 +3766,7 @@ function LocalInternalGraphTable({ rows }: { rows: any[] }) {
             <TableCell className="nums">{formatNumber(page.internalLinks || 0)}</TableCell>
             <TableCell className="nums">{formatNumber(page.externalLinks || 0)}</TableCell>
             <TableCell><Badge variant={page.sitemapListed ? "good" : "warn"}>{page.sitemapListed ? "Listed" : "Missing"}</Badge></TableCell>
-            <TableCell><Badge variant={auditIssueCount(page) ? "warn" : "good"}>{formatNumber(auditIssueCount(page))}</Badge></TableCell>
+            <TableCell><Badge variant={scanIssueCount(page) ? "warn" : "good"}>{formatNumber(scanIssueCount(page))}</Badge></TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -4206,9 +4206,9 @@ function HistoryTable({
   );
 }
 
-function AuditReportRoute() {
+function ScanReportRoute() {
   const { scanId } = useParams();
-  const [audit, setAudit] = useState<any>(null);
+  const [scan, setReportScan] = useState<any>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -4221,7 +4221,7 @@ function AuditReportRoute() {
       try {
         const row = await api.scan(scanId);
         if (!cancelled) {
-          setAudit(row);
+          setReportScan(row);
           if (!row) {
             clearSelectedScanId();
             if (interval) {
@@ -4265,8 +4265,8 @@ function AuditReportRoute() {
       {error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       {loading ? (
         <EmptyState title="Loading report" text="Reading the saved scan from local SQLite." />
-      ) : audit ? (
-        <AuditDetail audit={audit} />
+      ) : scan ? (
+        <ScanDetail scan={scan} />
       ) : (
         <EmptyState title="Scan not found" text="This saved scan no longer exists in local SQLite." action={<Button asChild><Link to="/scans"><FileSearch /> Open scans</Link></Button>} />
       )}
@@ -4274,28 +4274,28 @@ function AuditReportRoute() {
   );
 }
 
-function AuditsPage({ site }: { site: Site }) {
-  const [url, setUrl] = useState(preferredAuditUrl(site));
-  const [audits, setAudits] = useState<any[]>([]);
+function ScansPage({ site }: { site: Site }) {
+  const [url, setUrl] = useState(preferredScanUrl(site));
+  const [scans, setScans] = useState<any[]>([]);
   const [allScans, setAllScans] = useState<any[]>([]);
   const [detail, setDetail] = useState<any>(null);
-  const [deletingAudit, setDeletingAudit] = useState<any>(null);
-  const [clearingAudits, setClearingAudits] = useState(false);
-  const [confirmClearAudits, setConfirmClearAudits] = useState(false);
+  const [deletingScan, setDeletingScan] = useState<any>(null);
+  const [clearingScans, setClearingScans] = useState(false);
+  const [confirmClearScans, setConfirmClearScans] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [showCustomUrl, setShowCustomUrl] = useState(false);
   const [manualLedgerScanId, setManualLedgerScanId] = useState("");
   const [manualLedgerSiteId, setManualLedgerSiteId] = useState("");
-  const activeScan = auditIsActive(detail) ? detail : allScans.find(auditIsActive);
+  const activeScan = scanIsActive(detail) ? detail : allScans.find(scanIsActive);
   async function load() {
     const [siteRows, ledgerRows] = await Promise.all([
       api.scans(site.id),
       api.allScans(),
     ]);
-    const rows = sortAuditRows(siteRows);
-    const ledger = sortAuditRows(ledgerRows);
-    setAudits(rows);
+    const rows = sortScanRows(siteRows);
+    const ledger = sortScanRows(ledgerRows);
+    setScans(rows);
     setAllScans(ledger);
     const currentDetail = detail?.id ? ledger.find((row) => row.id === detail.id) : null;
     const currentDetailBelongsToSite = currentDetail?.site_id === site.id;
@@ -4318,12 +4318,12 @@ function AuditsPage({ site }: { site: Site }) {
     load().catch(console.error);
   }, [site.id]);
   useEffect(() => {
-    setUrl(preferredAuditUrl(site));
+    setUrl(preferredScanUrl(site));
     setError("");
     setShowCustomUrl(false);
   }, [site.id, site.domain, site.crawl_protocol, site.crawl_host]);
   useEffect(() => {
-    const hasActiveScan = allScans.some(auditIsActive);
+    const hasActiveScan = allScans.some(scanIsActive);
     if (!hasActiveScan) return;
     const interval = window.setInterval(() => {
       load().catch(console.error);
@@ -4331,15 +4331,15 @@ function AuditsPage({ site }: { site: Site }) {
     return () => window.clearInterval(interval);
   }, [site.id, allScans, detail?.id]);
   useEffect(() => {
-    if (!detail?.id || !auditIsActive(detail)) return;
+    if (!detail?.id || !scanIsActive(detail)) return;
     let cancelled = false;
     async function refreshSelectedScan() {
       try {
-        const nextAudit = await api.scan(detail.id);
-        if (cancelled || !nextAudit) return;
-        setDetail(nextAudit);
-        setAudits((rows) => upsertAuditRow(rows, nextAudit));
-        setAllScans((rows) => upsertAuditRow(rows, nextAudit));
+        const nextScan = await api.scan(detail.id);
+        if (cancelled || !nextScan) return;
+        setDetail(nextScan);
+        setScans((rows) => upsertScanRow(rows, nextScan));
+        setAllScans((rows) => upsertScanRow(rows, nextScan));
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not refresh scan progress");
       }
@@ -4360,11 +4360,11 @@ function AuditsPage({ site }: { site: Site }) {
     setManualLedgerScanId("");
     setManualLedgerSiteId("");
     try {
-      const audit = await api.startScan({ siteId: site.id, url });
-      setDetail(audit);
-      setAudits((rows) => upsertAuditRow(rows, audit));
-      setAllScans((rows) => upsertAuditRow(rows, audit));
-      if (audit?.id) setSelectedScanId(site.id, audit.id);
+      const scan = await api.startScan({ siteId: site.id, url });
+      setDetail(scan);
+      setScans((rows) => upsertScanRow(rows, scan));
+      setAllScans((rows) => upsertScanRow(rows, scan));
+      if (scan?.id) setSelectedScanId(site.id, scan.id);
       load().catch(console.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start scan");
@@ -4381,8 +4381,8 @@ function AuditsPage({ site }: { site: Site }) {
     try {
       const result = await api.scanSite(site.id);
       setDetail(result.scan);
-      setAudits((rows) => upsertAuditRow(rows, result.scan));
-      setAllScans((rows) => upsertAuditRow(rows, result.scan));
+      setScans((rows) => upsertScanRow(rows, result.scan));
+      setAllScans((rows) => upsertScanRow(rows, result.scan));
       if (result.scan?.id) setSelectedScanId(site.id, result.scan.id);
       load().catch(console.error);
     } catch (err) {
@@ -4412,19 +4412,19 @@ function AuditsPage({ site }: { site: Site }) {
   }
   async function clearHistory() {
     setError("");
-    setClearingAudits(true);
+    setClearingScans(true);
     try {
       await api.clearScans(site.id);
       clearSelectedScanId(site.id);
       setManualLedgerScanId("");
       setManualLedgerSiteId("");
       setDetail(null);
-      setConfirmClearAudits(false);
+      setConfirmClearScans(false);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not clear scan history");
     } finally {
-      setClearingAudits(false);
+      setClearingScans(false);
     }
   }
   return (
@@ -4458,7 +4458,7 @@ function AuditsPage({ site }: { site: Site }) {
         {showCustomUrl ? (
           <form className="mt-4 grid gap-3 border-t pt-4 lg:grid-cols-[1fr_auto]" onSubmit={start}>
             <Field label="URL to scan">
-              <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredAuditUrl(site) || "https://example.com"}/page`} />
+              <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${preferredScanUrl(site) || "https://example.com"}/page`} />
             </Field>
             <div className="flex items-end">
               <Button variant="secondary" disabled={starting || !url.trim()}><FileSearch /> Scan URL</Button>
@@ -4470,8 +4470,8 @@ function AuditsPage({ site }: { site: Site }) {
         ) : null}
       </section>
       <div className="mt-6 space-y-6">
-        {activeScan ? <ActiveScanBanner audit={activeScan} /> : null}
-        <AuditSpeedHistoryPanel audits={audits} />
+        {activeScan ? <ActiveScanBanner scan={activeScan} /> : null}
+        <ScanSpeedHistoryPanel scans={scans} />
         <section className="space-y-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -4480,7 +4480,7 @@ function AuditsPage({ site }: { site: Site }) {
             </div>
             {detail ? <Badge variant={detail.status === "completed" ? "good" : detail.status === "failed" ? "bad" : "warn"}>{detail.status}</Badge> : null}
           </div>
-          {detail ? <AuditDetail audit={detail} /> : (
+          {detail ? <ScanDetail scan={detail} /> : (
             <EmptyState
               title={allScans.length ? "No scan selected for this site" : "No scan report yet"}
               text={allScans.length ? "Every saved scan is still listed below. Open a row to inspect it, or run a new scan for this site." : "Start a local site scan to fill this report with crawl evidence."}
@@ -4504,16 +4504,16 @@ function AuditsPage({ site }: { site: Site }) {
             <div>
               <h2 className="text-lg font-semibold">All scan history</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Active site: {formatNumber(audits.length)} saved scans. Local database: {formatNumber(allScans.length)} total scans visible below.
+                Active site: {formatNumber(scans.length)} saved scans. Local database: {formatNumber(allScans.length)} total scans visible below.
               </p>
             </div>
-            {audits.length ? (
+            {scans.length ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setConfirmClearAudits(true)}
-                disabled={clearingAudits}
+                onClick={() => setConfirmClearScans(true)}
+                disabled={clearingScans}
               >
                 <Trash2 /> Delete scans for this site
               </Button>
@@ -4521,7 +4521,7 @@ function AuditsPage({ site }: { site: Site }) {
           </div>
           <div className="p-5">
             {allScans.length ? (
-              <AuditTable rows={allScans} showSite selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingAudit(allScans.find((audit) => audit.id === id) || { id })} />
+              <ScanTable rows={allScans} showSite selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingScan(allScans.find((scan) => scan.id === id) || { id })} />
             ) : (
               <EmptyState
                 title="No scans yet"
@@ -4538,23 +4538,23 @@ function AuditsPage({ site }: { site: Site }) {
           </div>
         </section>
       </div>
-      <AlertDialog open={Boolean(deletingAudit)} onOpenChange={(nextOpen) => !nextOpen && setDeletingAudit(null)}>
+      <AlertDialog open={Boolean(deletingScan)} onOpenChange={(nextOpen) => !nextOpen && setDeletingScan(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete scan?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the saved report for {deletingAudit?.url || "this scan"} from local SQLite. Other scans for the same site stay available.
+              This removes the saved report for {deletingScan?.url || "this scan"} from local SQLite. Other scans for the same site stay available.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={() => deletingAudit && remove(deletingAudit.id, deletingAudit).then(() => setDeletingAudit(null))}>
+            <AlertDialogAction type="button" onClick={() => deletingScan && remove(deletingScan.id, deletingScan).then(() => setDeletingScan(null))}>
               Delete scan
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AlertDialog open={confirmClearAudits} onOpenChange={setConfirmClearAudits}>
+      <AlertDialog open={confirmClearScans} onOpenChange={setConfirmClearScans}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete scans for this site?</AlertDialogTitle>
@@ -4564,9 +4564,9 @@ function AuditsPage({ site }: { site: Site }) {
           </AlertDialogHeader>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={clearingAudits}>Keep scans</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={clearHistory} disabled={clearingAudits}>
-              {clearingAudits ? "Deleting scans" : "Delete scans for this site"}
+            <AlertDialogCancel disabled={clearingScans}>Keep scans</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={clearHistory} disabled={clearingScans}>
+              {clearingScans ? "Deleting scans" : "Delete scans for this site"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4575,20 +4575,20 @@ function AuditsPage({ site }: { site: Site }) {
   );
 }
 
-function ActiveScanBanner({ audit }: { audit: any }) {
-  const progress = auditProgress(audit);
+function ActiveScanBanner({ scan }: { scan: any }) {
+  const progress = scanProgress(scan);
   return (
     <section className="rounded-md border border-primary/40 bg-primary/5 p-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="warn" className="gap-1"><Activity className="size-3" /> Scan running</Badge>
-            <span className="text-sm font-medium">{auditPhaseLabel(audit)}</span>
+            <span className="text-sm font-medium">{scanPhaseLabel(scan)}</span>
           </div>
-          <div className="mt-3 max-w-4xl break-all text-lg font-semibold">{audit.url}</div>
+          <div className="mt-3 max-w-4xl break-all text-lg font-semibold">{scan.url}</div>
           <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-            <span>{formatNumber(audit.pages_crawled || 0)} pages crawled</span>
-            <span>{formatNumber(audit.issue_count || 0)} issues found</span>
+            <span>{formatNumber(scan.pages_crawled || 0)} pages crawled</span>
+            <span>{formatNumber(scan.issue_count || 0)} issues found</span>
             <span>{formatNumber(progress)}% complete</span>
           </div>
           <div className="mt-4 max-w-3xl">
@@ -4596,15 +4596,15 @@ function ActiveScanBanner({ audit }: { audit: any }) {
           </div>
         </div>
         <Button asChild variant="secondary">
-          <Link to={`/scans/${audit.id}`}><FileSearch /> Open live report</Link>
+          <Link to={`/scans/${scan.id}`}><FileSearch /> Open live report</Link>
         </Button>
       </div>
     </section>
   );
 }
 
-function AuditSpeedHistoryPanel({ audits }: { audits: any[] }) {
-  const rows = auditSpeedHistoryRows(audits);
+function ScanSpeedHistoryPanel({ scans }: { scans: any[] }) {
+  const rows = scanSpeedHistoryRows(scans);
   const latest = rows[0];
   const previous = rows[1];
   return (
@@ -4643,11 +4643,11 @@ function AuditSpeedHistoryPanel({ audits }: { audits: any[] }) {
             {rows.map((row, index) => {
               const previousRow = rows[index + 1];
               return (
-                <TableRow key={row.audit.id}>
+                <TableRow key={row.scan.id}>
                   <TableCell className="max-w-md">
-                    <div className="truncate font-medium">{row.audit.url}</div>
+                    <div className="truncate font-medium">{row.scan.url}</div>
                     <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="size-3" /> {formatDate(row.audit.created_at || row.audit.updated_at)}
+                      <Clock className="size-3" /> {formatDate(row.scan.created_at || row.scan.updated_at)}
                     </div>
                   </TableCell>
                   <TableCell><Badge variant={speedVariant(row.metrics.averagePageLoadMs) as any}>{formatMs(row.metrics.averagePageLoadMs)}</Badge></TableCell>
@@ -4680,7 +4680,7 @@ function AuditSpeedHistoryPanel({ audits }: { audits: any[] }) {
   );
 }
 
-function AuditTable({
+function ScanTable({
   rows,
   showSite,
   selectedId,
@@ -4697,7 +4697,7 @@ function AuditTable({
     <>
       <div className="divide-y rounded-md border md:hidden">
         {rows.map((row) => {
-          const counts = auditSeverityCounts(row);
+          const counts = scanSeverityCounts(row);
           return (
             <div key={row.id} className={cn("p-4", selectedId === row.id ? "bg-accent/45" : "")}>
               <div className="break-all font-medium">{row.url}</div>
@@ -4706,8 +4706,8 @@ function AuditTable({
               </div>
               {showSite ? (
                 <div className="mt-3">
-                  <div className="text-sm font-medium">{auditSiteName(row)}</div>
-                  <div className="mt-1 break-all text-xs text-muted-foreground">{auditSiteDetail(row)}</div>
+                  <div className="text-sm font-medium">{scanSiteName(row)}</div>
+                  <div className="mt-1 break-all text-xs text-muted-foreground">{scanSiteDetail(row)}</div>
                 </div>
               ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -4715,8 +4715,8 @@ function AuditTable({
                 <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
               </div>
               <div className="mt-2">
-                <ProgressBar value={auditProgress(row)} />
-                <div className="mt-1 text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
+                <ProgressBar value={scanProgress(row)} />
+                <div className="mt-1 text-xs text-muted-foreground">{scanPhaseLabel(row)}</div>
               </div>
               <div className="mt-3 text-sm text-muted-foreground">{formatNumber(row.pages_crawled)} pages crawled</div>
               <div className="mt-2 flex flex-wrap gap-1">
@@ -4767,7 +4767,7 @@ function AuditTable({
           </TableHeader>
           <TableBody>
             {rows.map((row) => {
-              const counts = auditSeverityCounts(row);
+              const counts = scanSeverityCounts(row);
               return (
                 <TableRow
                   key={row.id}
@@ -4782,8 +4782,8 @@ function AuditTable({
                   </TableCell>
                   {showSite ? (
                     <TableCell className="min-w-40">
-                      <div className="font-medium">{auditSiteName(row)}</div>
-                      <div className="mt-1 break-all text-xs text-muted-foreground">{auditSiteDetail(row)}</div>
+                      <div className="font-medium">{scanSiteName(row)}</div>
+                      <div className="mt-1 break-all text-xs text-muted-foreground">{scanSiteDetail(row)}</div>
                     </TableCell>
                   ) : null}
                   <TableCell className="min-w-44">
@@ -4792,8 +4792,8 @@ function AuditTable({
                       <span className="text-sm font-medium">Score {row.status === "completed" ? formatNumber(row.score) : "-"}</span>
                     </div>
                     <div className="mt-2 max-w-52">
-                      <ProgressBar value={auditProgress(row)} />
-                      <div className="mt-1 text-xs text-muted-foreground">{auditPhaseLabel(row)}</div>
+                      <ProgressBar value={scanProgress(row)} />
+                      <div className="mt-1 text-xs text-muted-foreground">{scanPhaseLabel(row)}</div>
                     </div>
                   </TableCell>
                   <TableCell className="min-w-52">
@@ -4912,11 +4912,11 @@ function pageH1Status(page: any) {
   return { label: "Missing", badge: "0 H1", variant: "warn" };
 }
 
-function defaultAuditTab(audit: any) {
-  return auditIsActive(audit) ? "progress" : "overview";
+function defaultScanTab(scan: any) {
+  return scanIsActive(scan) ? "progress" : "overview";
 }
 
-const auditTabValues = new Set([
+const scanTabValues = new Set([
   "overview",
   "progress",
   "issues",
@@ -4931,20 +4931,20 @@ const auditTabValues = new Set([
   "raw",
 ]);
 
-function auditTabFromSearch(value: string | null, audit: any) {
-  return value && auditTabValues.has(value) ? value : defaultAuditTab(audit);
+function scanTabFromSearch(value: string | null, scan: any) {
+  return value && scanTabValues.has(value) ? value : defaultScanTab(scan);
 }
 
-function AuditDetail({ audit }: { audit: any }) {
+function ScanDetail({ scan }: { scan: any }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = auditTabFromSearch(searchParams.get("tab"), audit);
+  const requestedTab = scanTabFromSearch(searchParams.get("tab"), scan);
   const [activeTab, setActiveTab] = useState(requestedTab);
   const [severityFilter, setSeverityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedCheckTypes, setSelectedCheckTypes] = useState<string[]>([]);
   const [selectedCheckLabel, setSelectedCheckLabel] = useState("");
-  const result = audit.result || {};
+  const result = scan.result || {};
   const pages = result.pages || [];
   const issues = result.issues || [];
   const links = result.links || [];
@@ -4954,25 +4954,25 @@ function AuditDetail({ audit }: { audit: any }) {
   const assets = result.assets || [];
   const summary = result.summary || {};
   const issueGroups = result.issueGroups || [];
-  const severityCounts = auditSeverityCounts(audit);
-  const coverage = auditCoverageMetrics(audit, result, summary);
+  const severityCounts = scanSeverityCounts(scan);
+  const coverage = scanCoverageMetrics(scan, result, summary);
   const categories = Object.keys(summary.byCategory || {}).sort();
   const issueTypes = Array.from(new Set<string>(issues.map((issue: any) => String(issue.type || "")).filter(Boolean))).sort();
   const categoryEntries = Object.entries(summary.byCategory || {}).sort((a: any, b: any) => b[1] - a[1]);
   useEffect(() => {
     setActiveTab(requestedTab);
-  }, [audit.id, requestedTab]);
-  const changeAuditTab = (value: string) => {
+  }, [scan.id, requestedTab]);
+  const changeScanTab = (value: string) => {
     setActiveTab(value);
     const next = new URLSearchParams(searchParams);
-    if (value === defaultAuditTab(audit)) {
+    if (value === defaultScanTab(scan)) {
       next.delete("tab");
     } else {
       next.set("tab", value);
     }
     setSearchParams(next, { replace: true });
   };
-  const showIssues = () => changeAuditTab("issues");
+  const showIssues = () => changeScanTab("issues");
   const selectSeverity = (severity: string) => {
     setSeverityFilter(severity);
     setCategoryFilter("all");
@@ -4996,7 +4996,7 @@ function AuditDetail({ audit }: { audit: any }) {
     setSelectedCheckLabel(String(group.type || ""));
     showIssues();
   };
-  const selectAuditCheck = (row: AuditCheckRowModel) => {
+  const selectScanCheck = (row: ScanCheckRowModel) => {
     const types = row.types || [];
     setSeverityFilter("all");
     setCategoryFilter(row.category || "all");
@@ -5028,7 +5028,7 @@ function AuditDetail({ audit }: { audit: any }) {
   };
   return (
     <div className="space-y-5">
-      <Tabs value={activeTab} onValueChange={changeAuditTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={changeScanTab} className="space-y-4">
         <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>
@@ -5044,8 +5044,8 @@ function AuditDetail({ audit }: { audit: any }) {
           <TabsTrigger value="raw">Evidence</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-5">
-          <AuditReportOverview
-            audit={audit}
+          <ScanReportOverview
+            scan={scan}
             result={result}
             summary={summary}
             coverage={coverage}
@@ -5053,10 +5053,10 @@ function AuditDetail({ audit }: { audit: any }) {
             activeSeverity={severityFilter}
             onSeveritySelect={selectSeverity}
           />
-          <AuditActionBoard audit={audit} issueGroups={issueGroups} onSelectGroup={selectIssueGroup} />
+          <ScanActionBoard scan={scan} issueGroups={issueGroups} onSelectGroup={selectIssueGroup} />
         </TabsContent>
         <TabsContent value="progress">
-          <AuditProgressPanel audit={audit} result={result} coverage={coverage} />
+          <ScanProgressPanel scan={scan} result={result} coverage={coverage} />
         </TabsContent>
         <TabsContent value="issues" className="space-y-2">
           <div className="rounded-md border bg-muted/20 px-4 py-3">
@@ -5075,7 +5075,7 @@ function AuditDetail({ audit }: { audit: any }) {
               ) : null}
             </div>
           </div>
-          {issueGroups.length ? <AuditIssueGroups groups={issueGroups} onSelect={selectIssueGroup} /> : null}
+          {issueGroups.length ? <ScanIssueGroups groups={issueGroups} onSelect={selectIssueGroup} /> : null}
           {categoryEntries.length ? (
             <div className="flex flex-wrap gap-2 pb-2">
               {categoryEntries.map(([category, count]: any) => (
@@ -5124,65 +5124,65 @@ function AuditDetail({ audit }: { audit: any }) {
             </Select>
             {selectedCheckLabel ? <Badge variant="outline">Showing {selectedCheckLabel}</Badge> : null}
           </div>
-          {filteredIssues.length ? <AuditIssuesTable rows={filteredIssues} /> : <EmptyState title="No matching issues" text={audit.status === "completed" ? "This filter has no issues." : "Issues will appear while the scan runs."} />}
+          {filteredIssues.length ? <ScanIssuesTable rows={filteredIssues} /> : <EmptyState title="No matching issues" text={scan.status === "completed" ? "This filter has no issues." : "Issues will appear while the scan runs."} />}
         </TabsContent>
         <TabsContent value="checks">
-          <AuditCheckMatrix summary={summary} coverage={coverage} issues={issues} onSelectCheck={selectAuditCheck} />
+          <ScanCheckMatrix summary={summary} coverage={coverage} issues={issues} onSelectCheck={selectScanCheck} />
         </TabsContent>
         <TabsContent value="metadata">
-          {pages.length ? <AuditMetadataTable rows={pages} /> : <EmptyState title="No metadata yet" text="Metadata appears as soon as pages are crawled." />}
+          {pages.length ? <ScanMetadataTable rows={pages} /> : <EmptyState title="No metadata yet" text="Metadata appears as soon as pages are crawled." />}
         </TabsContent>
         <TabsContent value="pages">
-          {pages.length ? <AuditPagesTable rows={pages} /> : <EmptyState title="No pages yet" text="Pages will appear while the scan runs." />}
+          {pages.length ? <ScanPagesTable rows={pages} /> : <EmptyState title="No pages yet" text="Pages will appear while the scan runs." />}
         </TabsContent>
         <TabsContent value="links">
           <div className="space-y-4">
             {links.length ? (
-              <AuditSection title="Checked links" text="Every unique HTTP URL that the crawler verified. Broken and redirecting links are highlighted in the Status column.">
-                <AuditLinksTable rows={links} />
-              </AuditSection>
+              <ScanSection title="Checked links" text="Every unique HTTP URL that the crawler verified. Broken and redirecting links are highlighted in the Status column.">
+                <ScanLinksTable rows={links} />
+              </ScanSection>
             ) : <EmptyState title="No links checked yet" text="Links are checked after the page crawl finishes." />}
             {linkInventory.length ? (
-              <AuditSection title="Link inventory" text="All link tags found during the crawl, including anchor text, rel attributes, and source page.">
-                <AuditLinkInventoryTable rows={linkInventory} />
-              </AuditSection>
+              <ScanSection title="Link inventory" text="All link tags found during the crawl, including anchor text, rel attributes, and source page.">
+                <ScanLinkInventoryTable rows={linkInventory} />
+              </ScanSection>
             ) : null}
           </div>
         </TabsContent>
         <TabsContent value="images" className="space-y-4">
           {pages.some((page: any) => page.images > 0) ? (
-            <AuditSection title="Image summary by page" text="Missing src, alt text, and size attributes grouped by affected page.">
-              <AuditImageSummaryTable rows={pages} />
-            </AuditSection>
+            <ScanSection title="Image summary by page" text="Missing src, alt text, and size attributes grouped by affected page.">
+              <ScanImageSummaryTable rows={pages} />
+            </ScanSection>
           ) : null}
           {imageInventory.length ? (
-            <AuditSection title="Image tag inventory" text="Every image tag collected from the crawl, including content/decorative classification and tag-level problems.">
-              <AuditImageInventoryTable rows={imageInventory} />
-            </AuditSection>
+            <ScanSection title="Image tag inventory" text="Every image tag collected from the crawl, including content/decorative classification and tag-level problems.">
+              <ScanImageInventoryTable rows={imageInventory} />
+            </ScanSection>
           ) : null}
           {images.length ? (
-            <AuditSection title="Checked image URLs" text="Image resources fetched by the crawler, including Open Graph images when present.">
-              <AuditImagesTable rows={images} />
-            </AuditSection>
+            <ScanSection title="Checked image URLs" text="Image resources fetched by the crawler, including Open Graph images when present.">
+              <ScanImagesTable rows={images} />
+            </ScanSection>
           ) : <EmptyState title="No images checked yet" text="Images are checked after the page crawl finishes." />}
         </TabsContent>
         <TabsContent value="assets" className="space-y-4">
           {assets.length ? (
-            <AuditSection title="Checked CSS and JavaScript" text="Stylesheet and script URLs fetched during the scan with status, content type, and size.">
-              <AuditAssetsTable rows={assets} />
-            </AuditSection>
+            <ScanSection title="Checked CSS and JavaScript" text="Stylesheet and script URLs fetched during the scan with status, content type, and size.">
+              <ScanAssetsTable rows={assets} />
+            </ScanSection>
           ) : <EmptyState title="No CSS or JavaScript assets checked yet" text="Assets are checked after links and images." />}
         </TabsContent>
         <TabsContent value="speed" className="space-y-4">
-          <AuditSpeedReport pages={pages} issues={issues} assets={assets} summary={summary} coverage={coverage} />
+          <ScanSpeedReport pages={pages} issues={issues} assets={assets} summary={summary} coverage={coverage} />
         </TabsContent>
         <TabsContent value="crawl" className="space-y-4">
-          <AuditCrawlEvidence result={result} coverage={coverage} />
+          <ScanCrawlEvidence result={result} coverage={coverage} />
         </TabsContent>
         <TabsContent value="raw">
-          <AuditSection title="Complete scan evidence" text="The full saved crawl payload for export, debugging, and MCP/AI workflows.">
+          <ScanSection title="Complete scan evidence" text="The full saved crawl payload for export, debugging, and MCP/AI workflows.">
             <JsonBlock value={result} />
-          </AuditSection>
+          </ScanSection>
         </TabsContent>
       </Tabs>
     </div>
@@ -5195,12 +5195,12 @@ function severityVariant(severity: string) {
   return "outline";
 }
 
-function AuditCrawlEvidence({
+function ScanCrawlEvidence({
   result,
   coverage,
 }: {
   result: any;
-  coverage: ReturnType<typeof auditCoverageMetrics>;
+  coverage: ReturnType<typeof scanCoverageMetrics>;
 }) {
   const sitemapRows = Array.isArray(result.sitemap?.sitemaps) ? result.sitemap.sitemaps : [];
   const evidenceRows = [
@@ -5324,9 +5324,9 @@ function AuditCrawlEvidence({
   );
 }
 
-type AuditScanStepState = "complete" | "running" | "pending" | "failed";
+type ScanStepState = "complete" | "running" | "pending" | "failed";
 
-function auditStepIndex(audit: any) {
+function scanStepIndex(scan: any) {
   const order: Record<string, number> = {
     target: 0,
     queued: 0,
@@ -5339,9 +5339,9 @@ function auditStepIndex(audit: any) {
     completed: 6,
     failed: 0,
   };
-  const key = auditPhaseKey(audit);
+  const key = scanPhaseKey(scan);
   if (key === "failed") {
-    const phase = String(audit?.result?.phase || audit?.result?.summary?.phase || "").toLowerCase();
+    const phase = String(scan?.result?.phase || scan?.result?.summary?.phase || "").toLowerCase();
     if (phase.includes("deduplicating")) return 6;
     if (phase.includes("assets")) return 5;
     if (phase.includes("images") || phase.includes("css images")) return 4;
@@ -5352,16 +5352,16 @@ function auditStepIndex(audit: any) {
   return order[key] ?? 0;
 }
 
-function auditStepState(audit: any, index: number): AuditScanStepState {
-  if (audit?.status === "completed") return "complete";
-  const activeIndex = auditStepIndex(audit);
-  if (audit?.status === "failed") return index < activeIndex ? "complete" : index === activeIndex ? "failed" : "pending";
+function scanStepState(scan: any, index: number): ScanStepState {
+  if (scan?.status === "completed") return "complete";
+  const activeIndex = scanStepIndex(scan);
+  if (scan?.status === "failed") return index < activeIndex ? "complete" : index === activeIndex ? "failed" : "pending";
   if (index < activeIndex) return "complete";
   if (index === activeIndex) return "running";
   return "pending";
 }
 
-function AuditStepBadge({ state }: { state: AuditScanStepState }) {
+function ScanStepBadge({ state }: { state: ScanStepState }) {
   if (state === "complete") {
     return <Badge variant="good" className="gap-1"><CheckCircle2 className="size-3" /> Done</Badge>;
   }
@@ -5374,22 +5374,22 @@ function AuditStepBadge({ state }: { state: AuditScanStepState }) {
   return <Badge variant="outline" className="gap-1"><Clock className="size-3" /> Pending</Badge>;
 }
 
-function AuditProgressPanel({
-  audit,
+function ScanProgressPanel({
+  scan,
   result,
   coverage,
 }: {
-  audit: any;
+  scan: any;
   result: any;
-  coverage: ReturnType<typeof auditCoverageMetrics>;
+  coverage: ReturnType<typeof scanCoverageMetrics>;
 }) {
   const robotsFound = result.robots?.exists ? "robots.txt found" : "robots.txt missing";
   const sitemapFiles = Array.isArray(result.sitemap?.sitemaps) ? result.sitemap.sitemaps.length : 0;
-  const progress = auditProgress(audit);
+  const progress = scanProgress(scan);
   const steps = [
     {
       label: "Resolve start URL",
-      detail: result.startUrl || audit.url,
+      detail: result.startUrl || scan.url,
       evidence: "Saved scan URL and crawl scope.",
     },
     {
@@ -5419,8 +5419,8 @@ function AuditProgressPanel({
     },
     {
       label: "Build report",
-      detail: audit.status === "completed" ? `Score ${formatNumber(audit.score || 0)}` : audit.status === "failed" ? "Report did not finish" : "Grouping issues",
-      evidence: `${formatNumber(audit.issue_count || 0)} issues saved in local SQLite.`,
+      detail: scan.status === "completed" ? `Score ${formatNumber(scan.score || 0)}` : scan.status === "failed" ? "Report did not finish" : "Grouping issues",
+      evidence: `${formatNumber(scan.issue_count || 0)} issues saved in local SQLite.`,
     },
   ];
   return (
@@ -5430,15 +5430,15 @@ function AuditProgressPanel({
           <div>
             <h2 className="text-lg font-semibold">Scan progress</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {auditPhaseLabel(audit)} · {formatNumber(coverage.pages)} pages · {formatNumber(audit.issue_count || 0)} issues
+              {scanPhaseLabel(scan)} · {formatNumber(coverage.pages)} pages · {formatNumber(scan.issue_count || 0)} issues
             </p>
           </div>
-          <Badge variant={audit.status === "completed" ? "good" : audit.status === "failed" ? "bad" : "warn"}>{scanStatusLabel(audit.status)}</Badge>
+          <Badge variant={scan.status === "completed" ? "good" : scan.status === "failed" ? "bad" : "warn"}>{scanStatusLabel(scan.status)}</Badge>
         </div>
         <div className="mt-4 space-y-2">
           <ProgressBar value={progress} />
           <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span className="break-all">{result.startUrl || audit.url}</span>
+            <span className="break-all">{result.startUrl || scan.url}</span>
             <span className="nums">{formatNumber(progress)}%</span>
           </div>
         </div>
@@ -5458,7 +5458,7 @@ function AuditProgressPanel({
                 <div className="font-medium">{step.label}</div>
                 <div className="mt-1 break-all text-xs text-muted-foreground">{step.detail}</div>
               </TableCell>
-              <TableCell className="min-w-32"><AuditStepBadge state={auditStepState(audit, index)} /></TableCell>
+              <TableCell className="min-w-32"><ScanStepBadge state={scanStepState(scan, index)} /></TableCell>
               <TableCell className="min-w-96 text-sm text-muted-foreground">{step.evidence}</TableCell>
             </TableRow>
           ))}
@@ -5468,8 +5468,8 @@ function AuditProgressPanel({
   );
 }
 
-function AuditReportOverview({
-  audit,
+function ScanReportOverview({
+  scan,
   result,
   summary,
   coverage,
@@ -5477,17 +5477,17 @@ function AuditReportOverview({
   activeSeverity,
   onSeveritySelect,
 }: {
-  audit: any;
+  scan: any;
   result: any;
   summary: any;
-  coverage: ReturnType<typeof auditCoverageMetrics>;
+  coverage: ReturnType<typeof scanCoverageMetrics>;
   severityCounts: { high: number; medium: number; low: number };
   activeSeverity: string;
   onSeveritySelect: (severity: string) => void;
 }) {
-  const score = audit.status === "completed" ? Number(audit.score || 0) : auditProgress(audit);
-  const scoreVariant = audit.status === "failed" ? "bad" : score >= 85 ? "good" : score >= 60 ? "warn" : "bad";
-  const sourceUrl = result.startUrl || audit.url;
+  const score = scan.status === "completed" ? Number(scan.score || 0) : scanProgress(scan);
+  const scoreVariant = scan.status === "failed" ? "bad" : score >= 85 ? "good" : score >= 60 ? "warn" : "bad";
+  const sourceUrl = result.startUrl || scan.url;
   const canonicalTarget = result.pages?.find((page: any) => page.finalUrl)?.finalUrl || sourceUrl;
   const rows = [
     {
@@ -5499,7 +5499,7 @@ function AuditReportOverview({
           <Badge variant="outline">{formatNumber(severityCounts.low)} low</Badge>
         </div>
       ),
-      evidence: `${formatNumber(audit.issue_count || 0)} saved issues from ${formatNumber(coverage.pages)} crawled pages.`,
+      evidence: `${formatNumber(scan.issue_count || 0)} saved issues from ${formatNumber(coverage.pages)} crawled pages.`,
       action: (
         <div className="flex flex-wrap justify-end gap-2">
           {["high", "medium", "low"].map((severity) => (
@@ -5549,7 +5549,7 @@ function AuditReportOverview({
     },
     {
       area: "Start URL",
-      status: audit.status,
+      status: scan.status,
       evidence: (
         <span className="break-all">
           Started at {sourceUrl}. Final home evidence: {canonicalTarget}.
@@ -5561,7 +5561,7 @@ function AuditReportOverview({
   return (
     <ReportSection
       title="Scan health"
-      description={`${auditPhaseLabel(audit)} · ${formatDate(audit.created_at)} · stored in local SQLite`}
+      description={`${scanPhaseLabel(scan)} · ${formatDate(scan.created_at)} · stored in local SQLite`}
     >
       <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
         <div className="space-y-4 border-b pb-5 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-6">
@@ -5569,16 +5569,16 @@ function AuditReportOverview({
             <div className="text-sm font-medium text-muted-foreground">Score</div>
             <div className="mt-2 flex items-end gap-3">
               <div className="nums text-7xl font-semibold leading-none">{formatNumber(score)}</div>
-              <Badge variant={scoreVariant as any}>{scanStatusLabel(audit.status)}</Badge>
+              <Badge variant={scoreVariant as any}>{scanStatusLabel(scan.status)}</Badge>
             </div>
           </div>
-          <ProgressBar value={auditProgress(audit)} />
+          <ProgressBar value={scanProgress(scan)} />
           <div className="text-sm leading-6 text-muted-foreground">
-            {audit.status === "running" || audit.status === "queued"
+            {scan.status === "running" || scan.status === "queued"
               ? "This scan is still running and the evidence updates automatically."
-              : `${formatNumber(audit.issue_count || 0)} issues saved for this run.`}
+              : `${formatNumber(scan.issue_count || 0)} issues saved for this run.`}
           </div>
-          {audit.error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{audit.error}</p> : null}
+          {scan.error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{scan.error}</p> : null}
         </div>
         <Table>
           <TableHeader>
@@ -5605,12 +5605,12 @@ function AuditReportOverview({
   );
 }
 
-function AuditActionBoard({
-  audit,
+function ScanActionBoard({
+  scan,
   issueGroups,
   onSelectGroup,
 }: {
-  audit: any;
+  scan: any;
   issueGroups: any[];
   onSelectGroup: (group: any) => void;
 }) {
@@ -5622,7 +5622,7 @@ function AuditActionBoard({
       description={
         <div className="flex flex-wrap items-center gap-2">
           <span>Grouped issues with the highest crawl and search impact.</span>
-          <Badge variant={audit.status === "completed" ? "good" : "warn"}>{scanStatusLabel(audit.status)}</Badge>
+          <Badge variant={scan.status === "completed" ? "good" : "warn"}>{scanStatusLabel(scan.status)}</Badge>
         </div>
       }
     >
@@ -5660,7 +5660,7 @@ function AuditActionBoard({
           </TableBody>
         </Table>
       ) : (
-        <EmptyState title="No priority blockers" text={audit.status === "completed" ? "High and medium issue groups are clear." : "Priority issues appear while the scan runs."} />
+        <EmptyState title="No priority blockers" text={scan.status === "completed" ? "High and medium issue groups are clear." : "Priority issues appear while the scan runs."} />
       )}
     </ReportSection>
   );
@@ -5692,7 +5692,7 @@ function speedVariant(loadMs: unknown) {
   return "good";
 }
 
-function AuditSpeedReport({
+function ScanSpeedReport({
   pages,
   issues,
   assets,
@@ -5703,7 +5703,7 @@ function AuditSpeedReport({
   issues: any[];
   assets: any[];
   summary: any;
-  coverage: ReturnType<typeof auditCoverageMetrics>;
+  coverage: ReturnType<typeof scanCoverageMetrics>;
 }) {
   const timedPages = [...pages]
     .filter((page) => Number.isFinite(Number(page.loadMs)))
@@ -5756,23 +5756,23 @@ function AuditSpeedReport({
       </ReportSection>
 
       <ReportSection title="Page response timings" description="Slowest pages first, with response size and compression evidence.">
-        {timedPages.length ? <AuditSpeedPagesTable rows={timedPages} /> : <EmptyState title="No page timings" text="Run a fresh scan to record response timing for each HTML page." />}
+        {timedPages.length ? <ScanSpeedPagesTable rows={timedPages} /> : <EmptyState title="No page timings" text="Run a fresh scan to record response timing for each HTML page." />}
       </ReportSection>
 
       <ReportSection title="Performance issues" description="Only speed, payload, viewport, lazy-loading, and CSS/JS findings.">
-        {speedIssues.length ? <AuditIssuesTable rows={speedIssues} /> : <EmptyState title="No speed issues" text="The scan did not find slow pages or performance blockers." />}
+        {speedIssues.length ? <ScanIssuesTable rows={speedIssues} /> : <EmptyState title="No speed issues" text="The scan did not find slow pages or performance blockers." />}
       </ReportSection>
 
       {assets.length ? (
         <ReportSection title="CSS and JavaScript requests" description="Fetched stylesheet and script URLs with status, type, and size.">
-          <AuditAssetsTable rows={assets} />
+          <ScanAssetsTable rows={assets} />
         </ReportSection>
       ) : null}
     </div>
   );
 }
 
-function AuditSpeedPagesTable({ rows }: { rows: any[] }) {
+function ScanSpeedPagesTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader>
@@ -5807,19 +5807,19 @@ function AuditSpeedPagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function AuditCheckMatrix({
+function ScanCheckMatrix({
   summary,
   coverage,
   issues,
   onSelectCheck,
 }: {
   summary: any;
-  coverage: ReturnType<typeof auditCoverageMetrics>;
+  coverage: ReturnType<typeof scanCoverageMetrics>;
   issues: any[];
-  onSelectCheck: (row: AuditCheckRowModel) => void;
+  onSelectCheck: (row: ScanCheckRowModel) => void;
 }) {
   const byCategory = summary.byCategory || {};
-  const sections: AuditCheckSectionModel[] = [
+  const sections: ScanCheckSectionModel[] = [
     {
       title: "Metadata",
       text: "Titles, descriptions, snippets",
@@ -5833,7 +5833,7 @@ function AuditCheckMatrix({
         { label: "Multiple descriptions", value: issueTypeCount(issues, "description-multiple"), problem: true, severity: "warn", category: "metadata", types: ["description-multiple"] },
         { label: "Duplicate descriptions", value: issueTypeCount(issues, "duplicate-description"), problem: true, severity: "warn", category: "metadata", types: ["duplicate-description"] },
         { label: "Missing favicon", value: issueTypeCount(issues, "favicon-missing"), problem: true, severity: "warn", category: "metadata", types: ["favicon-missing"] },
-      ] satisfies AuditCheckRowModel[],
+      ] satisfies ScanCheckRowModel[],
     },
     {
       title: "Content",
@@ -5963,14 +5963,14 @@ function AuditCheckMatrix({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => <AuditCheckRow key={`${row.area}:${row.label}`} row={row} onSelect={onSelectCheck} />)}
+          {rows.map((row) => <ScanCheckRow key={`${row.area}:${row.label}`} row={row} onSelect={onSelectCheck} />)}
         </TableBody>
       </Table>
     </ReportSection>
   );
 }
 
-function AuditCheckRow({ row, onSelect }: { row: AuditCheckRowModel & { area?: string; areaText?: string }; onSelect: (row: AuditCheckRowModel) => void }) {
+function ScanCheckRow({ row, onSelect }: { row: ScanCheckRowModel & { area?: string; areaText?: string }; onSelect: (row: ScanCheckRowModel) => void }) {
   const value = Number(row.value || 0);
   const variant = row.problem ? (value > 0 ? row.severity || "warn" : "good") : "outline";
   const clickable = Boolean(row.problem && value > 0 && row.types?.length);
@@ -6013,7 +6013,7 @@ function AuditCheckRow({ row, onSelect }: { row: AuditCheckRowModel & { area?: s
   );
 }
 
-function AuditIssueGroups({ groups, onSelect }: { groups: any[]; onSelect: (group: any) => void }) {
+function ScanIssueGroups({ groups, onSelect }: { groups: any[]; onSelect: (group: any) => void }) {
   return (
     <ReportSection
       title="Priority work queue"
@@ -6061,7 +6061,7 @@ function AuditIssueGroups({ groups, onSelect }: { groups: any[]; onSelect: (grou
   );
 }
 
-function AuditSection({ title, text, children }: { title: string; text: string; children: ReactNode }) {
+function ScanSection({ title, text, children }: { title: string; text: string; children: ReactNode }) {
   return (
     <div className="space-y-3">
       <div>
@@ -6073,7 +6073,7 @@ function AuditSection({ title, text, children }: { title: string; text: string; 
   );
 }
 
-function AuditIssuesTable({ rows }: { rows: any[] }) {
+function ScanIssuesTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader>
@@ -6156,7 +6156,7 @@ function evidenceText(value: unknown) {
   return String(value);
 }
 
-function AuditMetadataTable({ rows }: { rows: any[] }) {
+function ScanMetadataTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader>
@@ -6203,7 +6203,7 @@ function AuditMetadataTable({ rows }: { rows: any[] }) {
   );
 }
 
-function AuditPagesTable({ rows }: { rows: any[] }) {
+function ScanPagesTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader><TableRow><TableHead>Page</TableHead><TableHead>Status</TableHead><TableHead>Indexable</TableHead><TableHead>Depth</TableHead><TableHead>Found by</TableHead><TableHead>Inlinks</TableHead><TableHead>Sitemap</TableHead><TableHead>Title</TableHead><TableHead>Description</TableHead><TableHead>H1/H2</TableHead><TableHead>Response</TableHead><TableHead>Links</TableHead><TableHead>Images</TableHead><TableHead>Words</TableHead><TableHead>Issues</TableHead></TableRow></TableHeader>
@@ -6241,7 +6241,7 @@ function AuditPagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function AuditImageSummaryTable({ rows }: { rows: any[] }) {
+function ScanImageSummaryTable({ rows }: { rows: any[] }) {
   const pages = rows.filter((page) => page.images > 0);
   return (
     <Table>
@@ -6284,7 +6284,7 @@ function AuditImageSummaryTable({ rows }: { rows: any[] }) {
   );
 }
 
-function AuditLinksTable({ rows }: { rows: any[] }) {
+function ScanLinksTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader><TableRow><TableHead>URL</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Anchor</TableHead><TableHead>Final URL</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
@@ -6304,7 +6304,7 @@ function AuditLinksTable({ rows }: { rows: any[] }) {
   );
 }
 
-function AuditAssetsTable({ rows }: { rows: any[] }) {
+function ScanAssetsTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader><TableRow><TableHead>Asset</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Loading</TableHead><TableHead>Content type</TableHead><TableHead>Size</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
@@ -6333,7 +6333,7 @@ function AuditAssetsTable({ rows }: { rows: any[] }) {
   );
 }
 
-function AuditImagesTable({ rows }: { rows: any[] }) {
+function ScanImagesTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader><TableRow><TableHead>Image</TableHead><TableHead>Status</TableHead><TableHead>Type</TableHead><TableHead>Size</TableHead><TableHead>Purpose</TableHead><TableHead>Final URL</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
@@ -6354,7 +6354,7 @@ function AuditImagesTable({ rows }: { rows: any[] }) {
   );
 }
 
-function AuditImageInventoryTable({ rows }: { rows: any[] }) {
+function ScanImageInventoryTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader><TableRow><TableHead>Image</TableHead><TableHead>Problems</TableHead><TableHead>Alt</TableHead><TableHead>Class</TableHead><TableHead>Size attrs</TableHead><TableHead>Sources</TableHead><TableHead>Loading</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
@@ -6388,7 +6388,7 @@ function AuditImageInventoryTable({ rows }: { rows: any[] }) {
   );
 }
 
-function AuditLinkInventoryTable({ rows }: { rows: any[] }) {
+function ScanLinkInventoryTable({ rows }: { rows: any[] }) {
   return (
     <Table>
       <TableHeader><TableRow><TableHead>URL</TableHead><TableHead>Type</TableHead><TableHead>Anchor</TableHead><TableHead>Rel</TableHead><TableHead>Window</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
@@ -6412,7 +6412,7 @@ function AuditLinkInventoryTable({ rows }: { rows: any[] }) {
 }
 
 function GscPage({ site }: { site: Site }) {
-  const defaultInspectionUrl = site.domain ? `${preferredAuditUrl(site).replace(/\/$/, "")}/` : "";
+  const defaultInspectionUrl = site.domain ? `${preferredScanUrl(site).replace(/\/$/, "")}/` : "";
   const defaultGscProperty = site.domain ? `sc-domain:${cleanSiteDomain(site.domain).replace(/^www\./i, "")}` : "";
   const [status, setStatus] = useState<any>(null);
   const [sites, setSites] = useState<any[]>([]);
@@ -6966,7 +6966,7 @@ function McpPage({ site }: { site: Site }) {
   const endpoint = `${window.location.origin}/mcp`;
   const exampleDomain = cleanSiteDomain(site.domain);
   const exampleSiteId = site.id;
-  const exampleScanUrl = site.domain ? preferredAuditUrl(site) : "https://example.com";
+  const exampleScanUrl = site.domain ? preferredScanUrl(site) : "https://example.com";
   const exampleKeyword = exampleDomain ? `${exampleDomain} seo scan` : `${site.name || "site"} seo scan`;
   const groupedTools = useMemo(() => {
     return tools.reduce<Record<string, any[]>>((acc, tool) => {
@@ -7098,7 +7098,7 @@ function McpToolTable({ rows }: { rows: any[] }) {
 function mcpToolGroup(name: string) {
   if (/site|whoami/.test(name)) return "Sites";
   if (/keyword|serp|rank/.test(name)) return "Keywords and ranks";
-  if (/audit|scan/.test(name)) return "Site scans";
+  if (/scan|scan/.test(name)) return "Site scans";
   if (/domain|backlink/.test(name)) return "Competitive data";
   if (/gsc|inspect/.test(name)) return "Search Console";
   if (/brand|prompt|ai/.test(name)) return "AI visibility";
