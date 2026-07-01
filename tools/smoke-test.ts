@@ -1188,6 +1188,32 @@ try {
   ) {
     throw new Error(`MCP get_domain_overview should accept and return domain while mapping legacy internals: ${JSON.stringify(mcpDomainOverview)}`);
   }
+  const mcpKeywordResearch = await request("/mcp", {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 201,
+      method: "tools/call",
+      params: {
+        name: "research_keywords",
+        arguments: { siteId: project.id, query: "seo software", limit: 5 },
+      },
+    }),
+  });
+  if (mcpKeywordResearch.error || !Array.isArray(mcpKeywordResearch.result?.structuredContent?.rows)) {
+    throw new Error(`MCP research_keywords should return structured keyword rows: ${JSON.stringify(mcpKeywordResearch)}`);
+  }
+  for (const [label, response] of [
+    ["scan_site", localMcpScan],
+    ["get_domain_overview", mcpDomainOverview],
+    ["research_keywords", mcpKeywordResearch],
+  ] as const) {
+    const structured = response.result?.structuredContent || {};
+    const serialized = JSON.stringify(structured);
+    if (/"project(?:Id|_id|_name|_domain)"/.test(serialized)) {
+      throw new Error(`MCP ${label} structured output should expose site identifiers, not project identifiers: ${serialized}`);
+    }
+  }
   const mcpGsc = await request("/mcp", {
     method: "POST",
     body: JSON.stringify({

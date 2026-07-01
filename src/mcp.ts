@@ -34,12 +34,18 @@ type JsonRpcRequest = {
   params?: any;
 };
 
-function publicMcpResult(result: any) {
-  if (!result || typeof result !== "object" || Array.isArray(result)) return result;
-  const output = { ...result };
-  if (typeof output.target === "string" && !("domain" in output)) {
-    output.domain = output.target;
-    delete output.target;
+function publicMcpResult(result: any): any {
+  if (Array.isArray(result)) return result.map(publicMcpResult);
+  if (!result || typeof result !== "object") return result;
+  const output: Record<string, any> = {};
+  for (const [key, value] of Object.entries(result)) {
+    let publicKey = key;
+    if (key === "projectId") publicKey = "siteId";
+    if (key === "project_id") publicKey = "site_id";
+    if (key === "project_name") publicKey = "site_name";
+    if (key === "project_domain") publicKey = "site_domain";
+    if (key === "target" && typeof value === "string" && !("domain" in result)) publicKey = "domain";
+    output[publicKey] = publicMcpResult(value);
   }
   return output;
 }
