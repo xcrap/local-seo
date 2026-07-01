@@ -525,6 +525,9 @@ try {
   if (!webAppClient.includes("<Pencil /> Edit") || !webAppClient.includes("<Trash2 /> Delete") || !webAppClient.includes('"Scan site"')) {
     throw new Error("Saved-site table actions should be visible text buttons for scan, edit, and delete.");
   }
+  if (!webAppClient.includes("saved locally.") || !webAppClient.includes("updated locally.") || !webAppClient.includes("deleted locally.")) {
+    throw new Error("Saved-site create, edit, and delete actions should show explicit local confirmations.");
+  }
   if (!webAppClient.includes('siteActions(site, "mobile")')) {
     throw new Error("Saved-site rows should expose scan, edit, and delete actions in the mobile layout.");
   }

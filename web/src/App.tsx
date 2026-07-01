@@ -165,6 +165,7 @@ function defaultCrawlHostFromConfig(config?: any): Site["crawl_host"] {
 
 const activeSiteStorageKey = "local-seo:site";
 const selectedAuditStoragePrefix = "local-seo:selected-audit";
+const siteActionMessageStorageKey = "local-seo:site-action-message";
 
 function selectedAuditStorageKey(siteId: string) {
   return `${selectedAuditStoragePrefix}:${siteId}`;
@@ -180,6 +181,16 @@ function setSelectedAuditId(siteId: string, auditId: string) {
 
 function clearSelectedAuditId(siteId?: string) {
   if (siteId) localStorage.removeItem(selectedAuditStorageKey(siteId));
+}
+
+function takeSiteActionMessage() {
+  const message = sessionStorage.getItem(siteActionMessageStorageKey) || "";
+  if (message) sessionStorage.removeItem(siteActionMessageStorageKey);
+  return message;
+}
+
+function stashSiteActionMessage(message: string) {
+  sessionStorage.setItem(siteActionMessageStorageKey, message);
 }
 
 function marketLabel(code: number) {
@@ -1900,9 +1911,20 @@ function SitesPage({
     crawl_host: "auto",
   });
   const [error, setError] = useState("");
+  const [actionMessage, setActionMessage] = useState(takeSiteActionMessage);
   const [scanningSiteId, setScanningSiteId] = useState("");
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
   const navigate = useNavigate();
+
+  function showActionMessage(message: string, persistForRemount = false) {
+    if (persistForRemount) stashSiteActionMessage(message);
+    setActionMessage(message);
+  }
+
+  function clearActionMessage() {
+    sessionStorage.removeItem(siteActionMessageStorageKey);
+    setActionMessage("");
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1933,6 +1955,7 @@ function SitesPage({
       return;
     }
     setError("");
+    clearActionMessage();
     setCreatingAction(scanAfterCreate ? "scan" : "save");
     try {
       const created = await api.createSite({
@@ -1953,6 +1976,7 @@ function SitesPage({
         return;
       }
       await reloadSites();
+      showActionMessage(`${cleanSiteDomain(created.domain) || created.name || "Site"} saved locally.`, true);
     } catch (err) {
       setError(err instanceof Error ? err.message : scanAfterCreate ? "Could not add and scan site" : "Could not add site");
     } finally {
@@ -1968,6 +1992,8 @@ function SitesPage({
   function startEdit(site: Site) {
     setEditing(site);
     setShowEditKeywordDefaults(false);
+    setError("");
+    clearActionMessage();
     setEditForm({
       name: site.name,
       domain: site.domain || "",
@@ -1984,9 +2010,10 @@ function SitesPage({
     if (!editing) return;
     setError("");
     try {
-      await api.updateSite(editing.id, editForm);
+      const updated = await api.updateSite(editing.id, editForm);
       setEditing(null);
       await reloadSites();
+      showActionMessage(`${cleanSiteDomain(updated.domain) || updated.name || "Site"} updated locally.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update site");
     }
@@ -1994,11 +2021,16 @@ function SitesPage({
 
   async function deleteSite(site: Site) {
     setError("");
+    clearActionMessage();
     try {
+      const message = `${cleanSiteDomain(site.domain) || site.name || "Site"} deleted locally.`;
+      if (site.id === activeSiteId) stashSiteActionMessage(message);
       await api.deleteSite(site.id);
       setDeleting(null);
       await reloadSites();
+      showActionMessage(message);
     } catch (err) {
+      sessionStorage.removeItem(siteActionMessageStorageKey);
       setError(err instanceof Error ? err.message : "Could not delete site");
     }
   }
@@ -2006,6 +2038,7 @@ function SitesPage({
   async function scanSite(site: Site) {
     if (!site.domain) return;
     setError("");
+    clearActionMessage();
     setScanningSiteId(site.id);
     try {
       const result = await api.scanSite(site.id);
@@ -2129,6 +2162,7 @@ function SitesPage({
           </Dialog>
         }
       />
+      {actionMessage ? <p className="mb-4 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-primary">{actionMessage}</p> : null}
       {error && <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p>}
       {sites.length === 0 ? (
         <section className="rounded-md border border-primary/40 bg-background p-5">

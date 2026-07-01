@@ -570,6 +570,7 @@ try {
       page.waitForResponse((response) => response.url().includes("/api/sites") && response.request().method() === "POST"),
       addSiteDialog.getByRole("button", { name: /^Save site only$/ }).click(),
     ]);
+    await page.getByText("second.test saved locally.").waitFor();
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
     await page.getByLabel("Organic research site").waitFor();
     if (await page.getByLabel("Organic research site").inputValue() !== "second.test") {
