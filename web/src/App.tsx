@@ -1,13 +1,17 @@
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type ComponentProps, type FormEvent, type ReactElement, type ReactNode } from "react";
-import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
+  ArrowLeft,
+  ArrowUpRight,
   BarChart3,
   Bot,
   Cable,
   CalendarDays,
   CheckCircle2,
+  ChevronRight,
+  Circle,
   Clock,
   Download,
   ExternalLink,
@@ -18,6 +22,7 @@ import {
   Globe2,
   Image,
   KeyRound,
+  LayoutGrid,
   ListChecks,
   Link2,
   LogOut,
@@ -86,23 +91,42 @@ import {
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-const nav = [
-  { to: "/", label: "Overview", icon: Gauge, end: true },
-  { to: "/sites", label: "Sites", icon: FolderKanban },
-  { to: "/keywords", label: "Keywords", icon: Search },
-  { to: "/serp", label: "SERP analysis", icon: Activity },
-  { to: "/saved", label: "Saved keywords", icon: TableProperties },
-  { to: "/rank", label: "Rank tracking", icon: Target },
-  { to: "/domain", label: "Organic research", icon: Globe2 },
-  { to: "/links", label: "Links", icon: Link2 },
-  { to: "/brand", label: "Brand lookup", icon: Sparkles },
-  { to: "/prompts", label: "Prompt explorer", icon: Bot },
-  { to: "/scans", label: "Site scans", icon: FileSearch },
-  { to: "/gsc", label: "Search Console", icon: BarChart3 },
-  { to: "/ai", label: "AI lab", icon: Bot },
-  { to: "/mcp-tools", label: "MCP", icon: Cable },
-  { to: "/settings", label: "Settings", icon: Settings },
+const navGroups: { label: string; items: { to: string; label: string; icon: any }[] }[] = [
+  { label: "Workspace", items: [{ to: "/overview", label: "Overview", icon: Gauge }] },
+  {
+    label: "Research",
+    items: [
+      { to: "/keywords", label: "Keywords", icon: Search },
+      { to: "/serp", label: "SERP analysis", icon: Activity },
+      { to: "/saved", label: "Saved keywords", icon: TableProperties },
+      { to: "/domain", label: "Organic research", icon: Globe2 },
+    ],
+  },
+  {
+    label: "Rankings",
+    items: [
+      { to: "/rank", label: "Rank tracking", icon: Target },
+      { to: "/gsc", label: "Search Console", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Technical",
+    items: [
+      { to: "/scans", label: "Site scans", icon: FileSearch },
+      { to: "/links", label: "Links", icon: Link2 },
+    ],
+  },
+  {
+    label: "AI & discovery",
+    items: [
+      { to: "/brand", label: "Brand lookup", icon: Sparkles },
+      { to: "/prompts", label: "Prompt explorer", icon: Bot },
+      { to: "/ai", label: "AI lab", icon: Zap },
+      { to: "/mcp-tools", label: "MCP", icon: Cable },
+    ],
+  },
 ];
+const navItems = navGroups.flatMap((group) => group.items);
 
 const defaultKeywordLocationCode = 2840;
 const defaultKeywordLanguageCode = "en";
@@ -375,7 +399,7 @@ function ScanUrlPills({
         <span
           key={candidate}
           className={cn(
-            "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-medium",
+            "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] px-2.5 py-1 text-xs font-medium",
             compact ? "px-2 py-0.5" : "",
           )}
         >
@@ -442,7 +466,7 @@ function ActiveSiteSelect({
   if (!sites.length) {
     return (
       <Button asChild variant="secondary" className="w-full justify-start">
-        <Link to="/sites"><Plus /> Add site</Link>
+        <Link to="/"><Plus /> Add site</Link>
       </Button>
     );
   }
@@ -572,12 +596,18 @@ function DatePicker({
   );
 }
 
-function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
+function EmptyState({ title, text, action, icon }: { title: string; text: string; action?: ReactNode; icon?: any }) {
+  const Icon = icon;
   return (
-    <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center">
-      <p className="font-medium">{title}</p>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{text}</p>
-      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+    <div className="flex flex-col items-center rounded-xl border border-dashed border-border bg-muted/25 px-6 py-10 text-center">
+      {Icon ? (
+        <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
+          <Icon className="size-5" />
+        </div>
+      ) : null}
+      <p className="font-heading text-base font-semibold">{title}</p>
+      <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-muted-foreground">{text}</p>
+      {action ? <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div> : null}
     </div>
   );
 }
@@ -599,7 +629,7 @@ function StatsBand({
   items: StatItem[];
 }) {
   return (
-    <section className="rounded-md border bg-background">
+    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
       {title || text ? (
         <div className="border-b px-5 py-4">
           {title ? <h2 className="text-lg font-semibold">{title}</h2> : null}
@@ -643,17 +673,22 @@ function StatsBand({
 function ReportSection({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description?: ReactNode;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-md border bg-background">
-      <div className="border-b px-5 py-4">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {description ? <div className="mt-1 text-sm text-muted-foreground">{description}</div> : null}
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04),0_10px_28px_-20px_rgb(38_32_20/0.18)]">
+      <div className="flex flex-col gap-3 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="font-heading text-lg font-semibold leading-tight">{title}</h2>
+          {description ? <div className="mt-1 text-sm leading-6 text-muted-foreground">{description}</div> : null}
+        </div>
+        {action ? <div className="flex shrink-0 flex-wrap gap-2">{action}</div> : null}
       </div>
       <div className="p-5">{children}</div>
     </section>
@@ -662,7 +697,7 @@ function ReportSection({
 
 function ProviderNotice({ title, text, source }: { title: string; text: string; source?: string }) {
   return (
-    <div className="rounded-md border bg-muted/30 p-4">
+    <div className="rounded-xl border border-border bg-muted/25 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={sourceVariant(source) as any}>{sourceLabel(source)}</Badge>
         <span className="font-medium">{title}</span>
@@ -837,13 +872,41 @@ function scanStatusLabel(status?: string) {
   return status.replaceAll("-", " ");
 }
 
-function ProgressBar({ value }: { value: number }) {
+function ProgressBar({ value, tone = "primary" }: { value: number; tone?: "primary" | "good" | "warn" | "bad" }) {
+  const toneColor =
+    tone === "good" ? "var(--good)" : tone === "warn" ? "var(--gold)" : tone === "bad" ? "var(--bad)" : "var(--primary)";
   return (
     <div className="h-2 overflow-hidden rounded-full bg-muted">
       <div
-        className="h-full rounded-full bg-primary transition-all"
-        style={{ width: `${Math.max(4, Math.min(100, value))}%` }}
+        className="h-full rounded-full transition-all"
+        style={{ width: `${Math.max(4, Math.min(100, value))}%`, backgroundColor: toneColor }}
       />
+    </div>
+  );
+}
+
+function Tip({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-gold/30 bg-gold/[0.09] px-3 py-2 text-xs leading-5 text-gold-foreground">
+      <Sparkles className="mt-0.5 size-3.5 shrink-0 opacity-80" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+type MetricTileProps = { label: string; value: ReactNode; hint?: ReactNode; tone?: "default" | "good" | "warn" | "bad"; icon?: any };
+
+function MetricTile({ label, value, hint, tone = "default", icon: Icon }: MetricTileProps) {
+  const valueColor =
+    tone === "good" ? "text-good" : tone === "warn" ? "text-warn" : tone === "bad" ? "text-bad" : "text-foreground";
+  return (
+    <div className="rounded-xl border border-border bg-card/60 p-4">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {Icon ? <Icon className="size-3.5" /> : null}
+        {label}
+      </div>
+      <div className={cn("metric mt-2 text-3xl", valueColor)}>{value}</div>
+      {hint ? <div className="mt-1 text-xs leading-5 text-muted-foreground">{hint}</div> : null}
     </div>
   );
 }
@@ -1121,19 +1184,18 @@ function PageHeader({
   description,
   action,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{eyebrow}</div>
-        <h1 className="page-title mt-2 text-3xl font-semibold">{title}</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border/70 pb-4">
+      <div className="min-w-0">
+        <h1 className="page-title text-[1.6rem] leading-tight">{title}</h1>
+        {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
       </div>
-      {action}
+      {action ? <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div> : null}
     </div>
   );
 }
@@ -1236,6 +1298,7 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
   const [shellScanning, setShellScanning] = useState(false);
   const [shellScanError, setShellScanError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const activeSite = useMemo(
     () => sites.find((site) => site.id === activeSiteId) || sites[0],
     [sites, activeSiteId],
@@ -1277,7 +1340,7 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 
   async function scanActiveSite() {
     if (!activeSite?.domain) {
-      navigate("/sites");
+      navigate("/");
       return;
     }
     setShellScanning(true);
@@ -1304,141 +1367,306 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
     onLogout();
   }
 
+  const isHome = location.pathname === "/" || location.pathname === "/sites" || location.pathname === "/settings";
+
+  if (sitesError) {
+    return (
+      <div className="grain flex min-h-screen items-center justify-center px-5">
+        <div className="relative z-10 w-full max-w-md">
+          <EmptyState
+            title="Could not load local sites"
+            text={`${sitesError}. Your SQLite data was not cleared; the app could not read it from the local API.`}
+            action={
+              <Button type="button" onClick={() => loadSites().catch(console.error)}>
+                <RefreshCw /> Retry
+              </Button>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (sitesLoading) {
+    return (
+      <div className="grain flex min-h-screen items-center justify-center">
+        <div className="relative z-10 flex items-center gap-3 text-sm text-muted-foreground">
+          <Circle className="size-3 animate-pulse fill-primary text-primary" />
+          Loading local SQLite sites…
+        </div>
+      </div>
+    );
+  }
+
+  const requireSite = (element: ReactNode) => (activeSite ? element : <NoSiteSelected />);
+
+  if (isHome) {
+    return (
+      <div className="grain min-h-screen">
+        <TopBar onLogout={logout} activeSite={activeSite} />
+        <main className="relative z-10 mx-auto w-full max-w-[1560px] px-5 pb-16 pt-7 lg:px-10 lg:pt-8">
+          <Routes>
+            <Route path="/" element={<SitesManager variant="home" sites={sites} reloadSites={loadSites} activeSiteId={activeSite?.id || ""} selectSite={selectSite} />} />
+            <Route path="/sites" element={<SitesManager variant="home" sites={sites} reloadSites={loadSites} activeSiteId={activeSite?.id || ""} selectSite={selectSite} />} />
+            <Route path="/settings" element={<SettingsPage sites={sites} reloadSites={loadSites} activeSiteId={activeSite?.id || ""} selectSite={selectSite} />} />
+          </Routes>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="grain min-h-screen">
-        <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col overflow-hidden border-r bg-background/90 px-4 py-5 backdrop-blur lg:flex">
-          <Link to="/" className="flex shrink-0 items-center gap-3 px-2">
-            <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Activity className="size-4" />
-            </div>
-            <div>
-              <div className="text-sm font-bold uppercase tracking-[0.18em]">Local SEO</div>
-              <div className="text-xs text-muted-foreground">Local SQLite</div>
-            </div>
+      <TopBar onLogout={logout} activeSite={activeSite} />
+      <WorkspaceSidebar
+        sites={sites}
+        activeSite={activeSite}
+        onSelect={selectSite}
+        onScan={scanActiveSite}
+        scanning={shellScanning}
+        scanError={shellScanError}
+      />
+      <WorkspaceMobileHeader
+        sites={sites}
+        activeSite={activeSite}
+        onSelect={selectSite}
+        onScan={scanActiveSite}
+        scanning={shellScanning}
+        scanError={shellScanError}
+        onNavigate={(path) => navigate(path)}
+      />
+      <main className="relative z-10 px-4 py-6 lg:ml-[264px] lg:px-9 lg:py-8">
+        <div className="mx-auto w-full max-w-[1640px]">
+          <Routes key={activeSite?.id || "no-site"}>
+            <Route path="/overview" element={requireSite(activeSite ? <Overview site={activeSite} reloadSites={loadSites} selectSite={selectSite} /> : null)} />
+            <Route path="/keywords" element={requireSite(activeSite ? <KeywordsPage site={activeSite} /> : null)} />
+            <Route path="/serp" element={requireSite(activeSite ? <SerpPage site={activeSite} /> : null)} />
+            <Route path="/saved" element={requireSite(activeSite ? <SavedPage site={activeSite} /> : null)} />
+            <Route path="/rank" element={requireSite(activeSite ? <RankPage site={activeSite} /> : null)} />
+            <Route path="/domain" element={requireSite(activeSite ? <DomainPage site={activeSite} /> : null)} />
+            <Route path="/links" element={requireSite(activeSite ? <LinksPage site={activeSite} /> : null)} />
+            <Route path="/brand" element={requireSite(activeSite ? <BrandLookupPage site={activeSite} /> : null)} />
+            <Route path="/prompts" element={requireSite(activeSite ? <PromptExplorerPage site={activeSite} /> : null)} />
+            <Route path="/scans" element={requireSite(activeSite ? <ScansPage site={activeSite} /> : null)} />
+            <Route path="/scans/:scanId" element={<ScanReportRoute />} />
+            <Route path="/gsc" element={requireSite(activeSite ? <GscPage site={activeSite} /> : null)} />
+            <Route path="/ai" element={requireSite(activeSite ? <AiPage site={activeSite} /> : null)} />
+            <Route path="/mcp-tools" element={requireSite(activeSite ? <McpPage site={activeSite} /> : null)} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function siteInitials(name?: string) {
+  const clean = String(name || "").trim();
+  if (!clean) return "•";
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function SiteAvatar({ site, className }: { site?: Site | null; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary ring-1 ring-inset ring-primary/15",
+        className,
+      )}
+    >
+      {siteInitials(site?.name || site?.domain)}
+    </div>
+  );
+}
+
+function BrandMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/25">
+        <Activity className="size-[18px]" />
+      </div>
+      {!compact ? (
+        <div className="leading-tight">
+          <div className="font-heading text-[15px] font-semibold tracking-tight">Local SEO</div>
+          <div className="text-[11px] text-muted-foreground">Editorial analytics desk</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TopBar({ onLogout, activeSite }: { onLogout: () => void; activeSite?: Site | null }) {
+  const location = useLocation();
+  const onSettings = location.pathname === "/settings";
+  return (
+    <header className="sticky top-0 z-40 h-14 border-b border-border/70 bg-background/85 backdrop-blur-md">
+      <div className="flex h-full items-center justify-between gap-3 px-4 lg:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link to="/" aria-label="All sites">
+            <BrandMark />
           </Link>
+          {activeSite ? (
+            <>
+              <span className="hidden text-border md:inline">/</span>
+              <NavLink
+                to="/overview"
+                className="hidden max-w-[16rem] truncate rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:inline-block"
+              >
+                {siteDisplayName(activeSite)}
+              </NavLink>
+            </>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Button asChild variant={onSettings ? "secondary" : "ghost"} size="sm">
+            <Link to="/settings">
+              <Settings /> <span className="hidden sm:inline">Settings</span>
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={onLogout}>
+            <LogOut /> <span className="hidden sm:inline">Sign out</span>
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
+}
 
-          <div className="mt-5 shrink-0 space-y-2">
-            <Label>Active site</Label>
-            <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={selectSite} />
-          </div>
+type SidebarProps = {
+  sites: Site[];
+  activeSite?: Site | null;
+  onSelect: (id: string) => void;
+  onScan: () => void;
+  scanning: boolean;
+  scanError: string;
+};
 
-          {activeSite?.domain ? (
-            <div className="mt-3 shrink-0 rounded-md border bg-card p-3">
-              <div className="text-xs font-medium text-muted-foreground">Scan plan</div>
-              <div className="mt-2">
-                <ScanPlanSummary site={activeSite} compact />
-              </div>
-              <Button className="mt-3 w-full justify-start" size="sm" onClick={scanActiveSite} disabled={shellScanning}>
-                <FileSearch /> {shellScanning ? "Starting scan" : "Scan website"}
-              </Button>
-              {shellScanError ? <p className="mt-2 text-xs text-destructive">{shellScanError}</p> : null}
+function WorkspaceSidebar({ sites, activeSite, onSelect, onScan, scanning, scanError }: SidebarProps) {
+  return (
+    <aside className="fixed bottom-0 left-0 top-14 z-20 hidden w-[264px] flex-col overflow-hidden border-r border-border/70 bg-surface/85 backdrop-blur lg:flex">
+      <div className="px-3 pt-4">
+        <div className="rounded-xl border border-border/80 bg-card p-3 shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
+          <div className="flex items-center gap-2.5">
+            <SiteAvatar site={activeSite} className="size-9" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[15px] font-semibold leading-tight">{activeSite ? siteDisplayName(activeSite) : "No site selected"}</div>
+              <div className="truncate text-xs text-muted-foreground">{activeSite?.domain || "Pick a site to begin"}</div>
             </div>
+          </div>
+          {sites.length > 1 ? (
+            <div className="mt-2.5">
+              <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={onSelect} />
+            </div>
+          ) : null}
+          {activeSite?.domain ? (
+            <>
+              <Button className="mt-2.5 w-full" size="sm" onClick={onScan} disabled={scanning}>
+                <FileSearch /> {scanning ? "Starting scan…" : "Scan website"}
+              </Button>
+              {scanError ? <p className="mt-2 text-xs text-destructive">{scanError}</p> : null}
+            </>
           ) : (
-            <Button asChild className="mt-3 w-full justify-start" size="sm">
-              <Link to="/sites"><Plus /> Add website</Link>
+            <Button asChild className="mt-2.5 w-full" size="sm">
+              <Link to="/"><Plus /> Add website</Link>
             </Button>
           )}
+        </div>
+      </div>
 
-          <nav className="mt-5 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-            {nav.map(({ to, label, icon: Icon, end }) => (
+      <nav className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-5">
+        {navGroups.map((group) => (
+          <div key={group.label} className="space-y-1">
+            <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{group.label}</div>
+            {group.items.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
-                end={end}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    isActive ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:bg-card/70 hover:text-foreground",
+                    "group flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/15"
+                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                   )
                 }
               >
-                <Icon className="size-4" />
+                <Icon className="size-4 shrink-0 opacity-90" />
                 {label}
               </NavLink>
             ))}
-          </nav>
+          </div>
+        ))}
+      </nav>
+    </aside>
+  );
+}
 
-          <Button variant="ghost" className="mt-4 shrink-0 justify-start" onClick={logout}>
-            <LogOut />
-            Sign out
+function WorkspaceMobileHeader({
+  sites,
+  activeSite,
+  onSelect,
+  onScan,
+  scanning,
+  scanError,
+  onNavigate,
+}: {
+  sites: Site[];
+  activeSite?: Site | null;
+  onSelect: (id: string) => void;
+  onScan: () => void;
+  scanning: boolean;
+  scanError: string;
+  onNavigate: (path: string) => void;
+}) {
+  return (
+    <div className="sticky top-14 z-20 border-b border-border/70 bg-background/85 px-4 py-3 backdrop-blur lg:hidden">
+      <div className="flex items-center gap-2.5 rounded-xl border border-border/80 bg-card p-2.5">
+        <SiteAvatar site={activeSite} className="size-9" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">{activeSite ? siteDisplayName(activeSite) : "No site selected"}</div>
+          <div className="truncate text-xs text-muted-foreground">{activeSite?.domain || "Pick a site"}</div>
+        </div>
+        {activeSite?.domain ? (
+          <Button size="sm" onClick={onScan} disabled={scanning}>
+            <FileSearch /> {scanning ? "Scanning" : "Scan"}
           </Button>
-        </aside>
+        ) : null}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {sites.length > 1 ? <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={onSelect} /> : <div />}
+        <Select onValueChange={onNavigate}>
+          <SelectTrigger>
+            <SelectValue placeholder="Go to…" />
+          </SelectTrigger>
+          <SelectContent>
+            {navItems.map((item) => (
+              <SelectItem key={item.to} value={item.to}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {scanError ? <p className="mt-2 text-xs text-destructive">{scanError}</p> : null}
+    </div>
+  );
+}
 
-        <header className="sticky top-0 z-20 border-b bg-background/90 px-4 py-3 backdrop-blur lg:hidden">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="font-bold uppercase tracking-[0.18em]">Local SEO</Link>
-            <Button size="sm" variant="outline" onClick={logout}>
-              <LogOut />
-            </Button>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={selectSite} />
-            {activeSite?.domain ? (
-              <Button size="sm" onClick={scanActiveSite} disabled={shellScanning}>
-                <FileSearch /> {shellScanning ? "Starting scan" : "Scan website"}
-              </Button>
-            ) : (
-              <Button asChild size="sm"><Link to="/sites"><Plus /> Add site</Link></Button>
-            )}
-          </div>
-          <div className="mt-2">
-            <Select onValueChange={(path) => navigate(path)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Navigate" />
-              </SelectTrigger>
-              <SelectContent>
-                {nav.map((item) => (
-                  <SelectItem key={item.to} value={item.to}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {shellScanError ? <p className="mt-2 text-xs text-destructive">{shellScanError}</p> : null}
-        </header>
-
-        <main className="relative z-10 px-4 py-6 lg:ml-64 lg:px-8 lg:py-8">
-          <div className="mx-auto w-full max-w-[1800px]">
-            {sitesError ? (
-              <EmptyState
-                title="Could not load local sites"
-                text={`${sitesError}. Your SQLite data was not cleared; the app could not read it from the local API.`}
-                action={
-                  <Button type="button" onClick={() => loadSites().catch(console.error)}>
-                    <RefreshCw /> Retry
-                  </Button>
-                }
-              />
-            ) : sitesLoading ? (
-              <div className="flex min-h-[50vh] items-center justify-center">
-                <Badge>Loading local SQLite sites</Badge>
-              </div>
-            ) : activeSite ? (
-              <Routes key={activeSite.id}>
-                <Route path="/" element={<Overview site={activeSite} reloadSites={loadSites} selectSite={selectSite} />} />
-                <Route path="/sites" element={<SitesPage sites={sites} reloadSites={loadSites} activeSiteId={activeSite.id} selectSite={selectSite} />} />
-                <Route path="/keywords" element={<KeywordsPage site={activeSite} />} />
-                <Route path="/serp" element={<SerpPage site={activeSite} />} />
-                <Route path="/saved" element={<SavedPage site={activeSite} />} />
-                <Route path="/rank" element={<RankPage site={activeSite} />} />
-                <Route path="/domain" element={<DomainPage site={activeSite} />} />
-                <Route path="/links" element={<LinksPage site={activeSite} />} />
-                <Route path="/brand" element={<BrandLookupPage site={activeSite} />} />
-                <Route path="/prompts" element={<PromptExplorerPage site={activeSite} />} />
-                <Route path="/scans" element={<ScansPage site={activeSite} />} />
-                <Route path="/scans/:scanId" element={<ScanReportRoute />} />
-                <Route path="/gsc" element={<GscPage site={activeSite} />} />
-                <Route path="/ai" element={<AiPage site={activeSite} />} />
-                <Route path="/mcp-tools" element={<McpPage site={activeSite} />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            ) : (
-              <SitesPage sites={sites} reloadSites={loadSites} activeSiteId="" selectSite={selectSite} />
-            )}
-          </div>
-        </main>
+function NoSiteSelected() {
+  return (
+    <div className="py-10">
+      <PageHeader eyebrow="Workspace" title="No site selected" description="Choose a site from the home screen to open its workspace, scans, and reports." />
+      <EmptyState
+        title="Pick a site to continue"
+        text="Your local SQLite data is grouped per site. Open one to see its overview, audits, keywords, and rankings."
+        action={
+          <Button asChild>
+            <Link to="/"><LayoutGrid /> Browse all sites</Link>
+          </Button>
+        }
+      />
     </div>
   );
 }
@@ -1451,7 +1679,7 @@ function NotFoundPage() {
         title="Page not found"
         description="This screen is not part of the local SEO app."
       />
-      <section className="rounded-md border bg-background">
+      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
         <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>
             <h2 className="text-lg font-semibold">Choose a current screen</h2>
@@ -1461,10 +1689,10 @@ function NotFoundPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild>
-              <Link to="/"><Gauge /> Open overview</Link>
+              <Link to="/overview"><Gauge /> Open overview</Link>
             </Button>
             <Button asChild variant="secondary">
-              <Link to="/sites"><FolderKanban /> Manage sites</Link>
+              <Link to="/"><FolderKanban /> Manage sites</Link>
             </Button>
           </div>
         </div>
@@ -1586,13 +1814,12 @@ function Overview({
   return (
     <>
       <PageHeader
-        eyebrow="Site overview"
         title={siteDisplayName(site)}
-        description={site.domain ? "Reports, scans, crawl links, rankings, and Search Console use this site." : "Add a site to unlock scans, reports, rankings, and Search Console."}
-        action={<Badge>{site.domain || "No site yet"}</Badge>}
+        description={site.domain ? undefined : "Add a site to unlock scans, reports, rankings, and Search Console."}
+        action={<Badge variant="outline">{site.domain || "No site yet"}</Badge>}
       />
       {!site.domain ? (
-        <section className="mb-6 rounded-md border border-primary/40 bg-background p-5">
+        <section className="mb-6 rounded-xl border border-primary/30 bg-primary/[0.03] p-5 sm:p-6">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">Start with a site scan</h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the website address once. The scan report opens automatically and stays saved locally.</p>
@@ -1634,7 +1861,7 @@ function Overview({
       ) : null}
       {scanError && <p className="mb-6 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{scanError}</p>}
       {scan && (
-        <section className="mb-6 rounded-md border border-primary/40 bg-background p-5">
+        <section className="mb-6 rounded-xl border border-primary/30 bg-primary/[0.03] p-5 sm:p-6">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">
               {scanRun?.status === "completed" ? "Scan complete" : scanRun?.status === "failed" ? "Scan failed" : "Scan running"} for {scan.scanUrl || scanRun?.url || scan.site}
@@ -1656,52 +1883,44 @@ function Overview({
           </div>
         </section>
       )}
-      <SiteCommandCenter site={site} summary={summary} scanning={scanning} onScan={scanSite} />
-      <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]">
-        <section className="rounded-md border bg-background">
-          <div className="border-b px-5 py-4">
-            <h2 className="text-lg font-semibold">Scan history</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {formatNumber(scanLedgerRows.length)} saved scans in local SQLite.
-            </p>
-          </div>
-          <div className="p-5">
-            {scanLedgerRows.length ? (
+      <div className="mb-6">
+        <SiteCommandCenter site={site} summary={summary} scanning={scanning} onScan={scanSite} />
+      </div>
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]">
+        <ReportSection title="Scan history" description={`${formatNumber(scanLedgerRows.length)} saved scans in local SQLite.`}>
+          {scanLedgerRows.length ? (
+            <div className="-mx-5 -mb-5">
               <ScanTable rows={scanLedgerRows} showSite activeSiteId={site.id} onInspect={openScanReport} />
-            ) : (
-              <EmptyState
-                title="No scans yet"
-                text={site.domain ? "Start a technical scan for this site." : "Add a website address to start scanning."}
-                action={
-                  site.domain ? (
-                    <Button onClick={scanSite} disabled={scanning}>
-                      <FileSearch /> {scanning ? "Starting" : "Scan website"}
-                    </Button>
-                  ) : (
-                    <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
-                  )
-                }
-              />
-            )}
-          </div>
-        </section>
-        <section className="rounded-md border bg-background">
-          <div className="border-b px-5 py-4">
-            <h2 className="text-lg font-semibold">Codex job history</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Local AI work runs through the Codex CLI with medium reasoning.</p>
-          </div>
-          <div className="p-5">
-            {summary?.latestAiJobs?.length ? (
-              <JobTable rows={summary.latestAiJobs} />
-            ) : (
-              <EmptyState
-                title="No AI jobs yet"
-                text="Start a local Codex workflow when you need analysis or prioritization."
-                action={<Button asChild variant="secondary"><Link to="/ai"><Bot /> Open AI lab</Link></Button>}
-              />
-            )}
-          </div>
-        </section>
+            </div>
+          ) : (
+            <EmptyState
+              icon={FileSearch}
+              title="No scans yet"
+              text={site.domain ? "Start a technical scan for this site." : "Add a website address to start scanning."}
+              action={
+                site.domain ? (
+                  <Button onClick={scanSite} disabled={scanning}>
+                    <FileSearch /> {scanning ? "Starting" : "Scan website"}
+                  </Button>
+                ) : (
+                  <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
+                )
+              }
+            />
+          )}
+        </ReportSection>
+        <ReportSection title="Codex job history" description="Local AI work runs through the Codex CLI with medium reasoning.">
+          {summary?.latestAiJobs?.length ? (
+            <JobTable rows={summary.latestAiJobs} />
+          ) : (
+            <EmptyState
+              icon={Bot}
+              title="No AI jobs yet"
+              text="Start a local Codex workflow when you need analysis or prioritization."
+              action={<Button asChild variant="secondary"><Link to="/ai"><Bot /> Open AI lab</Link></Button>}
+            />
+          )}
+        </ReportSection>
       </div>
     </>
   );
@@ -1735,10 +1954,10 @@ function SiteCommandCenter({
           <FileSearch /> {scanning ? "Starting" : "Scan website"}
         </Button>
       ) : (
-        <Button asChild size="sm"><Link to="/sites"><Plus /> Add site</Link></Button>
+        <Button asChild size="sm"><Link to="/"><Plus /> Add site</Link></Button>
       ),
       secondary: site.domain ? (
-        <Button asChild size="sm" variant="outline"><Link to="/sites"><Pencil /> Edit site</Link></Button>
+        <Button asChild size="sm" variant="outline"><Link to="/"><Pencil /> Edit site</Link></Button>
       ) : null,
     },
     {
@@ -1771,7 +1990,7 @@ function SiteCommandCenter({
           <Zap /> {scanning ? "Starting" : "Scan website"}
         </Button>
       ) : (
-        <Button asChild size="sm" variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
+        <Button asChild size="sm" variant="secondary"><Link to="/"><Plus /> Add site</Link></Button>
       ),
       secondary: latestScan ? (
         <Button asChild size="sm" variant="outline"><Link to="/scans"><FileSearch /> Open scan history</Link></Button>
@@ -1823,60 +2042,47 @@ function SiteCommandCenter({
     },
   ];
 
+  const iconByKey: Record<string, any> = {
+    site: Globe2,
+    scan: FileSearch,
+    speed: Zap,
+    organic: Search,
+    links: Link2,
+    rank: Target,
+    gsc: BarChart3,
+    ai: Bot,
+  };
+
   return (
-    <section className="rounded-md border bg-background">
-      <div className="border-b px-5 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Site control</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              The active site feeds scans, local link evidence, rankings, Search Console, and AI work.
-            </p>
-          </div>
-          {site.domain ? <Badge variant="outline">{scanUrlShortDetail(site)}</Badge> : null}
-        </div>
+    <section>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="eyebrow-muted">Site control</h2>
+        {site.domain ? <Badge variant="outline">{scanUrlShortDetail(site)}</Badge> : null}
       </div>
-      <div className="divide-y md:hidden">
-        {rows.map((row) => (
-          <div key={row.key} className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-medium">{row.area}</h3>
-              <Badge variant={siteCommandStatusVariant(row.status)}>{row.status}</Badge>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{row.evidence}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {row.secondary}
-              {row.action}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="hidden md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Area</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Local evidence</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.key}>
-                <TableCell className="font-medium">{row.area}</TableCell>
-                <TableCell className="min-w-36"><Badge variant={siteCommandStatusVariant(row.status)}>{row.status}</Badge></TableCell>
-                <TableCell className="min-w-96 break-words text-sm text-muted-foreground">{row.evidence}</TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-2">
-                    {row.secondary}
-                    {row.action}
+      <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border bg-card">
+        {rows.map((row) => {
+          const Icon = iconByKey[row.key] || Gauge;
+          return (
+            <div key={row.key} className="flex flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-accent/30 sm:flex-row sm:items-center sm:gap-4">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/12">
+                  <Icon className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{row.area}</span>
+                    <Badge variant={siteCommandStatusVariant(row.status)}>{row.status}</Badge>
                   </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">{row.evidence}</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                {row.action}
+                {row.secondary}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -1888,7 +2094,7 @@ function siteCommandStatusVariant(status: string): ComponentProps<typeof Badge>[
 
 function ScanCoverageList({ rows, scanStatus }: { rows: any[]; scanStatus?: string }) {
   return (
-    <div className="divide-y rounded-md border bg-background">
+    <div className="divide-y rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
       {rows.map((row) => {
         const status = row.key === "technical-scan" && scanStatus ? scanStatus : row.status;
         const variant = status === "completed" || status === "queued" || status === "running" || status === "local" ? "good" : status === "needs-provider" ? "warn" : "outline";
@@ -1916,12 +2122,58 @@ function ScanCoverageList({ rows, scanStatus }: { rows: any[]; scanStatus?: stri
   );
 }
 
-function SitesPage({
+function scoreTone(score: number) {
+  if (score >= 85) return "var(--good)";
+  if (score >= 60) return "var(--gold)";
+  return "var(--bad)";
+}
+
+function scoreBadgeVariant(score: number): ComponentProps<typeof Badge>["variant"] {
+  if (score >= 85) return "good";
+  if (score >= 60) return "warn";
+  return "bad";
+}
+
+function ScoreDial({
+  score,
+  size = 96,
+  label,
+  className,
+  color,
+  suffix,
+}: {
+  score: number;
+  size?: number;
+  label?: string;
+  className?: string;
+  color?: string;
+  suffix?: string;
+}) {
+  const value = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+  return (
+    <div
+      className={cn("score-ring relative flex shrink-0 items-center justify-center rounded-full", className)}
+      style={{ width: size, height: size, ["--ring-value" as any]: value, ["--ring-color" as any]: color || scoreTone(value) }}
+    >
+      <div className="flex flex-col items-center leading-none">
+        <span className="metric flex items-baseline" style={{ fontSize: size * 0.3 }}>
+          {value}
+          {suffix ? <span style={{ fontSize: size * 0.14 }} className="ml-0.5 text-muted-foreground">{suffix}</span> : null}
+        </span>
+        {label ? <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function SitesManager({
+  variant,
   sites,
   reloadSites,
   activeSiteId,
   selectSite,
 }: {
+  variant: "home" | "settings";
   sites: Site[];
   reloadSites: () => Promise<void>;
   activeSiteId: string;
@@ -1976,7 +2228,30 @@ function SitesPage({
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
   const [deletingSiteId, setDeletingSiteId] = useState("");
   const [editingSiteId, setEditingSiteId] = useState("");
+  const [allScans, setAllScans] = useState<any[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (variant !== "home") return;
+    let cancelled = false;
+    api.allScans()
+      .then((rows) => {
+        if (!cancelled) setAllScans(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [variant, sites.length]);
+
+  const healthBySite = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const scan of sortScanRows(allScans)) {
+      const key = scan.site_id;
+      if (key && !map.has(key)) map.set(key, scan);
+    }
+    return map;
+  }, [allScans]);
 
   function showActionMessage(message: string, persistForRemount = false) {
     if (persistForRemount) stashSiteActionMessage(message);
@@ -2166,228 +2441,373 @@ function SitesPage({
     );
   }
 
+  const banners = (
+    <>
+      {actionMessage ? (
+        <p className="mb-4 flex items-center gap-2 rounded-lg border border-good/20 bg-good-soft/60 px-3.5 py-2.5 text-sm text-good">
+          <CheckCircle2 className="size-4 shrink-0" /> {actionMessage}
+        </p>
+      ) : null}
+      {error && (
+        <p className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/30 bg-bad-soft/60 px-3.5 py-2.5 text-sm text-destructive">
+          <AlertTriangle className="size-4 shrink-0" /> {error}
+        </p>
+      )}
+    </>
+  );
+
+  const onboarding = (
+    <section className="rounded-2xl border border-dashed border-primary/40 bg-primary/[0.035] p-6 sm:p-9">
+      <div className="mx-auto max-w-2xl text-center">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
+          <Globe2 className="size-6" />
+        </div>
+        <h2 className="page-title mt-4 text-2xl font-medium">Add your first website</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+          Save the address once. The technical scan runs immediately and everything — score, issues, speed, links — stays in local SQLite.
+        </p>
+      </div>
+      <form className="mx-auto mt-6 max-w-2xl space-y-4" onSubmit={submit}>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] sm:items-end">
+          <Field label="Website address">
+            <Input value={form.domain} onChange={(event) => setForm({ ...form, domain: event.target.value })} placeholder="example.com" required />
+          </Field>
+          <Field label="Site name">
+            <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Optional" />
+          </Field>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Scan protocol">
+            <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Site["crawl_protocol"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Host variant">
+            <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Site["crawl_host"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+        <ScanPlanPreview site={formScanPlan} />
+        <div className="flex justify-center">
+          <Button type="submit" size="lg" disabled={Boolean(creatingAction)}>
+            <FileSearch /> {creatingAction === "scan" ? "Starting scan…" : "Add site and scan"}
+          </Button>
+        </div>
+      </form>
+    </section>
+  );
+
+  function renderSiteRow(site: Site) {
+    const scan = healthBySite.get(site.id);
+    const scanned = Boolean(scan);
+    const score = Number(scan?.score || 0);
+    const isActive = activeSiteId === site.id;
+    const sev = scanned ? scanSeverityCounts(scan) : { high: 0, medium: 0, low: 0 };
+    const openWorkspace = () => {
+      selectSite(site.id);
+      navigate("/overview");
+    };
+    return (
+      <div
+        key={site.id}
+        className={cn("group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/35", isActive ? "bg-primary/[0.045]" : "")}
+      >
+        <button type="button" onClick={openWorkspace} className="flex min-w-0 flex-1 items-center gap-3 text-left" title={`Open ${site.name}`}>
+          <SiteAvatar site={site} className="size-10 text-sm" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="truncate font-medium transition-colors group-hover:text-primary">{site.name}</span>
+              {isActive ? <Badge variant="good">Active</Badge> : null}
+            </div>
+            <div className="truncate text-sm text-muted-foreground">{site.domain || "No website address"}</div>
+          </div>
+        </button>
+
+        {site.domain ? (
+          <div className="hidden min-w-0 max-w-[20rem] flex-1 lg:block">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline">{crawlPreferenceLabel(site)}</Badge>
+              <Badge variant="outline">{scanUrlCountLabel(site)}</Badge>
+            </div>
+            <div className="mt-1 truncate text-xs text-muted-foreground">{preferredScanUrl(site)}</div>
+          </div>
+        ) : null}
+
+        <div className="hidden items-center gap-3 xl:flex">
+          {scanned ? (
+            <>
+              <Badge variant={scoreBadgeVariant(score)}>{formatNumber(score)} health</Badge>
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                <span className={sev.high ? "font-medium text-bad" : ""}>{formatNumber(sev.high)}</span> high ·{" "}
+                <span className={sev.medium ? "font-medium text-warn" : ""}>{formatNumber(sev.medium)}</span> med · {formatNumber(scan.pages_crawled)} pages
+              </span>
+            </>
+          ) : (
+            <Badge variant="outline">Not scanned</Badge>
+          )}
+        </div>
+
+        {site.domain ? (
+          <Button size="sm" variant="outline" className="hidden sm:inline-flex" disabled={scanningSiteId === site.id} onClick={() => scanSite(site)}>
+            <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan"}
+          </Button>
+        ) : null}
+        <div className="flex items-center opacity-60 transition-opacity group-hover:opacity-100">
+          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
+            <Pencil />
+          </Button>
+          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
+            <Trash2 />
+          </Button>
+        </div>
+        <Button size="sm" variant="ghost" className="text-muted-foreground group-hover:text-foreground" onClick={openWorkspace}>
+          Open <ChevronRight />
+        </Button>
+      </div>
+    );
+  }
+
+  const addDialog = (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) setShowKeywordDefaults(false);
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add site</DialogTitle>
+          <DialogDescription>Add the website once, choose exactly how it should be reached, and start a local scan immediately.</DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={submit}>
+          <Field label="Site name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Optional" /></Field>
+          <Field label="Website address"><Input value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="example.com" required /></Field>
+          <KeywordToolDefaultsPanel
+            expanded={showKeywordDefaults}
+            locationCode={form.locationCode}
+            languageCode={form.languageCode}
+            onToggle={() => setShowKeywordDefaults((value) => !value)}
+            onLocationCodeChange={(value) => setForm({ ...form, locationCode: value })}
+            onLanguageCodeChange={(value) => setForm({ ...form, languageCode: value })}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Scan protocol">
+              <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Site["crawl_protocol"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Host variant">
+              <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Site["crawl_host"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <ScanPlanPreview site={formScanPlan} />
+          <Field label="Notes"><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" disabled={Boolean(creatingAction)} onClick={() => createSite(false)}>
+              <Plus /> {creatingAction === "save" ? "Saving" : "Save site only"}
+            </Button>
+            <Button type="submit" disabled={Boolean(creatingAction)}>
+              <FileSearch /> {creatingAction === "scan" ? "Starting scan" : "Add site and scan"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const editDialog = (
+    <Dialog open={Boolean(editing)} onOpenChange={(nextOpen) => !nextOpen && setEditing(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit site</DialogTitle>
+          <DialogDescription>Changes apply to this saved website address and future scans.</DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={submitEdit}>
+          <Field label="Site name"><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></Field>
+          <Field label="Website address"><Input value={editForm.domain} onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })} /></Field>
+          <KeywordToolDefaultsPanel
+            expanded={showEditKeywordDefaults}
+            locationCode={editForm.location_code}
+            languageCode={editForm.language_code}
+            onToggle={() => setShowEditKeywordDefaults((value) => !value)}
+            onLocationCodeChange={(value) => setEditForm({ ...editForm, location_code: value })}
+            onLanguageCodeChange={(value) => setEditForm({ ...editForm, language_code: value })}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Scan protocol">
+              <Select value={editForm.crawl_protocol} onValueChange={(value) => setEditForm({ ...editForm, crawl_protocol: value as Site["crawl_protocol"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Host variant">
+              <Select value={editForm.crawl_host} onValueChange={(value) => setEditForm({ ...editForm, crawl_host: value as Site["crawl_host"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <ScanPlanPreview site={editScanPlan} />
+          <Field label="Notes"><Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></Field>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" disabled={Boolean(editingSiteId)}>
+            <Pencil /> {editingSiteId ? "Saving changes" : "Save changes"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const deleteDialog = (
+    <AlertDialog open={Boolean(deleting)} onOpenChange={(nextOpen) => !nextOpen && setDeleting(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete site?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently removes "{deleting?.name}" and its saved scans, keywords, trackers, Search Console imports, and local history from SQLite.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={Boolean(deletingSiteId)}>Cancel</AlertDialogCancel>
+          <AlertDialogAction type="button" disabled={Boolean(deletingSiteId)} onClick={() => deleting && deleteSite(deleting)}>
+            {deletingSiteId ? "Deleting site" : "Delete site"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
+  if (variant === "home") {
+    return (
+      <>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border/70 pb-4">
+          <div className="min-w-0">
+            <h1 className="page-title text-[1.7rem] leading-tight">Your sites</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {formatNumber(sites.length)} {sites.length === 1 ? "site" : "sites"} · open one to enter its workspace
+            </p>
+          </div>
+          {sites.length ? (
+            <Button onClick={() => setOpen(true)}>
+              <Plus /> Add site
+            </Button>
+          ) : null}
+        </div>
+        {banners}
+        {sites.length === 0 ? (
+          onboarding
+        ) : (
+          <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
+            {sites.map((site) => renderSiteRow(site))}
+          </div>
+        )}
+        {addDialog}
+        {editDialog}
+        {deleteDialog}
+      </>
+    );
+  }
+
   return (
     <>
-      <PageHeader
-        eyebrow="Websites"
-        title="Sites"
-        description="A site is one saved website address plus its crawl URL preferences. The active site feeds scans, reports, crawl links, rankings, and Search Console."
-        action={
-          <Dialog open={open} onOpenChange={(nextOpen) => {
-            setOpen(nextOpen);
-            if (!nextOpen) setShowKeywordDefaults(false);
-          }}>
-            <DialogTrigger asChild>
-              <Button><Plus /> Add site</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add site</DialogTitle>
-                <DialogDescription>Add the website once, choose exactly how it should be reached, and start a local scan immediately.</DialogDescription>
-              </DialogHeader>
-              <form className="space-y-4" onSubmit={submit}>
-                <Field label="Site name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Optional" /></Field>
-                <Field label="Website address"><Input value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="example.com" required /></Field>
-                <KeywordToolDefaultsPanel
-                  expanded={showKeywordDefaults}
-                  locationCode={form.locationCode}
-                  languageCode={form.languageCode}
-                  onToggle={() => setShowKeywordDefaults((value) => !value)}
-                  onLocationCodeChange={(value) => setForm({ ...form, locationCode: value })}
-                  onLanguageCodeChange={(value) => setForm({ ...form, languageCode: value })}
-                />
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Scan protocol">
-                    <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Site["crawl_protocol"] })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Host variant">
-                    <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Site["crawl_host"] })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                </div>
-                <ScanPlanPreview site={formScanPlan} />
-                <Field label="Notes"><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button type="button" variant="secondary" disabled={Boolean(creatingAction)} onClick={() => createSite(false)}>
-                    <Plus /> {creatingAction === "save" ? "Saving" : "Save site only"}
-                  </Button>
-                  <Button type="submit" disabled={Boolean(creatingAction)}>
-                    <FileSearch /> {creatingAction === "scan" ? "Starting scan" : "Add site and scan"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        }
-      />
-      {actionMessage ? <p className="mb-4 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-primary">{actionMessage}</p> : null}
-      {error && <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p>}
-      {sites.length === 0 ? (
-        <section className="rounded-md border border-primary/40 bg-background p-5">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold">Start with a site scan</h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">Add the website address once. The scan report opens automatically and stays saved locally.</p>
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04),0_10px_28px_-20px_rgb(38_32_20/0.2)]">
+        <div className="flex flex-col gap-3 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-heading text-lg font-semibold">Sites</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">Saved website addresses and their crawl preferences. The active site drives every workspace screen.</p>
           </div>
-          <form className="space-y-4" onSubmit={submit}>
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
-              <Field label="Website address">
-                <Input value={form.domain} onChange={(event) => setForm({ ...form, domain: event.target.value })} placeholder="example.com" required />
-              </Field>
-              <Field label="Site name">
-                <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Site name (optional)" />
-              </Field>
-              <Button type="submit" disabled={Boolean(creatingAction)} className="lg:mb-px">
-                <FileSearch /> {creatingAction === "scan" ? "Starting scan" : "Add site and scan"}
-              </Button>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Scan protocol">
-                <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Site["crawl_protocol"] })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Host variant">
-                <Select value={form.crawlHost} onValueChange={(value) => setForm({ ...form, crawlHost: value as Site["crawl_host"] })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-            <ScanPlanPreview site={formScanPlan} />
-          </form>
-        </section>
-      ) : (
-        <section className="rounded-md border bg-background">
-          <div className="divide-y md:hidden">
-            {sites.map((site) => (
-              <div key={site.id} className={cn("space-y-4 p-4", activeSiteId === site.id ? "bg-accent/35" : "")}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="break-words text-base font-semibold">{site.name}</div>
-                    <div className="mt-1 break-all text-sm text-muted-foreground">{site.domain || "Add a website address"}</div>
-                  </div>
-                  {activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}
-                </div>
-                <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Scan plan</div>
-                  <ScanPlanSummary site={site} compact />
-                </div>
-                {site.notes ? (
-                  <p className="text-sm leading-6 text-muted-foreground">{site.notes}</p>
-                ) : null}
-                {siteActions(site, "mobile")}
-              </div>
-            ))}
-          </div>
-          <div className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Site</TableHead>
-                  <TableHead>Scan plan</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          <Button size="sm" onClick={() => setOpen(true)}><Plus /> Add site</Button>
+        </div>
+        <div className="p-5">
+          {banners}
+          {sites.length === 0 ? (
+            onboarding
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
                 {sites.map((site) => (
-                  <TableRow key={site.id} className={activeSiteId === site.id ? "bg-accent/35" : ""}>
-                    <TableCell className="min-w-64">
-                      <div className="font-medium">{site.name}</div>
-                      <div className="text-xs text-muted-foreground">{site.domain || "Add a website address"}</div>
-                    </TableCell>
-                    <TableCell className="min-w-56">
-                      <ScanPlanSummary site={site} compact />
-                    </TableCell>
-                    <TableCell className="max-w-md">
-                      <div className="line-clamp-2 text-sm text-muted-foreground">{site.notes || "No notes yet."}</div>
-                    </TableCell>
-                    <TableCell>{activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}</TableCell>
-                    <TableCell>{siteActions(site)}</TableCell>
-                  </TableRow>
+                  <div key={site.id} className={cn("space-y-4 rounded-xl border p-4", activeSiteId === site.id ? "border-primary/30 bg-primary/[0.03]" : "border-border")}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <SiteAvatar site={site} className="size-10" />
+                        <div className="min-w-0">
+                          <div className="break-words font-heading text-base font-semibold">{site.name}</div>
+                          <div className="mt-0.5 break-all text-sm text-muted-foreground">{site.domain || "Add a website address"}</div>
+                        </div>
+                      </div>
+                      {activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}
+                    </div>
+                    <ScanPlanSummary site={site} compact />
+                    {site.notes ? <p className="text-sm leading-6 text-muted-foreground">{site.notes}</p> : null}
+                    {siteActions(site, "mobile")}
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-        </section>
-      )}
-      <Dialog open={Boolean(editing)} onOpenChange={(nextOpen) => !nextOpen && setEditing(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit site</DialogTitle>
-            <DialogDescription>Changes apply to this saved website address and future scans.</DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={submitEdit}>
-            <Field label="Site name"><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></Field>
-            <Field label="Website address"><Input value={editForm.domain} onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })} /></Field>
-            <KeywordToolDefaultsPanel
-              expanded={showEditKeywordDefaults}
-              locationCode={editForm.location_code}
-              languageCode={editForm.language_code}
-              onToggle={() => setShowEditKeywordDefaults((value) => !value)}
-              onLocationCodeChange={(value) => setEditForm({ ...editForm, location_code: value })}
-              onLanguageCodeChange={(value) => setEditForm({ ...editForm, language_code: value })}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Scan protocol">
-                <Select value={editForm.crawl_protocol} onValueChange={(value) => setEditForm({ ...editForm, crawl_protocol: value as Site["crawl_protocol"] })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Host variant">
-                <Select value={editForm.crawl_host} onValueChange={(value) => setEditForm({ ...editForm, crawl_host: value as Site["crawl_host"] })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-            <ScanPlanPreview site={editScanPlan} />
-            <Field label="Notes"><Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></Field>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={Boolean(editingSiteId)}>
-              <Pencil /> {editingSiteId ? "Saving changes" : "Save changes"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={Boolean(deleting)} onOpenChange={(nextOpen) => !nextOpen && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete site?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently removes "{deleting?.name}" and its saved scans, keywords, trackers, Search Console imports, and local history from SQLite.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={Boolean(deletingSiteId)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" disabled={Boolean(deletingSiteId)} onClick={() => deleting && deleteSite(deleting)}>
-              {deletingSiteId ? "Deleting site" : "Delete site"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              </div>
+              <div className="-mx-5 -mb-5 hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="pl-5">Site</TableHead>
+                      <TableHead>Scan plan</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="pr-5 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sites.map((site) => (
+                      <TableRow key={site.id} className={activeSiteId === site.id ? "bg-primary/[0.04]" : ""}>
+                        <TableCell className="min-w-64 pl-5">
+                          <div className="flex items-center gap-3">
+                            <SiteAvatar site={site} className="size-9" />
+                            <div className="min-w-0">
+                              <div className="font-medium">{site.name}</div>
+                              <div className="text-xs text-muted-foreground">{site.domain || "Add a website address"}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-56">
+                          <ScanPlanSummary site={site} compact />
+                        </TableCell>
+                        <TableCell className="max-w-md">
+                          <div className="line-clamp-2 text-sm text-muted-foreground">{site.notes || "No notes yet."}</div>
+                        </TableCell>
+                        <TableCell>{activeSiteId === site.id ? <Badge variant="good">Active</Badge> : <Badge variant="outline">Available</Badge>}</TableCell>
+                        <TableCell className="pr-5">{siteActions(site)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+      {addDialog}
+      {editDialog}
+      {deleteDialog}
     </>
   );
 }
@@ -2438,7 +2858,7 @@ function KeywordsPage({ site }: { site: Site }) {
   return (
     <>
       <PageHeader eyebrow="Research" title="Keyword research" description="Find real keyword suggestions. Volume, CPC, and difficulty stay unavailable unless you import real metrics later." />
-      <section className="rounded-md border bg-background p-5">
+      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
         <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_140px_auto] lg:items-end" onSubmit={submit}>
           <Field label="Seed keyword">
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={site.domain || "seed keyword"} />
@@ -2620,7 +3040,7 @@ function SavedPage({ site }: { site: Site }) {
           </div>
         }
       />
-      <section className="mb-6 rounded-md border bg-background p-5">
+      <section className="mb-6 rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-end">
           <Field label="Search keywords">
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search saved keywords" />
@@ -2656,7 +3076,7 @@ function SavedPage({ site }: { site: Site }) {
       {error ? <p className="mb-4 rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{error}</p> : null}
       {message ? <p className="mb-4 rounded-md border border-primary/30 bg-muted/30 p-3 text-sm text-primary">{message}</p> : null}
       {selectedIds.length > 0 && (
-        <section className="mb-6 rounded-md border border-primary/40 bg-background p-5">
+        <section className="mb-6 rounded-xl border border-primary/30 bg-primary/[0.03] p-5 sm:p-6">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
             <Field label="Tag names">
               <Input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder="tag names, comma separated" />
@@ -2767,7 +3187,7 @@ function SerpPage({ site }: { site: Site }) {
   return (
     <>
       <PageHeader eyebrow="SERP" title="SERP analysis" description="Inspect ranking pages, active-site ownership, intent mix, and content opportunities for one query." />
-      <section className="rounded-md border bg-background p-5">
+      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
         <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end" onSubmit={submit}>
           <Field label="Search query">
             <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="best local seo tool" required />
@@ -3177,7 +3597,7 @@ function DomainPage({ site }: { site: Site }) {
 
   async function scanSite() {
     if (!site.domain) {
-      navigate("/sites");
+      navigate("/");
       return;
     }
     setScanning(true);
@@ -3200,7 +3620,7 @@ function DomainPage({ site }: { site: Site }) {
   return (
     <>
       <PageHeader eyebrow="Competitive" title="Organic research" description="Import ranked keywords and top pages for the active site or a competitor site." />
-      <section className="rounded-md border bg-background p-5">
+      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={run}>
           <SiteDomainField
             label="Research domain"
@@ -3339,7 +3759,7 @@ function LocalOrganicEvidence({
   const missingDescriptionCount = pages.filter((page: any) => !page.description).length;
   const h1IssueCount = pages.reduce((total: number, page: any) => total + pageIssueTypesCount(page, ["h1-count", "h1-empty"]), 0);
   return (
-    <section className="rounded-md border bg-background">
+    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
       <div className="border-b px-5 py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -3361,7 +3781,7 @@ function LocalOrganicEvidence({
                 <FileSearch /> {scanning ? "Starting scan" : `Scan ${siteDomain}`}
               </Button>
             ) : (
-              <Button asChild variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
+              <Button asChild variant="secondary"><Link to="/"><Plus /> Add site</Link></Button>
             )}
           />
         ) : !scan.result ? (
@@ -3372,7 +3792,7 @@ function LocalOrganicEvidence({
           />
         ) : (
           <>
-            <div className="divide-y rounded-md border bg-background">
+            <div className="divide-y rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
               {[
                 ["Pages crawled", pages.length],
                 ["Indexable pages", indexableCount],
@@ -3636,7 +4056,7 @@ function LinksPage({ site }: { site: Site }) {
 
   async function scanSite() {
     if (!site.domain) {
-      navigate("/sites");
+      navigate("/");
       return;
     }
     setScanning(true);
@@ -3659,7 +4079,7 @@ function LinksPage({ site }: { site: Site }) {
   return (
     <>
       <PageHeader eyebrow="Authority" title="Links" description="Local crawl links come from saved scans. Web-wide backlink tables come from CSV imports saved in SQLite." />
-      <section className="rounded-md border bg-background p-5">
+      <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-5">
         <form className="grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={submit}>
           <SiteDomainField
             label="Web-wide backlink domain"
@@ -3765,7 +4185,7 @@ function LocalLinkEvidence({
   const pageRows = [...pages]
     .sort((a, b) => Number(b.internalInlinks || 0) - Number(a.internalInlinks || 0));
   return (
-    <section className="rounded-md border bg-background">
+    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
       <div className="border-b px-5 py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -3787,7 +4207,7 @@ function LocalLinkEvidence({
                 <FileSearch /> {scanning ? "Starting scan" : `Scan ${siteDomain}`}
               </Button>
             ) : (
-              <Button asChild variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
+              <Button asChild variant="secondary"><Link to="/"><Plus /> Add site</Link></Button>
             )}
           />
         ) : !scan.result ? (
@@ -3798,7 +4218,7 @@ function LocalLinkEvidence({
           />
         ) : (
           <>
-            <div className="divide-y rounded-md border bg-background">
+            <div className="divide-y rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
               {[
                 ["Link tags found", linkInventory.length],
                 ["External links found", linkInventory.filter((link: any) => link.type === "external").length],
@@ -4558,7 +4978,7 @@ function ScansPage({ site }: { site: Site }) {
                 <FileSearch /> {starting ? "Starting" : `Scan ${site.domain}`}
               </Button>
             ) : (
-              <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
+              <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
             )}
             <Button type="button" variant="outline" onClick={() => setShowCustomUrl((value) => !value)}>
               <FileSearch /> {showCustomUrl ? "Hide URL scan" : "Specific URL"}
@@ -4602,14 +5022,14 @@ function ScansPage({ site }: { site: Site }) {
                         <FileSearch /> {starting ? "Starting" : "Scan website"}
                       </Button>
                     )
-                    : <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
+                    : <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
                   : undefined
               }
             />
           )}
         </section>
 
-        <section className="rounded-md border bg-background">
+        <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
           <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">All scan history</h2>
@@ -4641,7 +5061,7 @@ function ScansPage({ site }: { site: Site }) {
                     <FileSearch /> {starting ? "Starting" : "Scan website"}
                   </Button>
                 ) : (
-                  <Button asChild><Link to="/sites"><Plus /> Add site</Link></Button>
+                  <Button asChild><Link to="/"><Plus /> Add site</Link></Button>
                 )}
               />
             )}
@@ -4718,7 +5138,7 @@ function ScanSpeedHistoryPanel({ scans }: { scans: any[] }) {
   const latest = rows[0];
   const previous = rows[1];
   return (
-    <section className="rounded-md border bg-background">
+    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
       <div className="flex flex-col gap-3 border-b px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Page speed tracking</h2>
@@ -5548,7 +5968,7 @@ function ScanProgressPanel({
     },
   ];
   return (
-    <section className="rounded-md border bg-background">
+    <section className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)]">
       <div className="border-b px-5 py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -5611,137 +6031,115 @@ function ScanReportOverview({
 }) {
   const isActive = scanIsActive(scan);
   const isCompleted = scan.status === "completed";
+  const isFailed = scan.status === "failed";
   const finalScore = Number(scan.score || 0);
   const progress = scanProgress(scan);
-  const scoreVariant = scan.status === "failed" ? "bad" : isActive ? "warn" : finalScore >= 85 ? "good" : finalScore >= 60 ? "warn" : "bad";
+  const dialColor = isFailed ? "var(--bad)" : isActive ? "var(--primary)" : undefined;
   const sourceUrl = result.startUrl || scan.url;
   const canonicalUrl = result.pages?.find((page: any) => page.finalUrl)?.finalUrl || sourceUrl;
-  const rows = [
+  const metaIssues = Number(summary.missingTitles || 0) + Number(summary.missingDescriptions || 0);
+  const imageAltIssues = Number(summary.missingAlt || 0) + Number(summary.imagesMissingDimensions || 0);
+  const resourceFailures = coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets;
+
+  const tiles: MetricTileProps[] = [
     {
-      area: "Issue impact",
-      status: (
-        <div className="flex flex-wrap gap-1">
-          <Badge variant={severityCounts.high ? "bad" : "outline"}>{formatNumber(severityCounts.high)} high</Badge>
-          <Badge variant={severityCounts.medium ? "warn" : "outline"}>{formatNumber(severityCounts.medium)} medium</Badge>
-          <Badge variant="outline">{formatNumber(severityCounts.low)} low</Badge>
-        </div>
-      ),
-      evidence: `${formatNumber(scan.issue_count || 0)} saved issues from ${formatNumber(coverage.pages)} crawled pages.`,
-      action: (
-        <div className="flex flex-wrap justify-end gap-2">
-          {["high", "medium", "low"].map((severity) => (
-            <Button
-              key={severity}
-              size="sm"
-              variant={activeSeverity === severity ? "default" : "outline"}
-              onClick={() => onSeveritySelect(severity)}
-            >
-              <ListChecks /> {severity}
-            </Button>
-          ))}
-        </div>
-      ),
+      label: "Pages crawled",
+      value: formatNumber(coverage.pages),
+      icon: FileText,
+      hint: `${formatNumber(coverage.indexablePages)} indexable · ${formatNumber(coverage.nonIndexablePages)} noindex · ${formatNumber(coverage.sitemapUrls)} in sitemap`,
     },
     {
-      area: "Crawl scope",
-      status: `${formatNumber(coverage.pages)} pages`,
-      evidence: `${formatNumber(coverage.indexablePages)} indexable · ${formatNumber(coverage.nonIndexablePages)} non-indexable · ${formatNumber(coverage.unknownIndexabilityPages)} unknown · ${formatNumber(coverage.sitemapUrls)} sitemap-listed.`,
-      action: <Badge variant={coverage.unknownIndexabilityPages || coverage.nonIndexablePages ? "warn" : "good"}>{coverage.unknownIndexabilityPages ? "needs checking" : "measured"}</Badge>,
+      label: "Links checked",
+      value: formatNumber(coverage.checkedLinks),
+      icon: Link2,
+      tone: coverage.brokenLinks ? "bad" : "good",
+      hint: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.redirectedLinks)} redirecting`,
     },
     {
-      area: "Resources",
-      status: `${formatNumber(coverage.linkTags)} links · ${formatNumber(coverage.imageTags)} images · ${formatNumber(coverage.assetTags)} CSS/JS`,
-      evidence: `${formatNumber(coverage.checkedLinks)} link URLs checked (${formatNumber(coverage.brokenLinks)} failing) · ${formatNumber(coverage.checkedImages)} image URLs checked (${formatNumber(coverage.brokenImages)} failing) · ${formatNumber(coverage.checkedAssets)} CSS/JS checked (${formatNumber(coverage.brokenAssets)} failing).`,
-      action: <Badge variant={coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets ? "bad" : "good"}>{coverage.brokenLinks || coverage.brokenImages || coverage.brokenAssets ? "failures" : "reachable"}</Badge>,
+      label: "Images checked",
+      value: formatNumber(coverage.checkedImages),
+      icon: Image,
+      tone: coverage.brokenImages ? "bad" : coverage.largeImages ? "warn" : "good",
+      hint: `${formatNumber(coverage.brokenImages)} broken · ${formatNumber(coverage.largeImages || 0)} large`,
     },
     {
-      area: "Page speed",
-      status: coverage.measuredPageLoads ? `${formatMs(coverage.averagePageLoadMs)} average response` : "not measured",
-      evidence: coverage.measuredPageLoads
-        ? `${formatNumber(coverage.measuredPageLoads)} pages timed · median ${formatMs(coverage.medianPageLoadMs)} · p95 ${formatMs(coverage.p95PageLoadMs)} · slowest ${formatMs(coverage.slowestPageLoadMs)}.`
-        : "Run a fresh scan to record crawler response timing for each HTML page.",
-      action: <Badge variant={coverage.verySlowPages ? "bad" : coverage.slowPages ? "warn" : coverage.measuredPageLoads ? "good" : "outline"}>{coverage.slowPages ? `${formatNumber(coverage.slowPages)} slow` : coverage.measuredPageLoads ? "measured" : "no timing"}</Badge>,
+      label: "Avg response",
+      value: coverage.measuredPageLoads ? formatMs(coverage.averagePageLoadMs) : "—",
+      icon: Zap,
+      tone: coverage.verySlowPages ? "bad" : coverage.slowPages ? "warn" : coverage.measuredPageLoads ? "good" : "default",
+      hint: coverage.measuredPageLoads
+        ? `p95 ${formatMs(coverage.p95PageLoadMs)} · ${formatNumber(coverage.slowPages)} slow pages`
+        : "No timing captured yet",
     },
     {
-      area: "Metadata",
-      status: `${formatNumber(summary.missingTitles || 0)} missing titles · ${formatNumber(summary.missingDescriptions || 0)} missing descriptions`,
-      evidence: `${formatNumber(summary.titleLengthIssues || 0)} title length issues · ${formatNumber(summary.descriptionLengthIssues || 0)} description length issues · ${formatNumber(issueTypeCount(result.issues || [], "duplicate-title"))} duplicate titles.`,
-      action: <Badge variant={summary.missingTitles || summary.missingDescriptions || summary.titleLengthIssues || summary.descriptionLengthIssues ? "warn" : "good"}>{summary.missingTitles || summary.missingDescriptions ? "fix" : "checked"}</Badge>,
+      label: "Metadata gaps",
+      value: formatNumber(metaIssues),
+      icon: Tags,
+      tone: metaIssues ? "warn" : "good",
+      hint: `${formatNumber(summary.titleLengthIssues || 0)} title · ${formatNumber(summary.descriptionLengthIssues || 0)} description length`,
     },
     {
-      area: "Images",
-      status: `${formatNumber(summary.missingAlt || 0)} alt issues · ${formatNumber(summary.imagesMissingDimensions || 0)} size issues`,
-      evidence: `${formatNumber(summary.cssImageResources || 0)} CSS image URLs · ${formatNumber(summary.imagesMissingLazyLoading || 0)} lazy-loading issues · ${formatNumber(summary.largeImages || coverage.largeImages || 0)} large images.`,
-      action: <Badge variant={summary.imageIssues || coverage.brokenImages ? "warn" : "good"}>{summary.imageIssues || coverage.brokenImages ? "inspect" : "clear"}</Badge>,
-    },
-    {
-      area: "Start URL",
-      status: scan.status,
-      evidence: (
-        <span className="break-all">
-          Started at {sourceUrl}. Final home evidence: {canonicalUrl}.
-        </span>
-      ),
-      action: isCompleted
-        ? <Badge variant={scoreVariant as any}>{formatNumber(finalScore)} score</Badge>
-        : <Badge variant={scoreVariant as any}>{isActive ? `${formatNumber(progress)}% live` : scanStatusLabel(scan.status)}</Badge>,
+      label: "Image alt/size",
+      value: formatNumber(imageAltIssues),
+      icon: ImageOff,
+      tone: imageAltIssues ? "warn" : "good",
+      hint: `${formatNumber(summary.imagesMissingLazyLoading || 0)} lazy · ${formatNumber(summary.cssImageResources || 0)} CSS images`,
     },
   ];
+
   return (
     <ReportSection
       title={isActive ? "Live scan progress" : "Scan health"}
       description={`${scanPhaseLabel(scan)} · ${formatDate(scan.created_at)} · stored in local SQLite`}
+      action={<Badge variant={isFailed ? "bad" : isActive ? "warn" : scoreBadgeVariant(finalScore)}>{scanStatusLabel(scan.status)}</Badge>}
     >
-      <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
-        <div className="space-y-4 border-b pb-5 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-6">
-          <div>
-            <div className="text-sm font-medium text-muted-foreground">{isCompleted ? "Score" : "Progress"}</div>
-            <div className="mt-2 flex items-end gap-3">
-              <div className="nums text-7xl font-semibold leading-none">
-                {isCompleted ? formatNumber(finalScore) : `${formatNumber(progress)}%`}
+      <div className="grid gap-6 xl:grid-cols-[248px_minmax(0,1fr)]">
+        <div className="flex flex-col items-center gap-4 border-b border-border/70 pb-6 text-center xl:items-start xl:border-b-0 xl:border-r xl:pb-0 xl:pr-6 xl:text-left">
+          <ScoreDial
+            score={isCompleted || isFailed ? finalScore : progress}
+            size={148}
+            color={dialColor}
+            suffix={isActive ? "%" : undefined}
+            label={isCompleted ? "health score" : isFailed ? "score" : "progress"}
+          />
+          {isActive ? (
+            <div className="w-full space-y-2">
+              <ProgressBar value={progress} />
+              <p className="text-xs leading-5 text-muted-foreground">The final health score appears after the crawl, resource checks, and report build finish.</p>
+            </div>
+          ) : (
+            <div className="w-full space-y-2.5">
+              <div className="flex flex-wrap justify-center gap-1.5 xl:justify-start">
+                <Button size="sm" variant={activeSeverity === "high" ? "default" : "outline"} onClick={() => onSeveritySelect("high")}>
+                  <span className={cn("size-1.5 rounded-full", severityCounts.high ? "bg-bad" : "bg-muted-foreground/40")} /> {formatNumber(severityCounts.high)} high
+                </Button>
+                <Button size="sm" variant={activeSeverity === "medium" ? "default" : "outline"} onClick={() => onSeveritySelect("medium")}>
+                  <span className={cn("size-1.5 rounded-full", severityCounts.medium ? "bg-warn" : "bg-muted-foreground/40")} /> {formatNumber(severityCounts.medium)} med
+                </Button>
+                <Button size="sm" variant={activeSeverity === "low" ? "default" : "outline"} onClick={() => onSeveritySelect("low")}>
+                  <span className="size-1.5 rounded-full bg-muted-foreground/40" /> {formatNumber(severityCounts.low)} low
+                </Button>
               </div>
-              <Badge variant={scoreVariant as any}>{scanStatusLabel(scan.status)}</Badge>
+              <p className="text-xs leading-5 text-muted-foreground">
+                {formatNumber(scan.issue_count || 0)} issues across {formatNumber(coverage.pages)} pages. Tap a severity to filter the issue list.
+              </p>
             </div>
-          </div>
-          <ProgressBar value={progress} />
-          <div className="text-sm leading-6 text-muted-foreground">
-            {isActive
-              ? "The final health score appears after the crawl, resource checks, and report build finish."
-              : `${formatNumber(scan.issue_count || 0)} issues saved for this run.`}
-          </div>
-          {scan.error ? <p className="rounded-md border border-destructive/40 bg-muted/30 p-3 text-sm text-destructive">{scan.error}</p> : null}
+          )}
+          {scan.error ? <p className="w-full rounded-lg border border-destructive/30 bg-bad-soft/60 p-3 text-left text-xs text-destructive">{scan.error}</p> : null}
         </div>
-        <div className="divide-y md:hidden">
-          {rows.map((row) => (
-            <div key={row.area} className="space-y-3 py-4 first:pt-0 last:pb-0">
-              <div className="font-medium">{row.area}</div>
-              <div className="text-sm">{row.status}</div>
-              <div className="text-sm leading-6 text-muted-foreground">{row.evidence}</div>
-              <div className="flex flex-wrap gap-2">{row.action}</div>
-            </div>
-          ))}
-        </div>
-        <div className="hidden md:block">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Area</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Evidence</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.area}>
-                  <TableCell className="min-w-44 font-medium">{row.area}</TableCell>
-                  <TableCell className="min-w-56">{row.status}</TableCell>
-                  <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{row.evidence}</TableCell>
-                  <TableCell className="text-right">{row.action}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {tiles.map((tile) => (
+              <MetricTile key={tile.label} {...tile} />
+            ))}
+          </div>
+          <Tip>
+            {resourceFailures
+              ? `Resource failures detected — ${formatNumber(coverage.brokenLinks)} links, ${formatNumber(coverage.brokenImages)} images and ${formatNumber(coverage.brokenAssets)} assets need attention. `
+              : "All checked links, images and assets responded. "}
+            Crawl started at <span className="break-all font-medium">{sourceUrl}</span>.
+          </Tip>
         </div>
       </div>
     </ReportSection>
@@ -5758,78 +6156,57 @@ function ScanActionBoard({
   onSelectGroup: (group: any) => void;
 }) {
   const priorityGroups = issueGroups
-    .filter((group) => group.severity === "high" || group.severity === "medium");
+    .filter((group) => group.severity === "high" || group.severity === "medium")
+    .sort((a, b) => (a.severity === b.severity ? Number(b.count || 0) - Number(a.count || 0) : a.severity === "high" ? -1 : 1));
   return (
     <ReportSection
       title="Fix first"
-      description={
-        <div className="flex flex-wrap items-center gap-2">
-          <span>Grouped issues with the highest crawl and search impact.</span>
-          <Badge variant={scan.status === "completed" ? "good" : "warn"}>{scanStatusLabel(scan.status)}</Badge>
-        </div>
-      }
+      description="Grouped issues with the highest crawl and search impact — ranked by severity, then reach."
+      action={<Badge variant={scan.status === "completed" ? "good" : "warn"}>{scanStatusLabel(scan.status)}</Badge>}
     >
       {priorityGroups.length ? (
-        <>
-          <div className="divide-y md:hidden">
-            {priorityGroups.map((group) => (
-              <div key={group.key} className="space-y-3 py-4 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge>
-                  <span className="nums text-lg font-semibold">{formatNumber(group.count)}</span>
-                  <span className="text-sm text-muted-foreground">affected</span>
-                </div>
-                <div>
-                  <div className="font-medium">{group.message}</div>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
-                    <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
+        <div className="space-y-3">
+          {priorityGroups.map((group, index) => {
+            const accent = group.severity === "high" ? "bg-bad" : "bg-warn";
+            return (
+              <div
+                key={group.key}
+                className="relative overflow-hidden rounded-xl border border-border bg-card/60 p-4 pl-5 transition-colors hover:border-border/60 hover:bg-accent/30"
+              >
+                <span className={cn("absolute inset-y-0 left-0 w-1", accent)} />
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">{index + 1}</span>
+                      <Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge>
+                      <span className="font-medium leading-snug">{group.message}</span>
+                    </div>
+                    <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{group.recommendation}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
+                      <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-4 lg:flex-col lg:items-end">
+                    <div className="text-right leading-none">
+                      <div className="metric text-2xl">{formatNumber(group.count)}</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">affected</div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
+                      <ListChecks /> Show issues
+                    </Button>
                   </div>
                 </div>
-                <p className="text-sm leading-6 text-muted-foreground">{group.recommendation}</p>
-                <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
-                  <ListChecks /> Show {formatNumber(group.count)} issues
-                </Button>
               </div>
-            ))}
-          </div>
-          <div className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Issue</TableHead>
-                  <TableHead>Affected</TableHead>
-                  <TableHead>Fix</TableHead>
-                  <TableHead className="text-right">Open</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {priorityGroups.map((group) => (
-                  <TableRow key={group.key}>
-                    <TableCell><Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge></TableCell>
-                    <TableCell className="min-w-80">
-                      <div className="font-medium">{group.message}</div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        <Badge variant="outline">{issueCategoryLabel(group.category)}</Badge>
-                        <Badge variant="outline">{String(group.type || "").replaceAll("-", " ")}</Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="nums text-lg font-semibold">{formatNumber(group.count)}</TableCell>
-                    <TableCell className="min-w-96 text-sm leading-6 text-muted-foreground">{group.recommendation}</TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
-                        <ListChecks /> Show {formatNumber(group.count)} issues
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </>
+            );
+          })}
+        </div>
       ) : (
-        <EmptyState title="No priority blockers" text={scan.status === "completed" ? "High and medium issue groups are clear." : "Priority issues appear while the scan runs."} />
+        <EmptyState
+          icon={CheckCircle2}
+          title="No priority blockers"
+          text={scan.status === "completed" ? "High and medium issue groups are clear. Nice work." : "Priority issues appear while the scan runs."}
+        />
       )}
     </ReportSection>
   );
@@ -6372,37 +6749,54 @@ function ScanMetadataTable({ rows }: { rows: any[] }) {
   );
 }
 
+function SeverityInline({ issues }: { issues: any[] }) {
+  const list = Array.isArray(issues) ? issues : [];
+  const high = list.filter((issue: any) => issue.severity === "high").length;
+  const med = list.filter((issue: any) => issue.severity === "medium").length;
+  const low = list.filter((issue: any) => issue.severity === "low").length;
+  if (!high && !med && !low) {
+    return <span className="inline-flex items-center gap-1 text-xs text-good"><CheckCircle2 className="size-3.5" /> clean</span>;
+  }
+  return (
+    <div className="flex items-center gap-2.5 whitespace-nowrap text-xs tabular-nums">
+      {high ? <span className="inline-flex items-center gap-1 font-medium text-bad"><span className="size-1.5 rounded-full bg-bad" />{high}</span> : null}
+      {med ? <span className="inline-flex items-center gap-1 font-medium text-warn"><span className="size-1.5 rounded-full bg-warn" />{med}</span> : null}
+      {low ? <span className="inline-flex items-center gap-1 text-muted-foreground"><span className="size-1.5 rounded-full bg-muted-foreground/50" />{low}</span> : null}
+    </div>
+  );
+}
+
 function ScanPagesTable({ rows }: { rows: any[] }) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>Page</TableHead><TableHead>Status</TableHead><TableHead>Indexable</TableHead><TableHead>Depth</TableHead><TableHead>Found by</TableHead><TableHead>Inlinks</TableHead><TableHead>Sitemap</TableHead><TableHead>Title</TableHead><TableHead>Description</TableHead><TableHead>H1/H2</TableHead><TableHead>Response</TableHead><TableHead>Links</TableHead><TableHead>Images</TableHead><TableHead>Words</TableHead><TableHead>Issues</TableHead></TableRow></TableHeader>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Page</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Indexable</TableHead>
+          <TableHead>Sitemap</TableHead>
+          <TableHead className="text-right">Response</TableHead>
+          <TableHead className="text-right">Words</TableHead>
+          <TableHead className="text-right">Links·Img</TableHead>
+          <TableHead>Issues</TableHead>
+        </TableRow>
+      </TableHeader>
       <TableBody>
         {rows.map((page) => (
           <TableRow key={page.url}>
-            <TableCell className="max-w-xs">
+            <TableCell className="max-w-sm">
               <div className="truncate font-medium">{page.title || page.url}</div>
               <div className="truncate text-xs text-muted-foreground">{page.url}</div>
             </TableCell>
             <TableCell><Badge variant={page.status >= 400 ? "bad" : page.status >= 300 ? "warn" : "good"}>{page.status}</Badge></TableCell>
             <TableCell><IndexabilityBadge page={page} /></TableCell>
-            <TableCell className="nums">{page.depth ?? 0}</TableCell>
-            <TableCell><Badge variant={page.discovery === "sitemap" ? "warn" : "outline"}>{page.discovery || "crawl"}</Badge></TableCell>
-            <TableCell className="nums">{formatNumber(page.internalInlinks || 0)}</TableCell>
             <TableCell><Badge variant={page.sitemapListed ? "good" : "warn"}>{page.sitemapListed ? "Listed" : "Missing"}</Badge></TableCell>
-            <TableCell className="nums">{textLength(page.title, page.titleLength)}</TableCell>
-            <TableCell className="nums">{textLength(page.description, page.descriptionLength)}</TableCell>
-            <TableCell className="nums">{pageH1Count(page)} / {page.h2Count || 0}</TableCell>
-            <TableCell className="nums">{formatMs(page.loadMs)}</TableCell>
-            <TableCell className="nums">{formatNumber((page.internalLinks || 0) + (page.externalLinks || 0))}</TableCell>
-            <TableCell className="nums">{page.images || 0}</TableCell>
-            <TableCell className="nums">{formatNumber(page.wordCount)}</TableCell>
-            <TableCell>
-              <div className="flex flex-wrap gap-1">
-                <Badge variant={(page.issues || []).some((issue: any) => issue.severity === "high") ? "bad" : "outline"}>{(page.issues || []).filter((issue: any) => issue.severity === "high").length} high</Badge>
-                <Badge variant={(page.issues || []).some((issue: any) => issue.severity === "medium") ? "warn" : "outline"}>{(page.issues || []).filter((issue: any) => issue.severity === "medium").length} med</Badge>
-                <Badge variant="outline">{(page.issues || []).filter((issue: any) => issue.severity === "low").length} low</Badge>
-              </div>
+            <TableCell className="text-right nums tabular-nums">{formatMs(page.loadMs)}</TableCell>
+            <TableCell className="text-right nums tabular-nums">{formatNumber(page.wordCount)}</TableCell>
+            <TableCell className="whitespace-nowrap text-right text-muted-foreground nums tabular-nums">
+              {formatNumber((page.internalLinks || 0) + (page.externalLinks || 0))} · {formatNumber(page.images || 0)}
             </TableCell>
+            <TableCell><SeverityInline issues={page.issues} /></TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -7306,7 +7700,7 @@ function mcpToolGroup(name: string) {
 
 function McpExample({ title, value }: { title: string; value: unknown }) {
   return (
-    <div className="rounded-md border bg-background p-3">
+    <div className="rounded-xl border border-border bg-card shadow-[0_1px_2px_0_rgb(38_32_20/0.04)] p-3">
       <div className="font-medium">{title}</div>
       <pre className="mt-2 overflow-auto rounded-md bg-secondary p-3 text-xs leading-relaxed text-secondary-foreground">
         {JSON.stringify(value, null, 2)}
@@ -7315,7 +7709,17 @@ function McpExample({ title, value }: { title: string; value: unknown }) {
   );
 }
 
-function SettingsPage() {
+function SettingsPage({
+  sites,
+  reloadSites,
+  activeSiteId,
+  selectSite,
+}: {
+  sites: Site[];
+  reloadSites: () => Promise<void>;
+  activeSiteId: string;
+  selectSite: (id: string) => void;
+}) {
   const [config, setConfig] = useState<any>({});
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
@@ -7363,7 +7767,7 @@ function SettingsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Local" title="App settings" description="Preferences for the local app. Data sources are shown as status, not secret fields." />
+      <PageHeader title="Settings" description="Local app preferences. Data sources are shown as status, not secret fields." />
       <div className="grid gap-6 2xl:grid-cols-[460px_minmax(0,1fr)]">
         <ReportSection title="App preferences" description="Defaults used when a new site is added. Existing sites keep their own saved settings.">
           <form className="space-y-5" onSubmit={save}>

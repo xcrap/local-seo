@@ -5,7 +5,10 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
-      className={cn("rounded-lg border border-border bg-card text-card-foreground", className)}
+      className={cn(
+        "rounded-xl border border-border bg-card text-card-foreground shadow-[0_1px_2px_0_rgb(38_32_20/0.04),0_10px_28px_-18px_rgb(38_32_20/0.18)]",
+        className,
+      )}
       {...props}
     />
   );
@@ -28,7 +31,7 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="card-footer" className={cn("flex items-center border-t bg-muted/45 p-5", className)} {...props} />;
+  return <div data-slot="card-footer" className={cn("flex items-center border-t bg-muted/40 p-5", className)} {...props} />;
 }
 
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
