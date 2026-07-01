@@ -264,7 +264,7 @@ try {
     throw new Error("README should explain selected-site/comparison-site workflows with clear site and crawl URL wording.");
   }
   if (/search market\/language locale/i.test(readmeSource)) {
-    throw new Error("README should describe keyword/rank defaults, not a site search-language locale.");
+    throw new Error("README should describe keyword tool defaults, not a site search-language locale.");
   }
   const envExampleSource = await readFile(path.join(rootDir, ".env.example"), "utf8");
   if (/save these in Settings|save .* in Settings/i.test(envExampleSource + readmeSource)) {
@@ -380,10 +380,13 @@ try {
     throw new Error("Competitive pages should label their domain inputs as site-specific controls.");
   }
   if (/Search defaults|Search market|Keyword language|Default search market|Default keyword language/.test(webAppClient)) {
-    throw new Error("Site forms should label market/language as keyword/rank defaults, not site search defaults.");
+    throw new Error("Site forms should label market/language as keyword tool defaults, not site search defaults.");
   }
-  if (!webAppClient.includes("Keyword/rank defaults") || !webAppClient.includes("Keyword result language")) {
-    throw new Error("Site forms should make keyword/rank market and language defaults explicit.");
+  if (webAppClient.includes("Keyword/rank defaults") || webAppClient.includes("Keyword result language")) {
+    throw new Error("Site forms should not make saved websites look like they have one required search language.");
+  }
+  if (!webAppClient.includes("Keyword tool defaults") || !webAppClient.includes("Audits crawl every page language they find") || !webAppClient.includes('Field label="Result language"')) {
+    throw new Error("Keyword market/language controls should be optional keyword-tool defaults, not primary site fields.");
   }
   if (!webAppClient.includes("<TableHead>URL</TableHead>") || !webAppClient.includes("<TableHead>Window</TableHead>")) {
     throw new Error("Audit link tables should label URL columns and HTML target-window attributes clearly.");

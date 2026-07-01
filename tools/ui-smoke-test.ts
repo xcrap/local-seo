@@ -234,9 +234,9 @@ try {
     if (await page.getByText(/\b2840\b/).count()) {
       throw new Error("Main site flow exposes a raw location code.");
     }
-    await page.getByText(/Keyword\/rank defaults:/i).waitFor();
+    await page.getByText(/Keyword tools:/i).waitFor();
     if (await page.getByText(/Search defaults|Search locale/i).count()) {
-      throw new Error("Overview still presents keyword/rank defaults as site search defaults or a site locale.");
+      throw new Error("Overview still presents keyword tool defaults as site search defaults or a site locale.");
     }
 
     await page.getByRole("navigation").getByRole("link", { name: /^Organic research$/ }).click();
@@ -295,7 +295,9 @@ try {
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
     await page.getByText("A site is one saved website address").waitFor();
     await page.getByRole("columnheader", { name: /Scan plan/i }).waitFor();
-    await page.getByRole("columnheader", { name: /^Keyword\/rank defaults$/ }).waitFor();
+    if (await page.getByRole("columnheader", { name: /^Keyword\/rank defaults$/ }).count()) {
+      throw new Error("Sites table should not show keyword defaults as a primary site column.");
+    }
     await page.getByText(/2 crawl URLs/i).first().waitFor();
     if (await page.getByText(/First scan target/i).count()) {
       throw new Error("Sites flow still exposes the old first-target wording.");
@@ -387,9 +389,12 @@ try {
     await page.getByRole("heading", { name: /^Sites$/ }).waitFor();
     await page.getByRole("button", { name: /^Add site$/ }).click();
     const addSiteDialog = page.getByRole("dialog", { name: /^Add site$/ });
-    await addSiteDialog.getByText("Keyword/rank defaults").waitFor();
-    await addSiteDialog.getByText("Keyword market").waitFor();
-    await addSiteDialog.getByText("Keyword result language").waitFor();
+    await addSiteDialog.getByText("Keyword tool defaults").waitFor();
+    await addSiteDialog.getByText("Audits crawl every page language they find.").waitFor();
+    await addSiteDialog.getByText("Portugal · Portuguese").waitFor();
+    await addSiteDialog.getByRole("button", { name: /Keyword tool defaults/i }).click();
+    await addSiteDialog.getByText("Market").waitFor();
+    await addSiteDialog.getByText("Result language").waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "Portugal" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "Portuguese" }).first().waitFor();
     await addSiteDialog.locator("[data-slot='select-value']").filter({ hasText: "HTTPS only" }).first().waitFor();

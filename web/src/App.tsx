@@ -194,8 +194,65 @@ function languageLabel(code: string) {
   return languageOptions.find((item) => item.code === code)?.label || code;
 }
 
-function keywordRankDefaultsLabel(site: Site) {
+function keywordToolDefaultsLabel(site: Site) {
   return `${marketLabel(site.location_code)} · ${languageLabel(site.language_code)}`;
+}
+
+function KeywordToolDefaultsPanel({
+  expanded,
+  locationCode,
+  languageCode,
+  onToggle,
+  onLocationCodeChange,
+  onLanguageCodeChange,
+}: {
+  expanded: boolean;
+  locationCode: number;
+  languageCode: string;
+  onToggle: () => void;
+  onLocationCodeChange: (value: number) => void;
+  onLanguageCodeChange: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-md border bg-muted/15">
+      <Button
+        type="button"
+        variant="ghost"
+        className="h-auto w-full justify-between gap-4 rounded-none px-4 py-3 text-left hover:bg-muted/40"
+        onClick={onToggle}
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">Keyword tool defaults</span>
+          <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+            Optional. Used by keyword research, SERP checks, and rank tracking. Audits crawl every page language they find.
+          </span>
+        </span>
+        <Badge variant="outline" className="shrink-0">
+          {marketLabel(locationCode)} · {languageLabel(languageCode)}
+        </Badge>
+      </Button>
+      {expanded ? (
+        <div className="grid gap-4 border-t p-4 sm:grid-cols-2">
+          <Field label="Market">
+            <Select value={String(locationCode)} onValueChange={(value) => onLocationCodeChange(Number(value))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Result language">
+            <Select value={languageCode} onValueChange={onLanguageCodeChange}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function localSiteHost(domain: string) {
@@ -1526,7 +1583,7 @@ function SiteCommandCenter({
       area: "Selected site",
       status: site.domain || "missing",
       evidence: site.domain
-        ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredAuditUrl(site)} · Keyword/rank defaults: ${keywordRankDefaultsLabel(site)}`
+        ? `Scan plan: ${scanTargetShortDetail(site)} · starts at ${preferredAuditUrl(site)} · Keyword tools: ${keywordToolDefaultsLabel(site)}`
         : "Add a site before running audits, rankings, Search Console imports, or AI work.",
       action: site.domain ? (
         <Button size="sm" onClick={onScan} disabled={scanning}>
@@ -1705,6 +1762,8 @@ function SitesPage({
     crawlHost: "auto",
   };
   const [open, setOpen] = useState(false);
+  const [showKeywordDefaults, setShowKeywordDefaults] = useState(false);
+  const [showEditKeywordDefaults, setShowEditKeywordDefaults] = useState(false);
   const [siteDefaults, setSiteDefaults] = useState<SiteForm>(initialSiteForm);
   const [form, setForm] = useState<SiteForm>(initialSiteForm);
   const [editing, setEditing] = useState<Site | null>(null);
@@ -1786,6 +1845,7 @@ function SitesPage({
 
   function startEdit(site: Site) {
     setEditing(site);
+    setShowEditKeywordDefaults(false);
     setEditForm({
       name: site.name,
       domain: site.domain || "",
@@ -1858,7 +1918,10 @@ function SitesPage({
         title="Sites"
         description="A site is one saved website address plus its crawl URL preferences. The selected site feeds scans, reports, crawl links, rankings, and Search Console."
         action={
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(nextOpen) => {
+            setOpen(nextOpen);
+            if (!nextOpen) setShowKeywordDefaults(false);
+          }}>
             <DialogTrigger asChild>
               <Button><Plus /> Add site</Button>
             </DialogTrigger>
@@ -1870,30 +1933,14 @@ function SitesPage({
               <form className="space-y-4" onSubmit={submit}>
                 <Field label="Site name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Optional" /></Field>
                 <Field label="Website address"><Input value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="example.com" required /></Field>
-                <div className="space-y-2">
-                  <div>
-                    <h3 className="text-sm font-semibold">Keyword/rank defaults</h3>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. Site audits still crawl every page language they find.</p>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Keyword market">
-                      <Select value={String(form.locationCode)} onValueChange={(value) => setForm({ ...form, locationCode: Number(value) })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field label="Keyword result language">
-                      <Select value={form.languageCode} onValueChange={(value) => setForm({ ...form, languageCode: value })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                  </div>
-                </div>
+                <KeywordToolDefaultsPanel
+                  expanded={showKeywordDefaults}
+                  locationCode={form.locationCode}
+                  languageCode={form.languageCode}
+                  onToggle={() => setShowKeywordDefaults((value) => !value)}
+                  onLocationCodeChange={(value) => setForm({ ...form, locationCode: value })}
+                  onLanguageCodeChange={(value) => setForm({ ...form, languageCode: value })}
+                />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Scan protocol">
                     <Select value={form.crawlProtocol} onValueChange={(value) => setForm({ ...form, crawlProtocol: value as Site["crawl_protocol"] })}>
@@ -1971,7 +2018,6 @@ function SitesPage({
               <TableRow>
                 <TableHead>Site</TableHead>
                 <TableHead>Scan plan</TableHead>
-                <TableHead>Keyword/rank defaults</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1986,10 +2032,6 @@ function SitesPage({
                   </TableCell>
                   <TableCell className="min-w-56">
                     <ScanPlanSummary site={site} compact />
-                  </TableCell>
-                  <TableCell className="min-w-44">
-                    <div className="font-medium">{marketLabel(site.location_code)}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{languageLabel(site.language_code)} keywords</div>
                   </TableCell>
                   <TableCell className="max-w-md">
                     <div className="line-clamp-2 text-sm text-muted-foreground">{site.notes || "No notes yet."}</div>
@@ -2037,30 +2079,14 @@ function SitesPage({
           <form className="space-y-4" onSubmit={submitEdit}>
             <Field label="Site name"><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></Field>
             <Field label="Website address"><Input value={editForm.domain} onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })} /></Field>
-            <div className="space-y-2">
-              <div>
-                <h3 className="text-sm font-semibold">Keyword/rank defaults</h3>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. Site audits still crawl every page language they find.</p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Keyword market">
-                  <Select value={String(editForm.location_code)} onValueChange={(value) => setEditForm({ ...editForm, location_code: Number(value) })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {marketOptions.map((market) => <SelectItem key={market.code} value={String(market.code)}>{market.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Keyword result language">
-                  <Select value={editForm.language_code} onValueChange={(value) => setEditForm({ ...editForm, language_code: value })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {languageOptions.map((language) => <SelectItem key={language.code} value={language.code}>{language.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-            </div>
+            <KeywordToolDefaultsPanel
+              expanded={showEditKeywordDefaults}
+              locationCode={editForm.location_code}
+              languageCode={editForm.language_code}
+              onToggle={() => setShowEditKeywordDefaults((value) => !value)}
+              onLocationCodeChange={(value) => setEditForm({ ...editForm, location_code: value })}
+              onLanguageCodeChange={(value) => setEditForm({ ...editForm, language_code: value })}
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Scan protocol">
                 <Select value={editForm.crawl_protocol} onValueChange={(value) => setEditForm({ ...editForm, crawl_protocol: value as Site["crawl_protocol"] })}>
@@ -6582,7 +6608,7 @@ function SettingsPage() {
         <ReportSection title="App preferences" description="Defaults used when a new site is added. Existing sites keep their own saved settings.">
           <form className="space-y-5" onSubmit={save}>
             <div>
-              <h3 className="text-sm font-semibold">Keyword/rank defaults</h3>
+              <h3 className="text-sm font-semibold">Keyword tool defaults</h3>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. They do not restrict multilingual site audits.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
