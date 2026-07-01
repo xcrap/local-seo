@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useId, useMemo, useState, type ComponentProps, type ReactElement, type ReactNode } from "react";
+import { cloneElement, isValidElement, useId, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Activity, BarChart3, Bot, Cable, CalendarDays, FileSearch, Gauge, Globe2, Info, Link2, Plus, Search, Sparkles, TableProperties, Target, Zap } from "lucide-react";
 import type { Site } from "../api";
@@ -234,12 +234,6 @@ export function scanSiteName(row: any) {
   return row.site_name || row.site_domain || hostFromUrl(row.url) || "Unlinked saved site";
 }
 
-export function scanSiteDetail(row: any) {
-  if (row.site_domain) return row.site_domain;
-  const host = hostFromUrl(row.url);
-  return host ? `Scan URL host: ${host}` : "Saved site record unavailable";
-}
-
 export function scanHostCandidates(domain: string, crawlHost?: Site["crawl_host"]) {
   const root = domain.replace(/^www\./i, "");
   if (!root || localSiteHost(root)) return root ? [root] : [];
@@ -272,13 +266,6 @@ export function crawlPreferenceLabel(site?: ScanUrlPlan | null) {
   const protocol = crawlProtocolOptions.find((item) => item.value === (site?.crawl_protocol || "auto"))?.label || "Auto";
   const host = crawlHostOptions.find((item) => item.value === (site?.crawl_host || "auto"))?.label || "Auto";
   return `${protocol} · ${host}`;
-}
-
-export function scanUrlDetail(site?: ScanUrlPlan | null) {
-  const candidates = scanUrlCandidates(site);
-  if (!candidates.length) return "Set a website address to scan.";
-  if (candidates.length === 1) return `${crawlPreferenceLabel(site)} · ${candidates[0]}`;
-  return `${crawlPreferenceLabel(site)} · ${formatNumber(candidates.length)} possible crawl URLs`;
 }
 
 export function scanUrlShortDetail(site?: ScanUrlPlan | null) {
@@ -470,7 +457,12 @@ export function Hint({ tip, children, className }: { tip: ReactNode; children: R
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className={cn("has-tip", className)}>{children}</span>
+        <button
+          type="button"
+          className={cn("has-tip cursor-help rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", className)}
+        >
+          {children}
+        </button>
       </TooltipTrigger>
       <TooltipContent>{tip}</TooltipContent>
     </Tooltip>
@@ -562,7 +554,7 @@ export function DatePicker({
           mode="single"
           selected={parseDateInput(value)}
           onSelect={(date) => date && onChange(formatDateInput(date))}
-          initialFocus
+          autoFocus
         />
       </PopoverContent>
     </Popover>
@@ -841,15 +833,6 @@ export function ProgressBar({ value, tone = "primary" }: { value: number; tone?:
   );
 }
 
-export function Tip({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex items-start gap-2 rounded-lg bg-gold/[0.12] px-3 py-2 text-xs leading-5 text-gold-foreground">
-      <Sparkles className="mt-0.5 size-3.5 shrink-0 opacity-70" />
-      <span>{children}</span>
-    </div>
-  );
-}
-
 export type MetricTileProps = { label: string; value: ReactNode; hint?: ReactNode; tone?: "default" | "good" | "warn" | "bad"; icon?: any };
 
 export function MetricTile({ label, value, hint, tone = "default" }: MetricTileProps) {
@@ -1049,28 +1032,6 @@ export function scanSpeedMetrics(scan: any) {
     slowPages: Number(coverage.slowPages || 0),
     verySlowPages: Number(coverage.verySlowPages || 0),
   };
-}
-
-export function scanSpeedHistoryRows(scans: any[]) {
-  return sortScanRows(scans)
-    .filter((scan) => scan.status === "completed")
-    .map((scan) => ({ scan, metrics: scanSpeedMetrics(scan) }))
-    .filter((row) => row.metrics.measuredPageLoads > 0);
-}
-
-export function speedDeltaLabel(current: number, previous?: number) {
-  if (!Number.isFinite(Number(previous))) return "first measured scan";
-  const delta = Math.round(Number(current) - Number(previous));
-  if (delta === 0) return "unchanged";
-  return delta < 0 ? `${formatMs(Math.abs(delta))} faster` : `${formatMs(delta)} slower`;
-}
-
-export function speedDeltaVariant(current: number, previous?: number) {
-  if (!Number.isFinite(Number(previous))) return "outline";
-  const delta = Number(current) - Number(previous);
-  if (delta <= -100) return "good";
-  if (delta >= 250) return "warn";
-  return "outline";
 }
 
 export function issueTypeCount(issues: any[], type: string) {
@@ -1319,10 +1280,18 @@ export function JobTable({
             className={cn(onSelect ? "cursor-pointer" : "", selectedId === row.id ? "bg-accent/45" : "")}
             onClick={() => onSelect?.(row.id)}
           >
-            <TableCell className="font-medium">{row.type}</TableCell>
+            <TableCell className="font-medium">
+              {onSelect ? (
+                <button type="button" className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-sm" onClick={(event) => { event.stopPropagation(); onSelect(row.id); }}>
+                  {row.type}
+                </button>
+              ) : (
+                row.type
+              )}
+            </TableCell>
             <TableCell><Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge></TableCell>
             <TableCell className="max-w-md truncate text-muted-foreground">{row.error || row.message || row.result_text || "-"}</TableCell>
-            <TableCell className="text-muted-foreground">{row.created_at}</TableCell>
+            <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -1334,12 +1303,6 @@ export function scoreTone(score: number) {
   if (score >= 85) return "var(--good)";
   if (score >= 60) return "var(--gold)";
   return "var(--bad)";
-}
-
-export function scoreBadgeVariant(score: number): ComponentProps<typeof Badge>["variant"] {
-  if (score >= 85) return "good";
-  if (score >= 60) return "warn";
-  return "bad";
 }
 
 export function ScoreDial({

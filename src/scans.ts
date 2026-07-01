@@ -409,13 +409,17 @@ async function checkResource(url: string, method: "HEAD" | "GET" = "HEAD") {
         },
       });
     }
+    // A ranged GET reports the partial length in Content-Length; the true total
+    // is in Content-Range ("bytes 0-2048/524288"). Prefer that so size checks work.
+    const rangeTotal = Number((response.headers.get("content-range") || "").split("/")[1]) || null;
+    const partialLength = Number(response.headers.get("content-length") || 0) || null;
     return {
       ok: response.status < 400,
       status: response.status,
       finalUrl: response.url,
       redirected: response.redirected,
       contentType: response.headers.get("content-type") || "",
-      contentLength: Number(response.headers.get("content-length") || 0) || null,
+      contentLength: response.status === 206 ? rangeTotal ?? partialLength : partialLength,
       contentEncoding: response.headers.get("content-encoding") || "",
       error: "",
     };
@@ -437,16 +441,39 @@ function parseRobots(text: string) {
   const sitemaps: string[] = [];
   let disallowCount = 0;
   let blocksAll = false;
+  // Track the user-agent group each directive belongs to. `Disallow: /` only
+  // blocks our crawl when it applies to `*` (or all agents), so a targeted block
+  // like `User-agent: GPTBot\nDisallow: /` must not flag the whole site.
+  let currentAgents: string[] = [];
+  let sawDirectiveInGroup = false;
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.replace(/#.*/, "").trim();
     if (!line) continue;
     const [rawKey, ...rest] = line.split(":");
     const key = rawKey.trim().toLowerCase();
     const value = rest.join(":").trim();
-    if (key === "sitemap" && value) sitemaps.push(value);
+    if (key === "sitemap" && value) {
+      if (value) sitemaps.push(value);
+      continue;
+    }
+    if (key === "user-agent") {
+      // Consecutive user-agent lines share the same following directive block.
+      if (sawDirectiveInGroup) {
+        currentAgents = [];
+        sawDirectiveInGroup = false;
+      }
+      currentAgents.push(value.toLowerCase());
+      continue;
+    }
     if (key === "disallow") {
-      disallowCount += 1;
-      if (value === "/") blocksAll = true;
+      sawDirectiveInGroup = true;
+      const appliesToAll = currentAgents.length === 0 || currentAgents.includes("*");
+      if (appliesToAll) {
+        disallowCount += 1;
+        if (value === "/") blocksAll = true;
+      }
+    } else if (key === "allow") {
+      sawDirectiveInGroup = true;
     }
   }
   return { sitemaps: [...new Set(sitemaps)], disallowCount, blocksAll };

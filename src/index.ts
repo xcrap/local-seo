@@ -1,4 +1,5 @@
 import "./db";
+import { recoverInterruptedJobs } from "./db";
 import dotenv from "dotenv";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
@@ -574,6 +575,11 @@ app.post(
 if (!isDev) {
   app.use("/*", serveStatic({ root: "./web/dist" }));
   app.get("/*", serveStatic({ root: "./web/dist", path: "index.html" }));
+}
+
+const recovered = recoverInterruptedJobs();
+if (recovered.scans || recovered.jobs) {
+  console.log(`Recovered ${recovered.scans} interrupted scan(s) and ${recovered.jobs} interrupted job(s) from a previous run.`);
 }
 
 console.log(`Local SEO API running on http://localhost:${port}`);

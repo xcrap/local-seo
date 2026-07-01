@@ -11,6 +11,7 @@ export function BrandLookupPage({ site }: { site: Site }) {
   const [result, setResult] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function load() {
     setRuns(await api.brandLookupRuns(site.id));
@@ -18,16 +19,20 @@ export function BrandLookupPage({ site }: { site: Site }) {
   useEffect(() => {
     setQuery(site.domain || site.name);
     setResult(null);
+    setError("");
     load().catch(console.error);
   }, [site.id, site.domain, site.name]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
+    setError("");
     try {
       const data = await api.brandLookup({ siteId: site.id, query, competitors });
       setResult(data);
       await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not run the brand lookup.");
     } finally {
       setLoading(false);
     }
@@ -46,6 +51,7 @@ export function BrandLookupPage({ site }: { site: Site }) {
             <Field label="Brand or domain"><Input value={query} onChange={(event) => setQuery(event.target.value)} required /></Field>
             <Field label="Competitors"><Textarea value={competitors} onChange={(event) => setCompetitors(event.target.value)} placeholder="competitor.com, otherbrand" /></Field>
             <Button disabled={loading}><Sparkles /> {loading ? "Looking up" : "Run lookup"}</Button>
+            {error ? <p className="rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
           </form>
         </ReportSection>
         <div className="space-y-6">
@@ -182,6 +188,7 @@ export function PromptExplorerPage({ site }: { site: Site }) {
   const [result, setResult] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function load() {
     const history = await api.promptExplorerRuns(site.id);
@@ -191,16 +198,20 @@ export function PromptExplorerPage({ site }: { site: Site }) {
     setPrompt(`What are the best options for ${site.domain || site.name}?`);
     setHighlightBrand(site.domain || site.name);
     setResult(null);
+    setError("");
     load().catch(console.error);
   }, [site.id, site.domain, site.name]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
+    setError("");
     try {
       const data = await api.promptExplorer({ siteId: site.id, prompt, highlightBrand, models: ["local_codex"] });
       setResult(data);
       await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not run the prompt. Is the local Codex CLI available?");
     } finally {
       setLoading(false);
     }
@@ -235,6 +246,7 @@ export function PromptExplorerPage({ site }: { site: Site }) {
               ]}
             />
             <Button disabled={loading}><Bot /> {loading ? "Exploring" : "Explore prompt"}</Button>
+            {error ? <p className="rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
           </form>
         </ReportSection>
         <div className="space-y-6">

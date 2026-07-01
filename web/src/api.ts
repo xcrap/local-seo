@@ -49,7 +49,6 @@ export const api = {
   saveConfig: (body: Record<string, string>) =>
     request<any>("/api/config", { method: "PUT", body: JSON.stringify(body) }),
   sites: () => request<Site[]>("/api/sites"),
-  site: (id: string) => request<any>(`/api/sites/${id}`),
   createSite: (body: Partial<Site>) =>
     request<Site>("/api/sites", { method: "POST", body: JSON.stringify(body) }),
   updateSite: (id: string, body: Partial<Site>) =>
@@ -65,7 +64,6 @@ export const api = {
     }),
   saveKeywords: (body: any) =>
     request<any>("/api/keywords/save", { method: "POST", body: JSON.stringify(body) }),
-  savedKeywords: (siteId: string) => request<any[]>(`/api/sites/${siteId}/keywords`),
   querySavedKeywords: (siteId: string, body: any) =>
     request<any>(`/api/sites/${siteId}/keywords/query`, { method: "POST", body: JSON.stringify(body) }),
   keywordTags: (siteId: string) => request<any[]>(`/api/sites/${siteId}/keyword-tags`),
@@ -102,16 +100,11 @@ export const api = {
     }),
   syncRankMetrics: (trackerId: string) =>
     request<any>(`/api/rank-trackers/${trackerId}/sync-metrics`, { method: "POST" }),
-  rankTrend: (trackerId: string) => request<any[]>(`/api/rank-trackers/${trackerId}/trend`),
-  rankKeywordHistory: (trackerId: string, keywordId: string) =>
-    request<any[]>(`/api/rank-trackers/${trackerId}/keywords/${keywordId}/history`),
   runRankCheck: (trackerId: string) =>
     request<any>(`/api/rank-trackers/${trackerId}/check`, { method: "POST" }),
   domainOverview: (body: any) =>
     request<any>("/api/domain/overview", { method: "POST", body: JSON.stringify(body) }),
   domainSnapshots: (siteId: string) => request<any[]>(`/api/sites/${siteId}/domain-snapshots`),
-  domainKeywordSuggestions: (body: any) =>
-    request<any>("/api/domain/keyword-suggestions", { method: "POST", body: JSON.stringify(body) }),
   domainKeywords: (body: any) =>
     request<any>("/api/domain/keywords", { method: "POST", body: JSON.stringify(body) }),
   domainPages: (body: any) =>

@@ -19,13 +19,13 @@ if (codexModel() !== "") {
 if (codexReasoningEffort() !== "medium") {
   throw new Error("Codex reasoning should default to medium.");
 }
-if (!sameSiteUrl("https://www.waka.pt/about/", "https://waka.pt")) {
+if (!sameSiteUrl("https://www.example.com/about/", "https://example.com")) {
   throw new Error("Root and www variants should share scan scope.");
 }
-if (!sameSiteUrl("https://waka.pt/about/", "https://www.waka.pt")) {
+if (!sameSiteUrl("https://example.com/about/", "https://www.example.com")) {
   throw new Error("www and root variants should share scan scope.");
 }
-if (sameSiteUrl("https://blog.waka.pt/", "https://waka.pt")) {
+if (sameSiteUrl("https://blog.example.com/", "https://example.com")) {
   throw new Error("Unrelated subdomains must not share scan scope.");
 }
 const port = 4131 + Math.floor(Math.random() * 400);

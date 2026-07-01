@@ -214,16 +214,23 @@ export function ScansPage({ site }: { site: Site }) {
   }
   async function remove(id: string, row?: any) {
     const siteId = row?.site_id || site.id;
-    await api.deleteScan(siteId, id);
-    if (getSelectedScanId(siteId) === id) {
-      clearSelectedScanId(siteId);
+    setError("");
+    try {
+      await api.deleteScan(siteId, id);
+      if (getSelectedScanId(siteId) === id) {
+        clearSelectedScanId(siteId);
+      }
+      if (detail?.id === id) setDetail(null);
+      if (manualLedgerScanId === id) {
+        setManualLedgerScanId("");
+        setManualLedgerSiteId("");
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete the saved scan.");
+    } finally {
+      setDeletingScan(null);
     }
-    if (detail?.id === id) setDetail(null);
-    if (manualLedgerScanId === id) {
-      setManualLedgerScanId("");
-      setManualLedgerSiteId("");
-    }
-    await load();
   }
   async function clearHistory() {
     setError("");
@@ -359,7 +366,7 @@ export function ScansPage({ site }: { site: Site }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={() => deletingScan && remove(deletingScan.id, deletingScan).then(() => setDeletingScan(null))}>
+            <AlertDialogAction type="button" onClick={() => deletingScan && remove(deletingScan.id, deletingScan)}>
               Delete scan
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -549,6 +556,15 @@ function ScanDetail({ scan }: { scan: any }) {
   useEffect(() => {
     setActiveTab(requestedTab);
   }, [scan.id, requestedTab]);
+  // Reset issue filters when a different scan is opened from the ledger, so a
+  // filter from the previous scan doesn't hide the new scan's issues.
+  useEffect(() => {
+    setSeverityFilter("all");
+    setCategoryFilter("all");
+    setTypeFilter("all");
+    setSelectedCheckTypes([]);
+    setSelectedCheckLabel("");
+  }, [scan.id]);
   const changeScanTab = (value: string) => {
     setActiveTab(value);
     const next = new URLSearchParams(searchParams);
@@ -742,7 +758,7 @@ function ScanDetail({ scan }: { scan: any }) {
         <TabsContent value="images" className="space-y-4">
           {pages.some((page: any) => page.images > 0) ? (
             <ScanSection title="Image summary by page" text="Missing src, alt text, and size attributes grouped by affected page.">
-              <FilteredRows rows={pages} placeholder="Filter pages…">
+              <FilteredRows rows={pages.filter((page: any) => page.images > 0)} placeholder="Filter pages…">
                 {(rows) => <ScanImageSummaryTable rows={rows} />}
               </FilteredRows>
             </ScanSection>

@@ -408,7 +408,7 @@ function WorkspaceMobileHeader({
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
         {sites.length > 1 ? <ActiveSiteSelect sites={sites} activeSiteId={activeSite?.id || ""} onSelect={onSelect} /> : <div />}
-        <Select onValueChange={onNavigate}>
+        <Select value="" onValueChange={onNavigate}>
           <SelectTrigger>
             <SelectValue placeholder="Go to…" />
           </SelectTrigger>

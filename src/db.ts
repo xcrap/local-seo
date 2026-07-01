@@ -338,6 +338,23 @@ export function jsonParse<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
+// Scan and AI-job execution lives only in the running process. If the server
+// restarts mid-run, those rows would stay 'running'/'queued' forever and the UI
+// would poll them indefinitely — mark them failed on boot so they resolve.
+export function recoverInterruptedJobs() {
+  const scans = db
+    .prepare(
+      "UPDATE scans SET status = 'failed', error = CASE WHEN error = '' THEN 'Interrupted by a server restart before the scan finished.' ELSE error END, updated_at = CURRENT_TIMESTAMP WHERE status IN ('queued', 'running')",
+    )
+    .run();
+  const jobs = db
+    .prepare(
+      "UPDATE ai_jobs SET status = 'failed', error = CASE WHEN error = '' THEN 'Interrupted by a server restart before the job finished.' ELSE error END, finished_at = CURRENT_TIMESTAMP WHERE status IN ('queued', 'running')",
+    )
+    .run();
+  return { scans: scans.changes, jobs: jobs.changes };
+}
+
 if (import.meta.main) {
   console.log(`Database initialized at ${DB_PATH}`);
 }

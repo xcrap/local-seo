@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { BarChart3, Bot, ExternalLink, RefreshCw, Settings, Upload } from "lucide-react";
 import { api, type Site } from "../../api";
 import { Badge, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from "@/components/ui";
-import { DatePicker, EmptyState, Field, InfoTip, JobTable, PageHeader, ReportSection, StatsBand, StatusDot, StatusEvidenceTable, cleanSiteDomain, crawlHostOptions, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatDate, formatNumber, formatPercent, formatPosition, languageOptions, marketOptions, preferredScanUrl, serpProviderStatus } from "../shared";
+import { DatePicker, EmptyState, Field, InfoTip, JobTable, PageHeader, ReportSection, StatsBand, StatusDot, StatusEvidenceTable, cleanSiteDomain, crawlHostOptions, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatDate, formatDateInput, formatNumber, formatPercent, formatPosition, languageOptions, marketOptions, preferredScanUrl, serpProviderStatus } from "../shared";
 import { cn } from "@/lib/utils";
 
 export function GscPage({ site }: { site: Site }) {
@@ -20,8 +20,8 @@ export function GscPage({ site }: { site: Site }) {
   const [loading, setLoading] = useState("");
   const [gscTab, setGscTab] = useState("performance");
   const today = new Date();
-  const defaultEndDate = today.toISOString().slice(0, 10);
-  const defaultStartDate = new Date(today.getTime() - 28 * 86400000).toISOString().slice(0, 10);
+  const defaultEndDate = formatDateInput(today);
+  const defaultStartDate = formatDateInput(new Date(today.getTime() - 28 * 86400000));
   const [dateRange, setDateRange] = useState({ startDate: defaultStartDate, endDate: defaultEndDate });
   const latestImport = imports[0];
   const selectedGscProperty = status?.connection?.siteUrl || "";
@@ -338,10 +338,17 @@ function GscImportHistory({ rows, onOpen }: { rows: any[]; onOpen: (row: any) =>
             <TableRow
               key={row.id}
               className="cursor-pointer"
-              title={`Open ${row.sourceName || "Search Console CSV"}`}
               onClick={() => onOpen(row)}
             >
-              <TableCell className="font-medium">{row.sourceName || "Search Console CSV"}</TableCell>
+              <TableCell className="font-medium">
+                <button
+                  type="button"
+                  className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-sm"
+                  onClick={(event) => { event.stopPropagation(); onOpen(row); }}
+                >
+                  {row.sourceName || "Search Console CSV"}
+                </button>
+              </TableCell>
               <TableCell className="break-all text-sm text-muted-foreground">{row.siteUrl || "-"}</TableCell>
               <TableCell className="nums">{formatNumber(row.rowCount)}</TableCell>
               <TableCell className="nums">{formatNumber(row.totals?.clicks || 0)}</TableCell>
@@ -463,6 +470,8 @@ export function AiPage({ site }: { site: Site }) {
   const [type, setType] = useState("seo.coach");
   const [context, setContext] = useState(`Site: ${site.name}\nDomain: ${site.domain}`);
   const [activeJobId, setActiveJobId] = useState("");
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState("");
   const activeJob = jobs.find((job) => job.id === activeJobId) || jobs[0] || null;
 
   async function load() {
@@ -488,10 +497,19 @@ export function AiPage({ site }: { site: Site }) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const prompt = prompts.find((item) => item.key === type)?.template?.replace("{{context}}", context) || context;
-    const job = await api.createAiJob({ type, prompt });
-    if (job?.id) setActiveJobId(job.id);
-    await load();
+    if (starting) return;
+    setStarting(true);
+    setError("");
+    try {
+      const prompt = prompts.find((item) => item.key === type)?.template?.replace("{{context}}", context) || context;
+      const job = await api.createAiJob({ type, prompt });
+      if (job?.id) setActiveJobId(job.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the Codex job. Is the local Codex CLI available?");
+    } finally {
+      setStarting(false);
+    }
   }
 
   return (
@@ -511,7 +529,8 @@ export function AiPage({ site }: { site: Site }) {
               </Select>
             </Field>
             <Field label="Context"><Textarea className="min-h-48" value={context} onChange={(e) => setContext(e.target.value)} /></Field>
-            <Button><Bot /> Start job</Button>
+            <Button disabled={starting}><Bot /> {starting ? "Starting job" : "Start job"}</Button>
+            {error ? <p className="rounded-lg bg-bad-soft/50 px-3.5 py-2.5 text-sm text-destructive">{error}</p> : null}
           </form>
         </ReportSection>
         <div className="space-y-6">
@@ -684,9 +703,9 @@ function McpToolTable({ rows }: { rows: any[] }) {
 }
 
 function mcpToolGroup(name: string) {
+  if (/scan/.test(name)) return "Site scans";
   if (/site|whoami/.test(name)) return "Sites";
   if (/keyword|serp|rank/.test(name)) return "Keywords and ranks";
-  if (/scan|scan/.test(name)) return "Site scans";
   if (/domain|backlink/.test(name)) return "Competitive data";
   if (/gsc|inspect/.test(name)) return "Search Console";
   if (/brand|prompt|ai/.test(name)) return "AI visibility";

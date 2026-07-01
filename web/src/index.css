@@ -174,9 +174,13 @@ button:not(:disabled) {
   font-weight: 600;
 }
 
-/* Term that reveals evidence in a tooltip — no permanent decoration */
+/* Term that reveals evidence in a tooltip — no permanent decoration.
+   Inherits type so a <button> trigger reads as inline text. */
 .has-tip {
   cursor: help;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
 }
 .has-tip:hover {
   color: var(--foreground);

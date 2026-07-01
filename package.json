@@ -18,25 +18,21 @@
     "admin:password": "bun run tools/set-password.ts",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
-    "test:smoke": "bun run tools/smoke-test.ts",
-    "test:waka": "bun run tools/waka-scan-test.ts"
+    "test:smoke": "bun run tools/smoke-test.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "cheerio": "^1.2.0",
     "concurrently": "^10.0.3",
     "dotenv": "^17.4.2",
     "fast-xml-parser": "^5.4.1",
     "hono": "^4.12.8",
     "papaparse": "^5.5.3",
-    "tldts": "^7.0.25",
-    "zod": "^4.1.12"
+    "tldts": "^7.0.25"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
     "@types/bun": "^1.3.5",
     "@types/papaparse": "^5.5.2",
-    "playwright": "^1.61.1",
     "typescript": "^5.9.3"
   }
 }

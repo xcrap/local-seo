@@ -54,6 +54,15 @@ function normalizeDomain(value: string) {
     .toLowerCase();
 }
 
+// True when a SERP result host belongs to the tracked domain: exact match or a
+// subdomain of it. Dot-boundary check avoids "start.com" matching "art.com".
+function hostMatchesDomain(resultHost: string, target: string) {
+  const host = normalizeDomain(String(resultHost || ""));
+  const domain = normalizeDomain(String(target || ""));
+  if (!host || !domain) return false;
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
 function normalizeCrawlProtocol(value: unknown): CrawlProtocol {
   return value === "https" || value === "http" || value === "both" ? value : "auto";
 }
@@ -416,20 +425,24 @@ export function saveKeywords(input: {
       [site.id, keywordRow.keyword, site.location_code, site.language_code],
     );
     const existingTags = jsonParse<string[]>(existing?.tags, []);
+    // Only replace tags when the caller explicitly supplied some in replace mode;
+    // re-saving research rows (no tags) must not wipe imported/manual tags.
     const nextTags =
       input.tagMode === "append"
         ? Array.from(new Set([...existingTags, ...tagNames]))
-        : tagNames;
+        : tagNames.length
+          ? tagNames
+          : existingTags;
     run(
       `
       INSERT INTO saved_keywords
         (id, site_id, keyword, location_code, language_code, search_volume, difficulty, cpc, intent, tags, source)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(site_id, keyword, location_code, language_code) DO UPDATE SET
-        search_volume = excluded.search_volume,
-        difficulty = excluded.difficulty,
-        cpc = excluded.cpc,
-        intent = excluded.intent,
+        search_volume = COALESCE(excluded.search_volume, saved_keywords.search_volume),
+        difficulty = COALESCE(excluded.difficulty, saved_keywords.difficulty),
+        cpc = COALESCE(excluded.cpc, saved_keywords.cpc),
+        intent = CASE WHEN excluded.intent = 'unknown' THEN saved_keywords.intent ELSE excluded.intent END,
         tags = excluded.tags,
         source = excluded.source
       `,
@@ -1017,8 +1030,10 @@ export function syncRankKeywordMetrics(trackerId: string) {
 
 async function serpPosition(keyword: string, tracker: any) {
   const target = normalizeDomain(tracker.domain);
-  const rows = await searchWeb(keyword, Math.max(10, tracker.serp_depth)).catch(() => []);
-  const match = rows.find((row) => target && row.domain.includes(target));
+  // Do not swallow provider failures into a false "not ranking" result — let the
+  // error propagate so the run is marked failed instead of fabricating a drop.
+  const rows = await searchWeb(keyword, Math.max(10, tracker.serp_depth));
+  const match = rows.find((row) => hostMatchesDomain(row.domain, target));
   if (match) return { position: match.rank, url: match.url, title: match.title };
   return { position: null, url: "", title: "" };
 }
@@ -1932,7 +1947,7 @@ export async function getSerpAnalysis(input: {
       ...result,
       rows: rows.map((row) => ({
         ...row,
-        isDomain: domain ? row.domain.includes(domain) : false,
+        isDomain: domain ? hostMatchesDomain(row.domain, domain) : false,
       })),
     };
     result.domainPosition = result.rows.find((row: any) => row.isDomain)?.rank ?? null;

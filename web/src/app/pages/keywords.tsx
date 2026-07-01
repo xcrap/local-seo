@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Activity, CheckCircle2, Download, Plus, RefreshCw, Search, Tags, Target, Trash2, Upload } from "lucide-react";
 import { api, type KeywordResult, type Site } from "../../api";
 import { Badge, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from "@/components/ui";
-import { EmptyState, Field, HistoryList, HistoryTable, InfoTip, PageHeader, ReportSection, SiteDomainField, StatusDot, TagList, formatMetricStatus, formatNumber, keywordMetricClass, sourceLabel, sourceVariant } from "../shared";
+import { EmptyState, Field, HistoryList, HistoryTable, InfoTip, PageHeader, ReportSection, SiteDomainField, StatusDot, TagList, formatDate, formatMetricStatus, formatNumber, keywordMetricClass, sourceLabel, sourceVariant } from "../shared";
 
 function SourceMeta({ source, extra }: { source?: string; extra?: ReactNode }) {
   return (
@@ -67,7 +67,16 @@ export function KeywordsPage({ site }: { site: Site }) {
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={site.domain || "seed keyword"} />
           </Field>
           <Field label="Suggestion limit">
-            <Input value={limit} type="number" min={1} max={100} onChange={(e) => setLimit(Number(e.target.value))} />
+            <Input
+              value={limit}
+              type="number"
+              min={1}
+              max={100}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setLimit(e.target.value === "" || Number.isNaN(next) ? 1 : Math.max(1, Math.min(100, next)));
+              }}
+            />
           </Field>
           <Button disabled={loading || !query.trim()}><Search /> {loading ? "Researching" : "Research"}</Button>
         </form>
@@ -690,7 +699,7 @@ function RankKeywordTable({
             <TableCell className={keywordMetricClass(row.search_volume)}>{formatMetricStatus(row.search_volume)}</TableCell>
             <TableCell className={keywordMetricClass(row.keyword_difficulty)}>{formatMetricStatus(row.keyword_difficulty)}</TableCell>
             <TableCell className={keywordMetricClass(row.cpc)}>{formatMetricStatus(row.cpc)}</TableCell>
-            <TableCell className="text-muted-foreground">{row.metrics_fetched_at || "-"}</TableCell>
+            <TableCell className="text-muted-foreground">{row.metrics_fetched_at ? formatDate(row.metrics_fetched_at) : "-"}</TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -707,8 +716,8 @@ function RankRunsTable({ rows }: { rows: any[] }) {
           <TableRow key={row.id}>
             <TableCell><Badge variant={row.status === "completed" ? "good" : row.status === "failed" ? "bad" : "warn"}>{row.status}</Badge></TableCell>
             <TableCell>{row.message}</TableCell>
-            <TableCell className="text-muted-foreground">{row.started_at}</TableCell>
-            <TableCell className="text-muted-foreground">{row.finished_at || "-"}</TableCell>
+            <TableCell className="text-muted-foreground">{formatDate(row.started_at)}</TableCell>
+            <TableCell className="text-muted-foreground">{row.finished_at ? formatDate(row.finished_at) : "-"}</TableCell>
           </TableRow>
         ))}
       </TableBody>

@@ -23,7 +23,7 @@
 - `src/seo.ts` owns SEO research, keywords, rank tracking, imports, backlinks, and site-level application behavior.
 - `web/src/App.tsx` owns shell/routing only; page-level UI belongs under `web/src/app/pages/`.
 - `web/src/app/shared.tsx` is for shared app UI helpers, formatters, scan/site helpers, and reusable report widgets.
-- `tools/` contains smoke, UI, Waka crawl, and admin utility scripts.
+- `tools/` contains the smoke test and admin utility scripts.
 - `data/` contains local SQLite files. Do not delete local app data unless the user explicitly asks.
 
 ## Workflow
@@ -52,9 +52,8 @@
 - Run `bun run lint` after JavaScript, TypeScript, TSX, or JSON changes.
 - Run `bun x tsc -p tsconfig.json` after backend TypeScript changes.
 - Run `bun x tsc -p web/tsconfig.json` after frontend TypeScript/TSX changes.
-- Run `bun run test:smoke` after route, API, app-shell, scan-report, or source-guard changes.
-- Run `bun run test:waka` after crawler, sitemap, resource, page-speed, scan scoring, or scan report changes.
-- There are intentionally no UI/browser tests: guards cover the SEO engine (API, crawler, scoring, data), not visual design.
+- Run `bun run test:smoke` after route, API, app-shell, scan-report, crawler, or source-guard changes.
+- There are intentionally no UI/browser tests, and no live external-site crawl tests: guards cover the SEO engine (API, scoring, data honesty) with local fixtures, not visual design or third-party sites.
 - Run `bun run build` before shipping frontend-impacting changes.
 
 ## Style Preferences
