@@ -260,8 +260,12 @@ try {
     }
   }
   const readmeSource = await readFile(path.join(rootDir, "README.md"), "utf8");
-  if (/target domain/i.test(readmeSource)) {
-    throw new Error("README should explain selected-site/comparison-site workflows instead of vague target-domain wording.");
+  if (/target domain|crawl target preferences/i.test(readmeSource)) {
+    throw new Error("README should explain selected-site/comparison-site workflows with clear site and crawl URL wording.");
+  }
+  const envExampleSource = await readFile(path.join(rootDir, ".env.example"), "utf8");
+  if (/save these in Settings|save .* in Settings/i.test(envExampleSource + readmeSource)) {
+    throw new Error("Docs should not imply app Settings are used for secret environment credentials.");
   }
   const apiServerSource = await readFile(path.join(rootDir, "src/index.ts"), "utf8");
   if (apiServerSource.includes('"/api/projects')) {

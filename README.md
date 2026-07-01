@@ -18,7 +18,7 @@ auth service.
 
 ## OpenSEO-Inspired Local Workflows
 
-- **Sites:** saved websites with domain, crawl target preferences, search market/language locale, and notes.
+- **Sites:** saved websites with domain, crawl URL preferences, search market/language locale, and notes.
 - **Keyword research:** real DuckDuckGo suggestions, with DataForSEO metrics when configured.
 - **SERP analysis:** live web result snapshots, target ownership, ranking-page tables, and history.
 - **Saved keywords:** local canonical keyword list, filtering, managed tags, bulk tag edits, bulk delete, and CSV export.
@@ -44,8 +44,9 @@ Open `http://localhost:5173` during development. The API runs on
 `http://localhost:3031` by default.
 
 `.env` is optional for the local product. Create it only when connecting
-optional data-source credentials such as Google OAuth, DataForSEO, MCP token, or a custom
-Codex model.
+optional data-source credentials such as Google OAuth, a DataForSEO-compatible
+external SEO index, MCP token, or a custom Codex model. In-app Settings are for
+app preferences, not secret fields.
 
 The first load lets you create the local admin user in the browser. You can also
 create or update it from the terminal:
