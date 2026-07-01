@@ -194,7 +194,7 @@ function languageLabel(code: string) {
   return languageOptions.find((item) => item.code === code)?.label || code;
 }
 
-function searchDefaultsLabel(project: Project) {
+function keywordRankDefaultsLabel(project: Project) {
   return `${marketLabel(project.location_code)} · ${languageLabel(project.language_code)}`;
 }
 
@@ -1502,7 +1502,7 @@ function SiteCommandCenter({
       area: "Selected site",
       status: project.domain || "missing",
       evidence: project.domain
-        ? `Scan plan: ${scanTargetShortDetail(project)} · starts at ${preferredAuditUrl(project)} · Search defaults: ${searchDefaultsLabel(project)}`
+        ? `Scan plan: ${scanTargetShortDetail(project)} · starts at ${preferredAuditUrl(project)} · Keyword/rank defaults: ${keywordRankDefaultsLabel(project)}`
         : "Add a site before running audits, rankings, Search Console imports, or AI work.",
       action: project.domain ? (
         <Button size="sm" onClick={onScan} disabled={scanning}>
@@ -1848,11 +1848,11 @@ function ProjectsPage({
                 <Field label="Website address"><Input value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="example.com" required /></Field>
                 <div className="space-y-2">
                   <div>
-                    <h3 className="text-sm font-semibold">Search defaults</h3>
+                    <h3 className="text-sm font-semibold">Keyword/rank defaults</h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. Site audits still crawl every page language they find.</p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Search market">
+                    <Field label="Keyword market">
                       <Select value={String(form.locationCode)} onValueChange={(value) => setForm({ ...form, locationCode: Number(value) })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -1860,7 +1860,7 @@ function ProjectsPage({
                         </SelectContent>
                       </Select>
                     </Field>
-                    <Field label="Keyword language">
+                    <Field label="Keyword result language">
                       <Select value={form.languageCode} onValueChange={(value) => setForm({ ...form, languageCode: value })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -1947,7 +1947,7 @@ function ProjectsPage({
               <TableRow>
                 <TableHead>Site</TableHead>
                 <TableHead>Scan plan</TableHead>
-                <TableHead>Search defaults</TableHead>
+                <TableHead>Keyword/rank defaults</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -2015,11 +2015,11 @@ function ProjectsPage({
             <Field label="Website address"><Input value={editForm.domain} onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })} /></Field>
             <div className="space-y-2">
               <div>
-                <h3 className="text-sm font-semibold">Search defaults</h3>
+                <h3 className="text-sm font-semibold">Keyword/rank defaults</h3>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. Site audits still crawl every page language they find.</p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Search market">
+                <Field label="Keyword market">
                   <Select value={String(editForm.location_code)} onValueChange={(value) => setEditForm({ ...editForm, location_code: Number(value) })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -2027,7 +2027,7 @@ function ProjectsPage({
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Keyword language">
+                <Field label="Keyword result language">
                   <Select value={editForm.language_code} onValueChange={(value) => setEditForm({ ...editForm, language_code: value })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -6539,11 +6539,11 @@ function SettingsPage() {
         <ReportSection title="App preferences" description="Defaults used when a new site is added. Existing sites keep their own saved settings.">
           <form className="space-y-5" onSubmit={save}>
             <div>
-              <h3 className="text-sm font-semibold">Search defaults</h3>
+              <h3 className="text-sm font-semibold">Keyword/rank defaults</h3>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">Used for keyword research, SERP checks, and rank tracking. They do not restrict multilingual site audits.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Default search market">
+              <Field label="Default keyword market">
                 <Select value={String(form.default_location_code || 2840)} onValueChange={(value) => setForm({ ...form, default_location_code: Number(value) })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -6551,7 +6551,7 @@ function SettingsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Default keyword language">
+              <Field label="Default keyword result language">
                 <Select value={form.default_language_code || "en"} onValueChange={(value) => setForm({ ...form, default_language_code: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
