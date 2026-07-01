@@ -59,13 +59,13 @@ function googleClientConfig() {
   };
 }
 
-function redirectUri(baseUrl: string, projectId: string) {
-  return `${baseUrl.replace(/\/$/, "")}/api/gsc/callback?projectId=${encodeURIComponent(projectId)}`;
+function redirectUri(baseUrl: string, siteId: string) {
+  return `${baseUrl.replace(/\/$/, "")}/api/gsc/callback?siteId=${encodeURIComponent(siteId)}`;
 }
 
-export function gscStatus(projectId: string) {
+export function gscStatus(siteId: string) {
   const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
-    projectId,
+    siteId,
   ]);
   const config = googleClientConfig();
   return {
@@ -73,7 +73,7 @@ export function gscStatus(projectId: string) {
     connected: Boolean(connection?.refresh_token || connection?.access_token),
     connection: connection
       ? {
-          projectId,
+          siteId,
           siteUrl: connection.site_url,
           accountEmail: connection.account_email,
           expiresAt: connection.expires_at,
@@ -82,15 +82,15 @@ export function gscStatus(projectId: string) {
   };
 }
 
-export function createGscAuthUrl(projectId: string, baseUrl: string) {
+export function createGscAuthUrl(siteId: string, baseUrl: string) {
   const config = googleClientConfig();
   if (!config.clientId || !config.clientSecret) {
     throw new Error("Google client id and secret are required.");
   }
-  const state = Buffer.from(JSON.stringify({ projectId, nonce: randomUUID() })).toString("base64url");
+  const state = Buffer.from(JSON.stringify({ siteId, nonce: randomUUID() })).toString("base64url");
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", config.clientId);
-  url.searchParams.set("redirect_uri", redirectUri(baseUrl, projectId));
+  url.searchParams.set("redirect_uri", redirectUri(baseUrl, siteId));
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", GSC_SCOPE);
   url.searchParams.set("access_type", "offline");
@@ -100,7 +100,7 @@ export function createGscAuthUrl(projectId: string, baseUrl: string) {
 }
 
 export async function handleGscCallback(input: {
-  projectId: string;
+  siteId: string;
   code: string;
   baseUrl: string;
 }) {
@@ -115,7 +115,7 @@ export async function handleGscCallback(input: {
       code: input.code,
       client_id: config.clientId,
       client_secret: config.clientSecret,
-      redirect_uri: redirectUri(input.baseUrl, input.projectId),
+      redirect_uri: redirectUri(input.baseUrl, input.siteId),
       grant_type: "authorization_code",
     }),
   });
@@ -124,22 +124,22 @@ export async function handleGscCallback(input: {
     throw new Error(`Google OAuth failed: ${JSON.stringify(token).slice(0, 300)}`);
   }
   saveGscConnection({
-    projectId: input.projectId,
+    siteId: input.siteId,
     accessToken: String(token.access_token || ""),
     refreshToken: String(token.refresh_token || ""),
     expiresIn: Number(token.expires_in || 3600),
   });
-  return gscStatus(input.projectId);
+  return gscStatus(input.siteId);
 }
 
 function saveGscConnection(input: {
-  projectId: string;
+  siteId: string;
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
 }) {
   const existing = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
-    input.projectId,
+    input.siteId,
   ]);
   const refreshToken = input.refreshToken || existing?.refresh_token || "";
   run(
@@ -155,7 +155,7 @@ function saveGscConnection(input: {
     `,
     [
       existing?.id || randomUUID(),
-      input.projectId,
+      input.siteId,
       input.accessToken,
       refreshToken,
       Date.now() + input.expiresIn * 1000,
@@ -163,9 +163,9 @@ function saveGscConnection(input: {
   );
 }
 
-async function getAccessToken(projectId: string) {
+async function getAccessToken(siteId: string) {
   const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
-    projectId,
+    siteId,
   ]);
   if (!connection) throw new Error("Google Search Console is not connected.");
   if (connection.access_token && connection.expires_at > Date.now() + 60_000) {
@@ -188,7 +188,7 @@ async function getAccessToken(projectId: string) {
     throw new Error(`Google token refresh failed: ${JSON.stringify(token).slice(0, 300)}`);
   }
   saveGscConnection({
-    projectId,
+    siteId,
     accessToken: String(token.access_token || ""),
     refreshToken: connection.refresh_token,
     expiresIn: Number(token.expires_in || 3600),
@@ -196,8 +196,8 @@ async function getAccessToken(projectId: string) {
   return String(token.access_token || "");
 }
 
-export async function listGscSites(projectId: string) {
-  const accessToken = await getAccessToken(projectId);
+export async function listGscSites(siteId: string) {
+  const accessToken = await getAccessToken(siteId);
   const response = await fetch("https://www.googleapis.com/webmasters/v3/sites", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -206,28 +206,31 @@ export async function listGscSites(projectId: string) {
   return data.siteEntry || [];
 }
 
-export function setGscSite(projectId: string, siteUrl: string) {
+export function setGscSite(siteId: string, siteUrl: string) {
   run(
     "UPDATE gsc_connections SET site_url = ?, updated_at = CURRENT_TIMESTAMP WHERE project_id = ?",
-    [siteUrl, projectId],
+    [siteUrl, siteId],
   );
-  return gscStatus(projectId);
+  return gscStatus(siteId);
 }
 
 export async function queryGscPerformance(input: {
-  projectId: string;
+  siteId?: string;
+  projectId?: string;
   siteUrl?: string;
   startDate: string;
   endDate: string;
   dimensions?: string[];
   rowLimit?: number;
 }) {
+  const siteId = String(input.siteId || input.projectId || "");
+  if (!siteId) throw new Error("Site id is required.");
   const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
-    input.projectId,
+    siteId,
   ]);
   const siteUrl = input.siteUrl || connection?.site_url;
   if (!siteUrl) throw new Error("Choose a Search Console property first.");
-  const accessToken = await getAccessToken(input.projectId);
+  const accessToken = await getAccessToken(siteId);
   const response = await fetch(
     `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
     {
@@ -390,7 +393,7 @@ function parseGscCsv(csv: string) {
 function mapGscImport(row: GscImportRecord) {
   return {
     id: row.id,
-    projectId: row.project_id,
+    siteId: row.project_id,
     siteUrl: row.site_url,
     sourceName: row.source_name,
     dimensions: jsonParse<string[]>(row.dimensions_json, []),
@@ -401,22 +404,25 @@ function mapGscImport(row: GscImportRecord) {
   };
 }
 
-export function listGscImports(projectId: string) {
+export function listGscImports(siteId: string) {
   return all<GscImportRecord>(
     "SELECT * FROM gsc_imports WHERE project_id = ? ORDER BY created_at DESC",
-    [projectId],
+    [siteId],
   ).map(mapGscImport);
 }
 
 export function importGscPerformance(input: {
-  projectId: string;
+  siteId?: string;
+  projectId?: string;
   siteUrl?: string;
   sourceName?: string;
   dimensions?: string[] | string;
   csv?: string;
   rows?: Record<string, unknown>[];
 }) {
-  const project = getProject(input.projectId);
+  const siteId = String(input.siteId || input.projectId || "");
+  if (!siteId) throw new Error("Site id is required.");
+  const project = getProject(siteId);
   if (!project) throw new Error("Site not found.");
   const rawRows = input.csv ? parseGscCsv(input.csv) : input.rows || [];
   if (!rawRows.length) {
@@ -464,14 +470,14 @@ export async function getGscPerformance(input: {
   dimensions?: string[];
   rowLimit?: number;
 }) {
-  const projectId = String(input.projectId || input.siteId || "");
-  if (!projectId) throw new Error("Site id is required.");
-  const status = gscStatus(projectId);
+  const siteId = String(input.siteId || input.projectId || "");
+  if (!siteId) throw new Error("Site id is required.");
+  const status = gscStatus(siteId);
   if (status.connected && (input.siteUrl || status.connection?.siteUrl)) {
     return {
       source: "google_search_console",
       ...(await queryGscPerformance({
-        projectId,
+        siteId,
         siteUrl: input.siteUrl,
         startDate: String(input.startDate || ""),
         endDate: String(input.endDate || ""),
@@ -480,7 +486,7 @@ export async function getGscPerformance(input: {
       })),
     };
   }
-  const latest = listGscImports(projectId)[0];
+  const latest = listGscImports(siteId)[0];
   if (latest) {
     return {
       source: "local_gsc_import",
@@ -498,7 +504,7 @@ export async function getGscPerformance(input: {
 export function listGscConnections() {
   return all<GscConnection>("SELECT * FROM gsc_connections ORDER BY updated_at DESC").map(
     (row) => ({
-      projectId: row.project_id,
+      siteId: row.project_id,
       siteUrl: row.site_url,
       connected: Boolean(row.refresh_token || row.access_token),
       expiresAt: row.expires_at,
@@ -506,18 +512,21 @@ export function listGscConnections() {
   );
 }
 
-export function disconnectGsc(projectId: string) {
-  run("DELETE FROM gsc_connections WHERE project_id = ?", [projectId]);
+export function disconnectGsc(siteId: string) {
+  run("DELETE FROM gsc_connections WHERE project_id = ?", [siteId]);
   return { connected: false };
 }
 
 export async function inspectGscUrls(input: {
-  projectId: string;
+  siteId?: string;
+  projectId?: string;
   urls: string[] | string;
   siteUrl?: string;
 }) {
+  const siteId = String(input.siteId || input.projectId || "");
+  if (!siteId) throw new Error("Site id is required.");
   const connection = get<GscConnection>("SELECT * FROM gsc_connections WHERE project_id = ?", [
-    input.projectId,
+    siteId,
   ]);
   const siteUrl = input.siteUrl || connection?.site_url;
   if (!siteUrl) throw new Error("Choose a Search Console property first.");
@@ -527,7 +536,7 @@ export async function inspectGscUrls(input: {
         .split(/\n|,/)
         .map((url) => url.trim())
         .filter(Boolean);
-  const accessToken = await getAccessToken(input.projectId);
+  const accessToken = await getAccessToken(siteId);
   const rows = [];
   for (const inspectionUrl of urls.slice(0, 20)) {
     const response = await fetch("https://searchconsole.googleapis.com/v1/urlInspection/index:inspect", {

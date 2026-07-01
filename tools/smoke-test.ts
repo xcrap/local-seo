@@ -254,6 +254,11 @@ try {
   if (gscSource.includes(".slice(0, 5000)")) {
     throw new Error("Search Console CSV imports must not silently drop rows after 5,000 entries.");
   }
+  for (const gscProjectLeak of ["callback?projectId", "projectId: row.project_id", "projectId, nonce"]) {
+    if (gscSource.includes(gscProjectLeak)) {
+      throw new Error(`Search Console public surface should use siteId, not ${gscProjectLeak}.`);
+    }
+  }
   const readmeSource = await readFile(path.join(rootDir, "README.md"), "utf8");
   if (/target domain/i.test(readmeSource)) {
     throw new Error("README should explain selected-site/comparison-site workflows instead of vague target-domain wording.");
@@ -889,12 +894,16 @@ try {
     fullGscImport.rowCount !== 5025 ||
     fullGscImport.rows?.length !== 5025 ||
     fullGscImport.totals?.clicks !== 5025 ||
-    fullGscImport.totals?.impressions !== 10050
+    fullGscImport.totals?.impressions !== 10050 ||
+    fullGscImport.siteId !== project.id ||
+    "projectId" in fullGscImport
   ) {
     throw new Error(`GSC CSV import silently dropped rows: ${JSON.stringify({
       rowCount: fullGscImport.rowCount,
       returnedRows: fullGscImport.rows?.length,
       totals: fullGscImport.totals,
+      siteId: fullGscImport.siteId,
+      projectId: fullGscImport.projectId,
     })}`);
   }
   const gscImport = await request("/api/gsc/import", {
@@ -920,6 +929,9 @@ try {
   const gscImports = await request(`/api/gsc/imports/${project.id}`);
   if (!gscImports.length || gscImports[0].id !== gscImport.id || !gscImports.some((row: any) => row.id === fullGscImport.id)) {
     throw new Error("GSC import was not persisted in SQLite.");
+  }
+  if (gscImports.some((row: any) => row.projectId || row.siteId !== project.id)) {
+    throw new Error(`GSC import history should expose siteId, not projectId: ${JSON.stringify(gscImports[0])}`);
   }
   const gscHistoryDb = new Database(serverDbPath);
   try {

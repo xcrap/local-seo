@@ -496,8 +496,8 @@ app.post(
   safe(async (c) => c.json(createAiJob((await readJson(c)) as any))),
 );
 
-app.get("/api/gsc/status/:projectId", safe((c) => c.json(gscStatus(c.req.param("projectId")))));
-app.get("/api/gsc/imports/:projectId", safe((c) => c.json(listGscImports(c.req.param("projectId")))));
+app.get("/api/gsc/status/:siteId", safe((c) => c.json(gscStatus(c.req.param("siteId")))));
+app.get("/api/gsc/imports/:siteId", safe((c) => c.json(listGscImports(c.req.param("siteId")))));
 app.post(
   "/api/gsc/start",
   safe(async (c) => {
@@ -508,16 +508,16 @@ app.post(
 app.get(
   "/api/gsc/callback",
   safe(async (c) => {
-    const projectId = c.req.query("projectId") || "";
+    const siteId = c.req.query("siteId") || "";
     const code = c.req.query("code") || "";
-    await handleGscCallback({ projectId, code, baseUrl: baseUrl(c) });
+    await handleGscCallback({ siteId, code, baseUrl: baseUrl(c) });
     return new Response(
       "<html><body><script>window.close()</script><p>Google Search Console connected. You can close this tab.</p></body></html>",
       { headers: { "Content-Type": "text/html; charset=utf-8" } },
     );
   }),
 );
-app.get("/api/gsc/sites/:projectId", safe(async (c) => c.json(await listGscSites(c.req.param("projectId")))));
+app.get("/api/gsc/sites/:siteId", safe(async (c) => c.json(await listGscSites(c.req.param("siteId")))));
 app.post(
   "/api/gsc/site",
   safe(async (c) => {

@@ -476,7 +476,7 @@ async function callTool(name: string, args: any) {
     case "get_gsc_performance":
       return getGscPerformance(args);
     case "inspect_urls":
-      return inspectGscUrls({ ...args, projectId: args.projectId || args.siteId });
+      return inspectGscUrls({ ...args, siteId: args.siteId || args.projectId });
     case "brand_lookup":
       return brandLookup(args);
     case "prompt_explorer":
