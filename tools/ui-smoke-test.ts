@@ -132,6 +132,17 @@ async function waitFor(url: string, timeoutMs = 20_000) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
+async function assertNoHorizontalOverflow(page: any, label: string) {
+  const widths = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+    body: document.body.scrollWidth,
+  }));
+  if (widths.document > widths.viewport + 2 || widths.body > widths.viewport + 2) {
+    throw new Error(`${label} should not create page-level horizontal scroll: ${JSON.stringify(widths)}.`);
+  }
+}
+
 async function cleanup() {
   web.kill();
   api.kill();
@@ -513,6 +524,19 @@ try {
     await page.getByLabel("SERP ownership site").waitFor();
     if (await page.getByLabel("SERP ownership site").inputValue() !== "second.test") {
       throw new Error("SERP ownership site did not follow the newly active site.");
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const [label, route] of [
+      ["overview", "/"],
+      ["sites", "/sites"],
+      ["audits", "/audits"],
+      ["organic research", "/domain"],
+      ["links", "/links"],
+      ["settings", "/settings"],
+    ] as const) {
+      await page.goto(`${webUrl}${route}`, { waitUntil: "networkidle" });
+      await assertNoHorizontalOverflow(page, `Mobile ${label}`);
     }
   } finally {
     await browser.close();

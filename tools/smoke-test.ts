@@ -367,6 +367,10 @@ try {
     throw new Error("SERP/rank search should support self-hosted SearXNG before falling back to DuckDuckGo.");
   }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
+  const webCssSource = await readFile(path.join(rootDir, "web/src/index.css"), "utf8");
+  if (!webCssSource.includes(".grid > *") || !webCssSource.includes("min-width: 0")) {
+    throw new Error("Grid children should be allowed to shrink so table evidence scrolls internally on mobile.");
+  }
   if (webApiClient.includes("/api/projects")) {
     throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");
   }

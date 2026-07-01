@@ -114,3 +114,7 @@ button:not(:disabled) {
   font-family: var(--font-heading);
   letter-spacing: 0;
 }
+
+.grid > * {
+  min-width: 0;
+}
