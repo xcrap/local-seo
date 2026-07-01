@@ -395,6 +395,9 @@ try {
   if (!webAppClient.includes('path="/mcp-tools"') || !webAppClient.includes('to: "/mcp-tools"')) {
     throw new Error("The MCP screen should use /mcp-tools so it does not conflict with the JSON-RPC /mcp endpoint.");
   }
+  if (!webAppClient.includes('element={<McpPage site={activeSite} />}') || webAppClient.includes('siteId: "site-id"')) {
+    throw new Error("The MCP screen should build examples from the active site, not placeholder site IDs.");
+  }
   if (webAppClient.includes('path="/mcp"') || webAppClient.includes('to: "/mcp"')) {
     throw new Error("The React app should not use /mcp as a UI route because /mcp is the JSON-RPC endpoint.");
   }

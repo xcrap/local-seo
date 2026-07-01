@@ -1391,7 +1391,7 @@ function AppShell() {
                 <Route path="/audits/:auditId" element={<AuditReportRoute />} />
                 <Route path="/gsc" element={<GscPage site={activeSite} />} />
                 <Route path="/ai" element={<AiPage site={activeSite} />} />
-                <Route path="/mcp-tools" element={<McpPage />} />
+                <Route path="/mcp-tools" element={<McpPage site={activeSite} />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
@@ -6833,12 +6833,15 @@ function AiJobOutput({ job }: { job: any }) {
   );
 }
 
-function McpPage() {
+function McpPage({ site }: { site: Site }) {
   const [tools, setTools] = useState<any[]>([]);
   useEffect(() => {
     api.mcpTools().then((data) => setTools(data.tools || [])).catch(console.error);
   }, []);
   const endpoint = `${window.location.origin}/mcp`;
+  const exampleDomain = cleanSiteDomain(site.domain);
+  const exampleSiteId = site.id;
+  const exampleKeyword = exampleDomain ? `${exampleDomain} seo audit` : `${site.name || "site"} seo audit`;
   const groupedTools = useMemo(() => {
     return tools.reduce<Record<string, any[]>>((acc, tool) => {
       const group = mcpToolGroup(tool.name);
@@ -6854,20 +6857,28 @@ function McpPage() {
     },
     {
       title: "Scan a site",
-      body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "scan_site", arguments: { siteId: "site-id" } } },
+      body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "scan_site", arguments: { siteId: exampleSiteId } } },
     },
     {
       title: "Read Search Console",
-      body: { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get_gsc_performance", arguments: { siteId: "site-id", startDate: "2026-06-01", endDate: "2026-06-30", dimensions: ["query"] } } },
+      body: { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get_gsc_performance", arguments: { siteId: exampleSiteId, startDate: "2026-06-01", endDate: "2026-06-30", dimensions: ["query"] } } },
     },
-    {
-      title: "Read organic domain",
-      body: { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_domain_overview", arguments: { siteId: "site-id", domain: "example.com" } } },
-    },
-    {
-      title: "Read link index",
-      body: { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "get_backlinks_profile", arguments: { siteId: "site-id", domain: "example.com", tab: "domains" } } },
-    },
+    ...(exampleDomain
+      ? [
+          {
+            title: "Read organic domain",
+            body: { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_domain_overview", arguments: { siteId: exampleSiteId, domain: exampleDomain } } },
+          },
+          {
+            title: "Read link index",
+            body: { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "get_backlinks_profile", arguments: { siteId: exampleSiteId, domain: exampleDomain, tab: "domains" } } },
+          },
+          {
+            title: "Analyze SERP",
+            body: { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "analyze_serp", arguments: { siteId: exampleSiteId, keyword: exampleKeyword, domain: exampleDomain } } },
+          },
+        ]
+      : []),
   ];
   return (
     <>
@@ -6884,6 +6895,18 @@ function McpPage() {
               <code className="block break-all rounded-md bg-secondary px-3 py-2 text-sm">{`POST ${endpoint}`}</code>
               <p className="text-sm text-muted-foreground">If a local token is configured, include `Authorization: Bearer ...` with the request.</p>
             </div>
+          </ReportSection>
+          <ReportSection title="Active site" description="Examples below are ready for this site.">
+            <StatusEvidenceTable
+              rows={[
+                {
+                  title: site.name || exampleDomain || "Active site",
+                  status: exampleDomain || "No website address",
+                  tone: "good",
+                  text: `siteId ${exampleSiteId}`,
+                },
+              ]}
+            />
           </ReportSection>
           <ReportSection title="Common calls" description="Known-good JSON-RPC request shapes.">
             <div className="space-y-3">

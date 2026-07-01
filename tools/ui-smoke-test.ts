@@ -469,6 +469,19 @@ try {
     await page.getByRole("heading", { name: /^MCP$/ }).waitFor();
     await page.getByRole("columnheader", { name: /^Inputs$/i }).first().waitFor();
     await page.getByRole("cell", { name: "scan_site" }).waitFor();
+    const activeSiteId = await page.evaluate(() => localStorage.getItem("local-seo:site") || "");
+    if (!activeSiteId) {
+      throw new Error("MCP page test could not read the active site ID from local storage.");
+    }
+    await page.getByText(activeSiteId).first().waitFor();
+    await page.getByText(`localhost:${fixtureServer.port}`).first().waitFor();
+    const mcpCommonCalls = page.locator("section").filter({ hasText: "Common calls" }).first();
+    if (await mcpCommonCalls.getByText("site-id").count()) {
+      throw new Error("MCP page exposes a placeholder site ID instead of the active site.");
+    }
+    if (await mcpCommonCalls.getByText(/\bexample\.com\b/i).count()) {
+      throw new Error("MCP page exposes a placeholder domain instead of the active site domain.");
+    }
     if (await page.getByText(/\bprojectId\b/).count()) {
       throw new Error("MCP page exposes legacy projectId wording.");
     }
