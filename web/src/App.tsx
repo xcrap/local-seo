@@ -1739,7 +1739,7 @@ function SiteCommandCenter({
       action: <Button asChild size="sm" variant="secondary"><Link to="/audits"><FileSearch /> Open site audits</Link></Button>,
       secondary: latestAudit ? (
         <Button asChild size="sm" variant="outline">
-          <Link to={`/audits/${latestAudit.id}`}><FileSearch /> Open report</Link>
+          <Link to={`/audits/${latestAudit.id}`}><FileSearch /> Open scan report</Link>
         </Button>
       ) : null,
     },
@@ -3196,7 +3196,7 @@ function AuditRunPicker({
           </SelectContent>
         </Select>
         <Button asChild variant="outline">
-          <Link to={`/audits/${selected.id}`}><FileSearch /> Open report</Link>
+          <Link to={`/audits/${selected.id}`}><FileSearch /> Open scan report</Link>
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -4734,7 +4734,7 @@ function AuditTable({
                           if (row.site_id) setSelectedAuditId(row.site_id, row.id);
                         }}
                       >
-                        <FileSearch /> Open report
+                        <FileSearch /> Open scan report
                       </Link>
                     </Button>
                   )}
@@ -4818,7 +4818,7 @@ function AuditTable({
                                 if (row.site_id) setSelectedAuditId(row.site_id, row.id);
                               }}
                             >
-                              <FileSearch /> Open report
+                              <FileSearch /> Open scan report
                             </Link>
                           </Button>
                         )}

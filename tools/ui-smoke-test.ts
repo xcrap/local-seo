@@ -413,7 +413,7 @@ try {
     await page.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
     await page
       .locator("section", { hasText: "Scan history" })
-      .getByRole("link", { name: /^Open report$/ })
+      .getByRole("link", { name: /^Open scan report$/ })
       .first()
       .waitFor();
     await assertNoHorizontalOverflow(page, "Mobile populated overview");

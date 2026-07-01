@@ -486,10 +486,13 @@ try {
   if (!webAppClient.includes('siteActions(site, "mobile")')) {
     throw new Error("Saved-site rows should expose scan, edit, and delete actions in the mobile layout.");
   }
-  for (const explicitDashboardAction of ["Open site audits", "Open speed report", "Open organic research", "Open local link graph", "Open rank tracking", "Open Search Console", "Open AI lab"]) {
+  for (const explicitDashboardAction of ["Open site audits", "Open scan report", "Open speed report", "Open organic research", "Open local link graph", "Open rank tracking", "Open Search Console", "Open AI lab"]) {
     if (!webAppClient.includes(explicitDashboardAction)) {
       throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
     }
+  }
+  if (webAppClient.includes(">Open report</Link>") || webAppClient.includes("Open report\\n")) {
+    throw new Error("Saved-scan actions should say Open scan report instead of generic Open report.");
   }
   for (const explicitDashboardStatus of ["Timing measured", "Ready for research", "Local graph ready", "Manual checks", "Ready for import", "Ready for Codex"]) {
     if (!webAppClient.includes(explicitDashboardStatus)) {
