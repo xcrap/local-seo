@@ -392,6 +392,14 @@ try {
     await page.getByText("Saved local Codex runs from SQLite.").waitFor();
     await page.getByText("Start or select a local Codex job to read the complete output here.").waitFor();
 
+    await page.getByRole("navigation").getByRole("link", { name: /^Prompt explorer$/ }).click();
+    await page.getByRole("heading", { name: /^Prompt explorer$/ }).waitFor();
+    await page.getByRole("row", { name: /Local runner.*Local Codex/i }).waitFor();
+    await page.getByRole("row", { name: /Reasoning.*Medium/i }).waitFor();
+    if (await page.getByLabel(/chat gpt/i).count()) {
+      throw new Error("Prompt explorer should not expose external model checkboxes in local Codex mode.");
+    }
+
     await page.getByRole("navigation").getByRole("link", { name: /^Settings$/ }).click();
     await page.getByRole("heading", { name: /^App settings$/ }).waitFor();
     await page.getByRole("heading", { name: /^Data sources$/ }).waitFor();

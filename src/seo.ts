@@ -1845,7 +1845,10 @@ export async function promptExplorer(input: {
   const prompt = input.prompt.trim();
   if (!prompt) throw new Error("Prompt is required.");
   const highlightBrand = input.highlightBrand?.trim() || site.domain || site.name;
-  const models = input.models?.length ? input.models : ["chat_gpt", "claude", "gemini", "perplexity"];
+  const hasConnectedAiVisibilitySource = dataForSeoReady();
+  const models = hasConnectedAiVisibilitySource
+    ? (input.models?.length ? input.models : ["chat_gpt", "claude", "gemini", "perplexity"])
+    : ["local_codex"];
   let source = "codex";
   const result: any = {
     prompt,
@@ -1854,7 +1857,7 @@ export async function promptExplorer(input: {
     results: [],
   };
 
-  if (dataForSeoReady()) {
+  if (hasConnectedAiVisibilitySource) {
     source = "dataforseo";
     for (const model of models) {
       const target: any = {

@@ -964,12 +964,29 @@ try {
   ) {
     throw new Error(`AI visibility should expose entity fields, not target fields: ${JSON.stringify(brandLookupResult)}`);
   }
-  await request("/api/prompt-explorer", {
+  const promptExplorerResult = await request("/api/prompt-explorer", {
     method: "POST",
     body: JSON.stringify({ siteId: project.id, prompt: "best seo software", highlightBrand: "Example" }),
   });
+  if (
+    promptExplorerResult.source !== "codex" ||
+    promptExplorerResult.results?.length !== 1 ||
+    promptExplorerResult.results?.[0]?.model !== "local_codex"
+  ) {
+    throw new Error(`Local prompt explorer should queue one Codex run instead of external model rows: ${JSON.stringify(promptExplorerResult)}`);
+  }
   const localHistoryDb = new Database(serverDbPath);
   try {
+    const savedPromptRun = localHistoryDb
+      .query<{ source: string; models: string }, [string]>("SELECT source, models FROM prompt_explorer_runs WHERE site_id = ? ORDER BY created_at DESC LIMIT 1")
+      .get(project.id);
+    if (
+      !savedPromptRun ||
+      savedPromptRun.source !== "codex" ||
+      JSON.stringify(JSON.parse(savedPromptRun.models || "[]")) !== JSON.stringify(["local_codex"])
+    ) {
+      throw new Error(`Local prompt explorer history should store local_codex only: ${JSON.stringify(savedPromptRun)}`);
+    }
     const insertDomainSnapshot = localHistoryDb.prepare(`
       INSERT INTO domain_snapshots (id, site_id, domain, source, result_json, created_at)
       VALUES (?, ?, ?, 'smoke-history', '{}', ?)

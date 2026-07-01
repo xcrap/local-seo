@@ -3867,6 +3867,7 @@ function CitationList({ rows }: { rows: any[] }) {
 function PromptExplorerPage({ site }: { site: Site }) {
   const [prompt, setPrompt] = useState(`What are the best options for ${site.domain || site.name}?`);
   const [highlightBrand, setHighlightBrand] = useState(site.domain || site.name);
+  const [config, setConfig] = useState<any>(null);
   const [models, setModels] = useState<Record<string, boolean>>({
     chat_gpt: true,
     claude: true,
@@ -3876,9 +3877,15 @@ function PromptExplorerPage({ site }: { site: Site }) {
   const [result, setResult] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const externalAiVisibilityConnected = Boolean(config?.seo_metrics_source_connected);
 
   async function load() {
-    setRuns(await api.promptExplorerRuns(site.id));
+    const [history, nextConfig] = await Promise.all([
+      api.promptExplorerRuns(site.id),
+      api.config(),
+    ]);
+    setRuns(history);
+    setConfig(nextConfig);
   }
   useEffect(() => {
     setPrompt(`What are the best options for ${site.domain || site.name}?`);
@@ -3891,7 +3898,9 @@ function PromptExplorerPage({ site }: { site: Site }) {
     event.preventDefault();
     setLoading(true);
     try {
-      const selectedModels = Object.entries(models).filter(([, enabled]) => enabled).map(([model]) => model);
+      const selectedModels = externalAiVisibilityConnected
+        ? Object.entries(models).filter(([, enabled]) => enabled).map(([model]) => model)
+        : ["local_codex"];
       const data = await api.promptExplorer({ siteId: site.id, prompt, highlightBrand, models: selectedModels });
       setResult(data);
       await load();
@@ -3902,20 +3911,39 @@ function PromptExplorerPage({ site }: { site: Site }) {
 
   return (
     <>
-      <PageHeader eyebrow="AI answers" title="Prompt explorer" description="Run a prompt across answer models and inspect brand mentions, citations, and fan-out queries." />
+      <PageHeader eyebrow="AI answers" title="Prompt explorer" description="Run prompts through local Codex by default. Compare external answer models only when a real AI visibility source is connected." />
       <div className="grid gap-6 2xl:grid-cols-[480px_minmax(0,1fr)]">
-        <ReportSection title="Prompt" description="Use this for AI visibility and citation testing.">
+        <ReportSection title="Prompt" description={externalAiVisibilityConnected ? "Connected AI visibility source available. Choose the answer models to query." : "Local mode queues one Codex medium job and does not invent model-specific responses."}>
           <form className="space-y-4" onSubmit={submit}>
             <Field label="Prompt"><Textarea className="min-h-32" value={prompt} onChange={(event) => setPrompt(event.target.value)} required /></Field>
             <Field label="Highlight brand"><Input value={highlightBrand} onChange={(event) => setHighlightBrand(event.target.value)} /></Field>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.keys(models).map((model) => (
-                <label key={model} className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                  <Checkbox checked={models[model]} onCheckedChange={(checked) => setModels({ ...models, [model]: checked === true })} />
-                  {model.replaceAll("_", " ")}
-                </label>
-              ))}
-            </div>
+            {externalAiVisibilityConnected ? (
+              <div className="grid grid-cols-2 gap-2">
+                {Object.keys(models).map((model) => (
+                  <label key={model} className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                    <Checkbox checked={models[model]} onCheckedChange={(checked) => setModels({ ...models, [model]: checked === true })} />
+                    {model.replaceAll("_", " ")}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <StatusEvidenceTable
+                rows={[
+                  {
+                    title: "Local runner",
+                    status: "Local Codex",
+                    tone: "good",
+                    text: "Prompt explorer queues one local Codex job and saves the run in SQLite.",
+                  },
+                  {
+                    title: "Reasoning",
+                    status: "Medium",
+                    tone: "outline",
+                    text: "Matches the app AI default. The full job output is read from the AI lab when complete.",
+                  },
+                ]}
+              />
+            )}
             <Button disabled={loading}><Bot /> {loading ? "Exploring" : "Explore prompt"}</Button>
           </form>
         </ReportSection>
