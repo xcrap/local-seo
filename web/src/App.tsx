@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useState, type ComponentProps, type FormEvent, type ReactElement, type ReactNode } from "react";
-import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
@@ -1708,6 +1708,7 @@ function SiteCommandCenter({
 }) {
   const latestAudit = summary?.latestAudits?.[0];
   const latestAuditSummary = latestAudit?.result?.summary || {};
+  const latestAuditSpeed = latestAudit ? auditSpeedMetrics(latestAudit) : null;
   const latestGscImport = summary?.latestGscImport;
   const rows = [
     {
@@ -1740,6 +1741,28 @@ function SiteCommandCenter({
         <Button asChild size="sm" variant="outline">
           <Link to={`/audits/${latestAudit.id}`}><FileSearch /> Open report</Link>
         </Button>
+      ) : null,
+    },
+    {
+      key: "speed",
+      area: "Page speed",
+      status: latestAuditSpeed?.measuredPageLoads ? "Timing measured" : "Needs scan",
+      evidence: latestAuditSpeed?.measuredPageLoads
+        ? `${formatNumber(latestAuditSpeed.measuredPageLoads)} pages timed · average ${formatMs(latestAuditSpeed.averagePageLoadMs)} · p95 ${formatMs(latestAuditSpeed.p95PageLoadMs)} · ${formatNumber(latestAuditSpeed.slowPages)} slow`
+        : "Run a site scan to record response timings for every crawled HTML page.",
+      action: latestAuditSpeed?.measuredPageLoads ? (
+        <Button asChild size="sm" variant="secondary">
+          <Link to={`/audits/${latestAudit.id}?tab=speed`}><Zap /> Open speed report</Link>
+        </Button>
+      ) : site.domain ? (
+        <Button size="sm" variant="secondary" onClick={onScan} disabled={scanning}>
+          <Zap /> {scanning ? "Starting" : "Scan speed"}
+        </Button>
+      ) : (
+        <Button asChild size="sm" variant="secondary"><Link to="/sites"><Plus /> Add site</Link></Button>
+      ),
+      secondary: latestAudit ? (
+        <Button asChild size="sm" variant="outline"><Link to="/audits"><FileSearch /> Open audit history</Link></Button>
       ) : null,
     },
     {
@@ -4888,8 +4911,29 @@ function defaultAuditTab(audit: any) {
   return auditIsActive(audit) ? "progress" : "overview";
 }
 
+const auditTabValues = new Set([
+  "overview",
+  "progress",
+  "issues",
+  "checks",
+  "metadata",
+  "pages",
+  "links",
+  "images",
+  "assets",
+  "speed",
+  "crawl",
+  "raw",
+]);
+
+function auditTabFromSearch(value: string | null, audit: any) {
+  return value && auditTabValues.has(value) ? value : defaultAuditTab(audit);
+}
+
 function AuditDetail({ audit }: { audit: any }) {
-  const [activeTab, setActiveTab] = useState(defaultAuditTab(audit));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = auditTabFromSearch(searchParams.get("tab"), audit);
+  const [activeTab, setActiveTab] = useState(requestedTab);
   const [severityFilter, setSeverityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -4911,9 +4955,19 @@ function AuditDetail({ audit }: { audit: any }) {
   const issueTypes = Array.from(new Set<string>(issues.map((issue: any) => String(issue.type || "")).filter(Boolean))).sort();
   const categoryEntries = Object.entries(summary.byCategory || {}).sort((a: any, b: any) => b[1] - a[1]);
   useEffect(() => {
-    setActiveTab(defaultAuditTab(audit));
-  }, [audit.id]);
-  const showIssues = () => setActiveTab("issues");
+    setActiveTab(requestedTab);
+  }, [audit.id, requestedTab]);
+  const changeAuditTab = (value: string) => {
+    setActiveTab(value);
+    const next = new URLSearchParams(searchParams);
+    if (value === defaultAuditTab(audit)) {
+      next.delete("tab");
+    } else {
+      next.set("tab", value);
+    }
+    setSearchParams(next, { replace: true });
+  };
+  const showIssues = () => changeAuditTab("issues");
   const selectSeverity = (severity: string) => {
     setSeverityFilter(severity);
     setCategoryFilter("all");
@@ -4969,7 +5023,7 @@ function AuditDetail({ audit }: { audit: any }) {
   };
   return (
     <div className="space-y-5">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={changeAuditTab} className="space-y-4">
         <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>

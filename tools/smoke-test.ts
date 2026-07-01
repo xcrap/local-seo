@@ -481,15 +481,18 @@ try {
   if (!webAppClient.includes('siteActions(site, "mobile")')) {
     throw new Error("Saved-site rows should expose scan, edit, and delete actions in the mobile layout.");
   }
-  for (const explicitDashboardAction of ["Open site audits", "Open organic research", "Open local link graph", "Open rank tracking", "Open Search Console", "Open AI lab"]) {
+  for (const explicitDashboardAction of ["Open site audits", "Open speed report", "Open organic research", "Open local link graph", "Open rank tracking", "Open Search Console", "Open AI lab"]) {
     if (!webAppClient.includes(explicitDashboardAction)) {
       throw new Error(`Dashboard actions should use explicit labels, missing ${explicitDashboardAction}.`);
     }
   }
-  for (const explicitDashboardStatus of ["Ready for research", "Local graph ready", "Manual checks", "Ready for import", "Ready for Codex"]) {
+  for (const explicitDashboardStatus of ["Timing measured", "Ready for research", "Local graph ready", "Manual checks", "Ready for import", "Ready for Codex"]) {
     if (!webAppClient.includes(explicitDashboardStatus)) {
       throw new Error(`Dashboard status labels should be concrete, missing ${explicitDashboardStatus}.`);
     }
+  }
+  if (!webAppClient.includes("?tab=speed") || !webAppClient.includes("useSearchParams")) {
+    throw new Error("Overview speed action should deep-link directly to the audit Speed tab.");
   }
   for (const vagueDashboardStatus of ['"has keywords"', '"has jobs"', '"ready"', '"manual"', '"needs scan"', '"not run"', '"local graph"']) {
     if (webAppClient.includes(vagueDashboardStatus)) {

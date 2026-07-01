@@ -288,6 +288,7 @@ try {
     }
     const siteControl = page.locator("section", { hasText: "Site control" });
     await siteControl.getByRole("row", { name: /Active site.*Keyword tools:/i }).waitFor();
+    await siteControl.getByRole("row", { name: /Page speed.*Timing measured.*pages timed/i }).waitFor();
     await siteControl.getByRole("row", { name: /Links.*Local graph ready/i }).waitFor();
     await siteControl.getByRole("row", { name: /Rank tracking.*Manual checks/i }).waitFor();
     await siteControl.getByRole("row", { name: /Search Console.*Ready for import/i }).waitFor();
@@ -299,11 +300,19 @@ try {
       throw new Error("Overview still exposes vague internal status labels.");
     }
     await siteControl.getByRole("link", { name: /^Open site audits$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open speed report$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open organic research$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open local link graph$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open rank tracking$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open Search Console$/ }).waitFor();
     await siteControl.getByRole("link", { name: /^Open AI lab$/ }).waitFor();
+    await siteControl.getByRole("link", { name: /^Open speed report$/ }).click();
+    await page.getByRole("heading", { name: /^Page speed evidence$/ }).waitFor();
+    if (!new URL(page.url()).searchParams.has("tab") || new URL(page.url()).searchParams.get("tab") !== "speed") {
+      throw new Error(`Open speed report should deep-link to the speed tab, got ${page.url()}.`);
+    }
+    await page.goto(webUrl, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: /Site control/i }).waitFor();
 
     await page.setViewportSize({ width: 1280, height: 820 });
     const desktopNavigation = page.getByRole("navigation").first();
