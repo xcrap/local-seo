@@ -275,6 +275,9 @@ try {
   if (seoSource.includes("activeProject:") || /^\s*projects:/m.test(seoSource)) {
     throw new Error("Dashboard API should return activeSite/sites terminology.");
   }
+  if (/slice\(0,\s*5\)/.test(seoSource)) {
+    throw new Error("Crawler audit issues should keep full local evidence arrays instead of five-item samples.");
+  }
   const webApiClient = await readFile(path.join(rootDir, "web/src/api.ts"), "utf8");
   if (webApiClient.includes("/api/projects")) {
     throw new Error("The web client should use /api/sites routes instead of legacy /api/projects routes.");

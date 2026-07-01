@@ -2983,7 +2983,7 @@ async function runLocalAudit(auditId: string) {
           type: "heading-hierarchy-jump",
           message: `${headingJumps.length} headings skip hierarchy levels`,
           recommendation: "Keep headings in a logical outline so crawlers and assistive technology can understand the page structure.",
-          evidence: { samples: headingJumps.slice(0, 5) },
+          evidence: { samples: headingJumps },
         });
       }
       if (wordCount > 300 && h2Count === 0) {
@@ -3263,7 +3263,7 @@ async function runLocalAudit(auditId: string) {
           type: "image-alt-generic",
           message: `${genericAlt.length} content images use generic alt text`,
           recommendation: "Write alt text that describes the specific image and its purpose on the page.",
-          evidence: { count: genericAlt.length, samples: genericAlt.slice(0, 5).map((image) => ({ src: image.src, alt: image.altPreview })) },
+          evidence: { count: genericAlt.length, samples: genericAlt.map((image) => ({ src: image.src, alt: image.altPreview })) },
         });
       }
       const longAlt = imageRows.filter((image) => image.classification === "content" && image.issues.includes("alt too long"));
@@ -3275,7 +3275,7 @@ async function runLocalAudit(auditId: string) {
           type: "image-alt-too-long",
           message: `${longAlt.length} content images have very long alt text`,
           recommendation: "Keep alt text concise and useful. Move long explanations into visible page copy.",
-          evidence: { count: longAlt.length, samples: longAlt.slice(0, 5).map((image) => ({ src: image.src, length: String(image.alt || "").length })) },
+          evidence: { count: longAlt.length, samples: longAlt.map((image) => ({ src: image.src, length: String(image.alt || "").length })) },
         });
       }
       const duplicateAltTexts = [...new Set(imageRows
@@ -3290,7 +3290,7 @@ async function runLocalAudit(auditId: string) {
           type: "image-alt-duplicate",
           message: "Multiple content images use the same alt text",
           recommendation: "Use distinct alt text when images convey different information. Repeated decorative images should be marked decorative.",
-          evidence: { duplicateAltTexts: duplicateAltTexts.slice(0, 5) },
+          evidence: { duplicateAltTexts },
         });
       }
       if (missingDimensions > 0) {
@@ -3313,7 +3313,7 @@ async function runLocalAudit(auditId: string) {
           type: "image-srcset-missing",
           message: `${missingSrcset.length} large content images have no srcset`,
           recommendation: "Use responsive image sources so mobile users do not download oversized images.",
-          evidence: { count: missingSrcset.length, samples: missingSrcset.slice(0, 5).map((image) => image.src) },
+          evidence: { count: missingSrcset.length, samples: missingSrcset.map((image) => image.src) },
         });
       }
       const missingLazyLoading = imageRows.filter((image) => image.issues.includes("not lazy loaded"));
@@ -3325,7 +3325,7 @@ async function runLocalAudit(auditId: string) {
           type: "image-lazy-loading-missing",
           message: `${missingLazyLoading.length} lower-page images are not lazy loaded`,
           recommendation: "Lazy-load images that are not needed for the initial viewport.",
-          evidence: { count: missingLazyLoading.length, samples: missingLazyLoading.slice(0, 5).map((image) => image.src) },
+          evidence: { count: missingLazyLoading.length, samples: missingLazyLoading.map((image) => image.src) },
         });
       }
       const mixedImages = imageRows.filter((image) => image.src && isHttpOnHttpsPage(image.src, current));
@@ -3337,7 +3337,7 @@ async function runLocalAudit(auditId: string) {
           type: "mixed-content-images",
           message: `${mixedImages.length} images use HTTP on an HTTPS page`,
           recommendation: "Serve image assets over HTTPS to avoid browser blocking and security warnings.",
-          evidence: { count: mixedImages.length, samples: mixedImages.slice(0, 5).map((image) => image.src) },
+          evidence: { count: mixedImages.length, samples: mixedImages.map((image) => image.src) },
         });
       }
       const mixedLinks = linkRows.filter((link) => isHttpOnHttpsPage(link.href, current));
@@ -3349,7 +3349,7 @@ async function runLocalAudit(auditId: string) {
           type: "mixed-content-links",
           message: `${mixedLinks.length} links use HTTP on an HTTPS page`,
           recommendation: "Update links to HTTPS versions where available.",
-          evidence: { count: mixedLinks.length, samples: mixedLinks.slice(0, 5).map((link) => link.href) },
+          evidence: { count: mixedLinks.length, samples: mixedLinks.map((link) => link.href) },
         });
       }
       const emptyAnchorLinks = linkRows.filter((link) => !link.anchor && !link.accessibleName);
@@ -3361,7 +3361,7 @@ async function runLocalAudit(auditId: string) {
           type: "empty-anchor-text",
           message: `${emptyAnchorLinks.length} links have no readable anchor text`,
           recommendation: "Add visible anchor text or accessible labels so users and crawlers understand the target.",
-          evidence: { count: emptyAnchorLinks.length, samples: emptyAnchorLinks.slice(0, 5).map((link) => link.href) },
+          evidence: { count: emptyAnchorLinks.length, samples: emptyAnchorLinks.map((link) => link.href) },
         });
       }
       const internalNofollowLinks = linkRows.filter((link) => link.type === "internal" && /\bnofollow\b/i.test(link.rel));
@@ -3373,7 +3373,7 @@ async function runLocalAudit(auditId: string) {
           type: "internal-nofollow",
           message: `${internalNofollowLinks.length} internal links are nofollow`,
           recommendation: "Remove nofollow from internal links unless crawl flow should intentionally be blocked.",
-          evidence: { count: internalNofollowLinks.length, samples: internalNofollowLinks.slice(0, 5).map((link) => link.href) },
+          evidence: { count: internalNofollowLinks.length, samples: internalNofollowLinks.map((link) => link.href) },
         });
       }
       const unsafeBlankLinks = linkRows.filter((link) => link.type === "external" && link.target.toLowerCase() === "_blank" && !/\b(noopener|noreferrer)\b/i.test(link.rel));
@@ -3385,7 +3385,7 @@ async function runLocalAudit(auditId: string) {
           type: "external-blank-missing-noopener",
           message: `${unsafeBlankLinks.length} external links open in a new tab without noopener`,
           recommendation: "Add rel=\"noopener\" or rel=\"noreferrer\" to external target=\"_blank\" links.",
-          evidence: { count: unsafeBlankLinks.length, samples: unsafeBlankLinks.slice(0, 5).map((link) => link.href) },
+          evidence: { count: unsafeBlankLinks.length, samples: unsafeBlankLinks.map((link) => link.href) },
         });
       }
       if (linkRows.filter((link) => link.type === "internal").length === 0) {
@@ -3418,7 +3418,7 @@ async function runLocalAudit(auditId: string) {
           type: "internal-links-with-tracking-parameters",
           message: `${trackingInternalLinks.length} internal links contain tracking parameters`,
           recommendation: "Remove tracking parameters from internal links and keep analytics tagging for inbound campaigns.",
-          evidence: { samples: trackingInternalLinks.slice(0, 5).map((link) => link.href) },
+          evidence: { samples: trackingInternalLinks.map((link) => link.href) },
         });
       }
       if (!schemaCount) {
@@ -3439,7 +3439,7 @@ async function runLocalAudit(auditId: string) {
           type: "structured-data-invalid",
           message: `${schemaParseErrors.length} JSON-LD blocks are invalid`,
           recommendation: "Fix JSON-LD syntax so search engines can parse structured data.",
-          evidence: { errors: schemaParseErrors.slice(0, 5) },
+          evidence: { errors: schemaParseErrors },
         });
       }
       if (!ogTitle || !ogDescription) {
@@ -3492,7 +3492,7 @@ async function runLocalAudit(auditId: string) {
           type: "hreflang-invalid",
           message: `${invalidHreflangs.length} hreflang links are invalid`,
           recommendation: "Use valid hreflang codes and valid alternate URLs.",
-          evidence: { invalidHreflangs: invalidHreflangs.slice(0, 5) },
+          evidence: { invalidHreflangs },
         });
       }
       const malformedHreflangs = hreflangs.filter((item) => item.lang && item.lang.toLowerCase() !== "x-default" && !isValidLangCode(item.lang));
@@ -3504,7 +3504,7 @@ async function runLocalAudit(auditId: string) {
           type: "hreflang-code-invalid",
           message: `${malformedHreflangs.length} hreflang codes do not look valid`,
           recommendation: "Use valid language or language-region codes, plus x-default when needed.",
-          evidence: { samples: malformedHreflangs.slice(0, 5) },
+          evidence: { samples: malformedHreflangs },
         });
       }
       const duplicateHreflangCodes = [...new Set(hreflangCodes.filter((code, index) => hreflangCodes.indexOf(code) !== index))];
@@ -3539,7 +3539,7 @@ async function runLocalAudit(auditId: string) {
           type: "mixed-content-assets",
           message: `${mixedAssets.length} CSS/JS assets use HTTP on an HTTPS page`,
           recommendation: "Serve CSS and JavaScript over HTTPS.",
-          evidence: { count: mixedAssets.length, samples: mixedAssets.slice(0, 5) },
+          evidence: { count: mixedAssets.length, samples: mixedAssets },
         });
       }
       const renderBlockingScripts = assetRows.filter((asset) =>
@@ -3557,7 +3557,7 @@ async function runLocalAudit(auditId: string) {
           type: "render-blocking-javascript",
           message: `${renderBlockingScripts.length} head scripts can block rendering`,
           recommendation: "Defer, async-load, module-load, or move non-critical scripts out of the document head.",
-          evidence: { samples: renderBlockingScripts.slice(0, 5).map((asset) => asset.url) },
+          evidence: { samples: renderBlockingScripts.map((asset) => asset.url) },
         });
       }
       if (assetRows.length > 60) {
