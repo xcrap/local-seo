@@ -170,7 +170,7 @@ export function KeywordToolDefaultsPanel({
       <Button
         type="button"
         variant="ghost"
-        className="h-auto w-full justify-between gap-4 rounded-none px-4 py-3 text-left hover:bg-muted/40"
+        className="h-auto w-full justify-between gap-4 whitespace-normal rounded-none px-4 py-3 text-left hover:bg-muted/40"
         onClick={onToggle}
       >
         <span className="min-w-0">
