@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Bot, FileSearch, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from "@/components/ui";
-import { EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteDisplayName, sortScanRows } from "../shared";
+import { CountUp, EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteDisplayName, sortScanRows } from "../shared";
 import { cn } from "@/lib/utils";
 import { ScanTable } from "./scans";
 
@@ -285,7 +285,7 @@ function SiteCommandCenter({
       key: "scan",
       label: "Technical scan",
       to: latestScan ? `/scans/${latestScan.id}` : "/scans",
-      value: latestScan ? formatNumber(latestScan.issue_count) : "—",
+      value: latestScan ? <CountUp value={latestScan.issue_count} /> : "—",
       status: latestScan ? `${scanStatusLabel(latestScan.status)} · ${formatNumber(latestScan.pages_crawled)} pages` : "Needs scan",
       tone: latestScan ? (latestScan.status === "failed" ? "bad" : "good") : "warn",
       tip: latestScan
@@ -296,7 +296,7 @@ function SiteCommandCenter({
       key: "speed",
       label: "Page speed",
       to: latestScanSpeed?.measuredPageLoads && latestScan ? `/scans/${latestScan.id}?tab=speed` : "/scans",
-      value: latestScanSpeed?.measuredPageLoads ? formatMs(latestScanSpeed.averagePageLoadMs) : "—",
+      value: latestScanSpeed?.measuredPageLoads ? <CountUp value={latestScanSpeed.averagePageLoadMs} format={formatMs} /> : "—",
       status: latestScanSpeed?.measuredPageLoads
         ? `${formatNumber(latestScanSpeed.measuredPageLoads)} pages timed · ${formatNumber(latestScanSpeed.slowPages)} slow`
         : "Needs scan",
@@ -309,7 +309,7 @@ function SiteCommandCenter({
       key: "links",
       label: "Links",
       to: "/links",
-      value: latestScan ? formatNumber(latestScanSummary.linkTags || 0) : "—",
+      value: latestScan ? <CountUp value={latestScanSummary.linkTags || 0} /> : "—",
       status: latestScan ? `${formatNumber(brokenLinks)} broken` : "Needs scan",
       tone: latestScan ? (brokenLinks ? "bad" : "good") : "warn",
       tip: latestScan
@@ -320,7 +320,7 @@ function SiteCommandCenter({
       key: "organic",
       label: "Organic research",
       to: "/domain",
-      value: formatNumber(summary?.savedKeywordCount || 0),
+      value: <CountUp value={summary?.savedKeywordCount || 0} />,
       status: summary?.savedKeywordCount ? "keywords saved" : "ready for research",
       tone: summary?.savedKeywordCount ? "good" : "outline",
       tip: "Saved keywords in the local list. Local crawl pages feed the organic research screen.",
@@ -329,7 +329,7 @@ function SiteCommandCenter({
       key: "rank",
       label: "Rank tracking",
       to: "/rank",
-      value: formatNumber(summary?.trackerCount || 0),
+      value: <CountUp value={summary?.trackerCount || 0} />,
       status: `${formatNumber(summary?.serpRunCount || 0)} SERP runs`,
       tone: summary?.trackerCount ? "good" : "outline",
       tip: "Tracked keywords and saved SERP position checks for this site.",
@@ -338,7 +338,7 @@ function SiteCommandCenter({
       key: "gsc",
       label: "Search Console",
       to: "/gsc",
-      value: formatNumber(summary?.gscImportCount || 0),
+      value: <CountUp value={summary?.gscImportCount || 0} />,
       status: summary?.gscImportCount
         ? `latest import: ${formatNumber(latestGscImport?.rowCount || 0)} rows`
         : "ready for import",
@@ -351,7 +351,7 @@ function SiteCommandCenter({
       key: "ai",
       label: "AI lab",
       to: "/ai",
-      value: formatNumber(summary?.latestAiJobs?.length || 0),
+      value: <CountUp value={summary?.latestAiJobs?.length || 0} />,
       status: summary?.latestAiJobs?.length ? "jobs saved" : "ready for Codex",
       tone: summary?.latestAiJobs?.length ? "good" : "outline",
       tip: "Saved Codex jobs. Runs locally through the Codex CLI with medium reasoning.",
@@ -366,7 +366,7 @@ function SiteCommandCenter({
           <Link
             key={tile.key}
             to={tile.to}
-            className="group min-w-0 rounded-2xl border border-border/70 bg-card px-4 py-4 transition-colors duration-150 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="group lift min-w-0 rounded-2xl border border-border/70 bg-card px-4 py-4 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="eyebrow-muted truncate">{tile.label}</span>

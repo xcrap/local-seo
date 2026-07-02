@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useId, useMemo, useState, type ReactElement, type ReactNode } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Activity, BarChart3, Bot, Cable, CalendarDays, FileSearch, Gauge, Globe2, Info, Link2, Plus, Search, Sparkles, TableProperties, Target, Zap } from "lucide-react";
 import type { Site } from "../api";
@@ -381,7 +381,7 @@ export function Field({
     ? cloneElement(children as ReactElement<{ id?: string }>, { id: childId })
     : children;
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Label htmlFor={childId}>{label}</Label>
       {field}
     </div>
@@ -471,7 +471,7 @@ export function SiteDomainField({
 }) {
   const usingSelectedSite = cleanSiteDomain(value) === cleanSiteDomain(siteDomain);
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <Label className="inline-flex items-center gap-1.5">
           {label}
@@ -482,7 +482,7 @@ export function SiteDomainField({
             type="button"
             size="sm"
             variant="ghost"
-            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            className="h-auto p-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
             onClick={() => onChange(siteDomain)}
           >
             Use active site
@@ -567,6 +567,43 @@ export type StatItem = {
   detail?: ReactNode;
 };
 
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+export function useCountUp(target: number, duration = 1200) {
+  const [display, setDisplay] = useState(() => (prefersReducedMotion() ? target : 0));
+  const displayRef = useRef(display);
+  displayRef.current = display;
+  useEffect(() => {
+    if (!Number.isFinite(target) || prefersReducedMotion() || target === displayRef.current) {
+      setDisplay(target);
+      return;
+    }
+    const from = displayRef.current;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const x = Math.min(1, (now - start) / duration);
+      const eased = 1 - (1 - x) ** 3;
+      setDisplay(from + (target - from) * eased);
+      if (x < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target, duration]);
+  return display;
+}
+
+export function CountUp({ value, format }: { value: unknown; format?: (value: number) => string }) {
+  const number = Number(value);
+  const finite = Number.isFinite(number);
+  const display = useCountUp(finite ? number : 0);
+  if (!finite) return <>{formatNumber(value)}</>;
+  const rounded = Math.round(display);
+  return <>{format ? format(rounded) : formatNumber(rounded)}</>;
+}
+
 export function StatsBand({
   title,
   text,
@@ -586,13 +623,13 @@ export function StatsBand({
       ) : null}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(10.5rem,1fr))]">
         {items.map((item) => (
-          <div key={item.title} className="min-w-0 rounded-xl bg-muted/55 px-4 py-3.5">
+          <div key={item.title} className="lift min-w-0 rounded-xl border border-border/70 bg-muted px-4.5 py-4">
             <div className="flex items-center gap-1.5">
               <span className="eyebrow-muted truncate">{item.title}</span>
               {item.detail ? <InfoTip label={`About ${item.title}`}>{item.detail}</InfoTip> : null}
             </div>
             <div className="metric mt-1.5 text-[1.7rem] leading-none">
-              {formatNumber(item.value)}
+              <CountUp value={item.value} />
             </div>
           </div>
         ))}
@@ -826,7 +863,7 @@ export function MetricTile({ label, value, hint, tone = "default" }: MetricTileP
   const valueColor =
     tone === "good" ? "text-good" : tone === "warn" ? "text-warn" : tone === "bad" ? "text-bad" : "text-foreground";
   return (
-    <div className="min-w-0 rounded-xl bg-muted/55 px-4 py-3.5">
+    <div className="lift min-w-0 rounded-xl border border-border/70 bg-muted px-4.5 py-4">
       <div className="eyebrow-muted truncate">{label}</div>
       <div className={cn("metric mt-1.5 text-[1.7rem] leading-none", valueColor)}>{value}</div>
       {hint ? <div className="mt-1.5 truncate text-xs leading-5 text-muted-foreground">{hint}</div> : null}
@@ -1308,14 +1345,35 @@ export function ScoreDial({
   suffix?: string;
 }) {
   const value = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+  const animated = useCountUp(value);
+  const stroke = Math.max(7, Math.round(size * 0.065));
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
   return (
     <div
-      className={cn("score-ring relative flex shrink-0 items-center justify-center rounded-full", className)}
-      style={{ width: size, height: size, ["--ring-value" as any]: value, ["--ring-color" as any]: color || scoreTone(value) }}
+      className={cn("relative flex shrink-0 items-center justify-center", className)}
+      style={{ width: size, height: size }}
     >
+      <svg className="absolute inset-0" width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="presentation" aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+        {animated > 0 ? (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={color || scoreTone(value)}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - animated / 100)}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        ) : null}
+      </svg>
       <div className="flex flex-col items-center leading-none">
         <span className="metric flex items-baseline" style={{ fontSize: size * 0.3 }}>
-          {value}
+          {Math.round(animated)}
           {suffix ? <span style={{ fontSize: size * 0.14 }} className="ml-0.5 text-muted-foreground">{suffix}</span> : null}
         </span>
         {label ? <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</span> : null}

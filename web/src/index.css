@@ -4,9 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-heading: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, sans-serif;
+  --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -48,51 +48,56 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   --radius: 0.65rem;
 
-  /* Warm stone canvas, near-white surfaces, dark ink — clear layering */
-  --background: oklch(0.952 0.008 84);
-  --foreground: oklch(0.205 0.019 65);
-  --surface: oklch(0.978 0.006 84);
-  --card: oklch(0.997 0.002 84);
-  --card-foreground: oklch(0.205 0.019 65);
-  --popover: oklch(0.997 0.002 84);
-  --popover-foreground: oklch(0.205 0.019 65);
+  /* Graphite — near-black canvas, charcoal surfaces, light ink */
+  --background: #0d0f13;
+  --foreground: #f0f2f5;
+  --surface: #111419;
+  --card: #15181e;
+  --card-foreground: #f0f2f5;
+  --popover: #1b1f26;
+  --popover-foreground: #f0f2f5;
 
-  /* Deep pine — brand + primary actions */
-  --primary: oklch(0.44 0.072 168);
-  --primary-foreground: oklch(0.985 0.012 90);
+  /* Teal accent — brand + primary actions; dark ink on the bright fill */
+  --primary: #2fbfa3;
+  --primary-foreground: #05231d;
 
-  --secondary: oklch(0.93 0.009 82);
-  --secondary-foreground: oklch(0.3 0.019 65);
-  --muted: oklch(0.945 0.009 83);
-  --muted-foreground: oklch(0.46 0.019 66);
-  --accent: oklch(0.915 0.018 84);
-  --accent-foreground: oklch(0.28 0.02 65);
+  --secondary: #1b1f26;
+  --secondary-foreground: #e6e9ee;
+  --muted: #1b1f26;
+  --muted-foreground: #8b919d;
+  --accent: #20242b;
+  --accent-foreground: #f0f2f5;
 
-  --destructive: oklch(0.552 0.172 27);
-  --destructive-foreground: oklch(0.985 0.012 90);
+  --destructive: #e2685f;
+  --destructive-foreground: #ffffff;
 
-  --border: oklch(0.878 0.011 78);
-  --input: oklch(0.845 0.013 78);
-  --ring: oklch(0.44 0.072 168);
+  --border: #232830;
+  --input: #2b313b;
+  --ring: #2fbfa3;
 
-  /* Inverse ink surface — tooltips, keyboard hints */
-  --ink: oklch(0.285 0.02 65);
-  --ink-foreground: oklch(0.965 0.008 84);
+  /* Inverse ink surface — tooltips flip light on graphite */
+  --ink: #f0f2f5;
+  --ink-foreground: #15181e;
 
   /* Amber accent for highlights, tips, gauges */
-  --gold: oklch(0.788 0.098 73);
-  --gold-foreground: oklch(0.32 0.04 62);
+  --gold: #dca94f;
+  --gold-foreground: #2b2109;
 
-  /* Semantic severity — soft tint background + saturated ink text */
-  --good: oklch(0.46 0.083 162);
-  --good-soft: oklch(0.935 0.038 162);
-  --warn: oklch(0.5 0.09 68);
-  --warn-soft: oklch(0.93 0.056 76);
-  --bad: oklch(0.51 0.155 27);
-  --bad-soft: oklch(0.938 0.052 30);
+  /* Semantic severity — translucent tint background + saturated light text */
+  --good: #2fbfa3;
+  --good-soft: rgba(47, 191, 163, 0.13);
+  --warn: #dca94f;
+  --warn-soft: rgba(220, 169, 79, 0.14);
+  --bad: #e2685f;
+  --bad-soft: rgba(226, 104, 95, 0.14);
+
+  /* Depth + glow for the graphite motion system */
+  --accent-glow: rgba(47, 191, 163, 0.25);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 14px 36px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.4), 0 22px 48px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -109,11 +114,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(120% 90% at 100% 0%, color-mix(in oklch, var(--gold) 9%, transparent), transparent 55%),
-    radial-gradient(110% 80% at 0% 0%, color-mix(in oklch, var(--primary) 5%, transparent), transparent 48%),
-    var(--background);
-  background-attachment: fixed;
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -186,16 +187,32 @@ button:not(:disabled) {
   color: var(--foreground);
 }
 
-/* Score gauge ring */
-.score-ring {
-  --ring-value: 0;
-  --ring-color: var(--primary);
-  background:
-    radial-gradient(closest-side, var(--card) 78%, transparent 79% 100%),
-    conic-gradient(
-      var(--ring-color) calc(var(--ring-value) * 1%),
-      color-mix(in oklch, var(--muted-foreground) 22%, transparent) 0
-    );
+/* Screen enter — content rises in on navigation */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Hover lift for stat cards and metric tiles */
+.lift {
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
 }
 
 /* Fine paper grid — very restrained */

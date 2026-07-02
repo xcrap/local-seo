@@ -108,7 +108,7 @@ function LoginScreen({
 
 	return (
 		<div className="grain flex min-h-screen items-center justify-center px-5">
-			<Card className="relative z-10 w-full max-w-md">
+			<Card className="rise relative z-10 w-full max-w-md">
 				<CardHeader className="space-y-3">
 					<div className="flex items-center gap-3">
 						<div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -307,7 +307,10 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 		return (
 			<div className="grain min-h-screen">
 				<TopBar onLogout={logout} />
-				<main className="relative z-10 mx-auto w-full max-w-[1560px] px-5 pb-16 pt-7 lg:px-10 lg:pt-8">
+				<main
+					key={location.pathname}
+					className="rise relative z-10 mx-auto w-full max-w-[1560px] px-5 pb-16 pt-7 lg:px-10 lg:pt-8"
+				>
 					<Routes>
 						<Route
 							path="/"
@@ -359,7 +362,10 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 				onNavigate={(path) => navigate(path)}
 			/>
 			<main className="relative z-10 px-4 py-6 lg:ml-66 lg:px-9 lg:py-8">
-				<div className="mx-auto w-full max-w-[1640px]">
+				<div
+					key={location.pathname}
+					className="rise mx-auto w-full max-w-[1640px]"
+				>
 					<Routes key={activeSite?.id || "no-site"}>
 						<Route
 							path="/overview"

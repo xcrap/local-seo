@@ -221,7 +221,7 @@ function ScanRunPicker({
   if (!scans.length) return null;
   const selected = scans.find((scan) => scan.id === selectedScanId) || scans[0];
   return (
-    <div className="w-full space-y-2 lg:w-[440px]">
+    <div className="w-full space-y-3 lg:w-[440px]">
       <Label>{label}</Label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Select value={selected?.id || ""} onValueChange={onScanChange}>

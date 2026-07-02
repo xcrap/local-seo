@@ -1,12 +1,12 @@
 import { Toaster as Sonner, toast, type ToasterProps } from "sonner";
 
-// Flat, theme-matched toasts: no drop shadow, warm-paper surface, ink text,
-// and severity accents pulled from the app's own CSS tokens. Sonner already
-// disables its slide/fade transitions under prefers-reduced-motion.
+// Theme-matched toasts: graphite surface, light ink, and severity accents
+// pulled from the app's own CSS tokens. Sonner already disables its
+// slide/fade transitions under prefers-reduced-motion.
 function Toaster(props: ToasterProps) {
   return (
     <Sonner
-      theme="light"
+      theme="dark"
       position="bottom-right"
       gap={10}
       toastOptions={{

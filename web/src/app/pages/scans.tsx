@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, ExternalLink, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem, toast } from "@/components/ui";
-import { EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
+import { CountUp, EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
 import { cn } from "@/lib/utils";
 
 function scanStatusTone(status?: string): "good" | "warn" | "bad" {
@@ -332,6 +332,7 @@ export function ScansPage({ site }: { site: Site }) {
               type="button"
               variant="outline"
               size="sm"
+              className="text-muted-foreground hover:text-bad"
               onClick={() => setConfirmClearScans(true)}
               disabled={clearingScans}
             >
@@ -1089,39 +1090,39 @@ function ScanReportOverview({
   const tiles: MetricTileProps[] = [
     {
       label: "Pages crawled",
-      value: formatNumber(coverage.pages),
+      value: <CountUp value={coverage.pages} />,
       hint: `${formatNumber(coverage.indexablePages)} indexable · ${formatNumber(coverage.nonIndexablePages)} noindex · ${formatNumber(coverage.sitemapUrls)} in sitemap`,
     },
     {
       label: "Links checked",
-      value: formatNumber(coverage.checkedLinks),
-      tone: coverage.brokenLinks ? "bad" : "good",
+      value: <CountUp value={coverage.checkedLinks} />,
+      tone: coverage.brokenLinks ? "bad" : "default",
       hint: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.redirectedLinks)} redirecting`,
     },
     {
       label: "Images checked",
-      value: formatNumber(coverage.checkedImages),
-      tone: coverage.brokenImages ? "bad" : coverage.largeImages ? "warn" : "good",
+      value: <CountUp value={coverage.checkedImages} />,
+      tone: coverage.brokenImages ? "bad" : coverage.largeImages ? "warn" : "default",
       hint: `${formatNumber(coverage.brokenImages)} broken · ${formatNumber(coverage.largeImages || 0)} large`,
     },
     {
       label: "Avg response",
-      value: coverage.measuredPageLoads ? formatMs(coverage.averagePageLoadMs) : "—",
-      tone: coverage.verySlowPages ? "bad" : coverage.slowPages ? "warn" : coverage.measuredPageLoads ? "good" : "default",
+      value: coverage.measuredPageLoads ? <CountUp value={coverage.averagePageLoadMs} format={formatMs} /> : "—",
+      tone: coverage.verySlowPages ? "bad" : coverage.slowPages ? "warn" : "default",
       hint: coverage.measuredPageLoads
         ? `p95 ${formatMs(coverage.p95PageLoadMs)} · ${formatNumber(coverage.slowPages)} slow pages`
         : "No timing captured yet",
     },
     {
       label: "Metadata gaps",
-      value: formatNumber(metaIssues),
-      tone: metaIssues ? "warn" : "good",
+      value: <CountUp value={metaIssues} />,
+      tone: metaIssues ? "warn" : "default",
       hint: `${formatNumber(summary.titleLengthIssues || 0)} title · ${formatNumber(summary.descriptionLengthIssues || 0)} description length`,
     },
     {
       label: "Image alt/size",
-      value: formatNumber(imageAltIssues),
-      tone: imageAltIssues ? "warn" : "good",
+      value: <CountUp value={imageAltIssues} />,
+      tone: imageAltIssues ? "warn" : "default",
       hint: `${formatNumber(summary.imagesMissingLazyLoading || 0)} lazy · ${formatNumber(summary.cssImageResources || 0)} CSS images`,
     },
   ];
@@ -1146,9 +1147,9 @@ function ScanReportOverview({
             <div className="w-full space-y-3">
               <div className="flex items-start justify-center gap-7">
                 {[
-                  { key: "high", label: "High", count: severityCounts.high, color: severityCounts.high ? "var(--bad)" : undefined },
-                  { key: "medium", label: "Medium", count: severityCounts.medium, color: severityCounts.medium ? "var(--warn)" : undefined },
-                  { key: "low", label: "Low", count: severityCounts.low, color: undefined },
+                  { key: "high", label: "High", count: severityCounts.high, labelClass: "text-bad" },
+                  { key: "medium", label: "Medium", count: severityCounts.medium, labelClass: "text-warn" },
+                  { key: "low", label: "Low", count: severityCounts.low, labelClass: "text-muted-foreground" },
                 ].map((item) => (
                   <button
                     key={item.key}
@@ -1156,13 +1157,14 @@ function ScanReportOverview({
                     onClick={() => onSeveritySelect(item.key)}
                     className="group rounded-md text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   >
-                    <span className="metric block text-xl leading-none" style={{ color: item.color || "var(--foreground)" }}>
-                      {formatNumber(item.count)}
+                    <span className="metric block text-xl leading-none">
+                      <CountUp value={item.count} />
                     </span>
                     <span
                       className={cn(
-                        "mt-1 block text-[11px] font-medium uppercase tracking-[0.08em] transition-colors",
-                        activeSeverity === item.key ? "text-foreground" : "text-muted-foreground group-hover:text-foreground",
+                        "mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] underline-offset-4 transition-colors",
+                        item.labelClass,
+                        activeSeverity === item.key ? "underline decoration-2" : "group-hover:underline",
                       )}
                     >
                       {item.label}
@@ -1218,23 +1220,31 @@ function ScanActionBoard({
       {priorityGroups.length ? (
         <div className="divide-y divide-border/60">
           {priorityGroups.map((group, index) => (
-            <div key={group.key} className="flex flex-col gap-3 py-3.5 first:pt-0 last:pb-0 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="metric w-4 shrink-0 text-right text-sm text-muted-foreground">{index + 1}</span>
-                  <Badge variant={severityVariant(group.severity) as any}>{group.severity}</Badge>
-                  <span className="font-medium leading-snug">{group.message}</span>
+            <div key={group.key} className="flex flex-col gap-4 py-5 first:pt-0 last:pb-0 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 gap-4">
+                <div className="metric flex size-7.5 shrink-0 items-center justify-center rounded-[9px] border border-border/70 bg-muted text-[13px] text-muted-foreground">
+                  {index + 1}
                 </div>
-                <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{group.recommendation}</p>
-                <p className="text-xs text-muted-foreground">{issueCategoryLabel(group.category)} · {String(group.type || "").replaceAll("-", " ")}</p>
+                <div className="min-w-0">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
+                    <Badge variant={severityVariant(group.severity) as any} className="text-[10.5px] font-semibold uppercase tracking-[0.06em]">
+                      {group.severity}
+                    </Badge>
+                    <span className="text-[15px] font-semibold leading-snug tracking-[-0.01em]">{group.message}</span>
+                  </div>
+                  <p className="max-w-3xl text-[13px] leading-5 text-muted-foreground">{group.recommendation}</p>
+                  <p className="mt-1 text-[11.5px] text-muted-foreground/60">
+                    {issueCategoryLabel(group.category)} · {String(group.type || "").replaceAll("-", " ")}
+                  </p>
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-4 lg:flex-col lg:items-end">
+              <div className="flex shrink-0 items-center gap-4 lg:flex-col lg:items-end lg:gap-3">
                 <div className="text-right leading-none">
-                  <div className="metric text-2xl">{formatNumber(group.count)}</div>
-                  <div className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">affected</div>
+                  <div className="metric text-[26px] font-bold"><CountUp value={group.count} /></div>
+                  <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Affected</div>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
-                  <ListChecks /> Show issues
+                  Show issues
                 </Button>
               </div>
             </div>
