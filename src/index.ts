@@ -30,7 +30,7 @@ import {
   setGscSite,
 } from "./gsc";
 import { handleMcp, mcpToolList } from "./mcp";
-import { resolveSavedSiteScanUrl, siteScanUrlCandidates } from "./site-scan-url";
+import { resolveSavedSiteScanUrl, siteScanUrlCandidates, unreachableScanUrlError } from "./site-scan-url";
 import {
   addRankKeywords,
   backlinksOverview,
@@ -259,7 +259,8 @@ async function startSavedSiteScan(c: any) {
   if (!site.domain) return c.json({ error: "Set a site domain first." }, 400);
   const candidateUrls = siteScanUrlCandidates(site);
   const url = await resolveSavedSiteScanUrl(site);
-  const scan = startScan(site.id, url);
+  if (!url) return c.json({ error: unreachableScanUrlError(site.domain).message }, 400);
+  const scan = await startScan(site.id, url);
   return c.json({
     site: site.domain,
     scan,
@@ -497,7 +498,7 @@ const clearSiteScansHandler = safe((c: any) => c.json(clearScans(c.req.param("id
 const deleteSiteScanHandler = safe((c: any) => c.json(deleteScan(c.req.param("siteId"), c.req.param("id"))));
 const startScanHandler = safe(async (c: any) => {
   const body = await readJson(c);
-  return c.json(startScan(siteBodyId(body), String(body.url)));
+  return c.json(await startScan(siteBodyId(body), String(body.url)));
 });
 
 app.get("/api/sites/:id/scans", listSiteScansHandler);

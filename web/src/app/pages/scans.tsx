@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, ExternalLink, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem, toast } from "@/components/ui";
-import { CountUp, EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
+import { CountUp, EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, scoreVerdict, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
 import { cn } from "@/lib/utils";
 
 function scanStatusTone(status?: string): "good" | "warn" | "bad" {
@@ -307,10 +307,10 @@ export function ScansPage({ site }: { site: Site }) {
           {detail ? <ScanDetail scan={detail} /> : (
             <TabCard>
               <EmptyState
-                title={allScans.length ? "No scan report open for this site" : "No scan report yet"}
-                text={allScans.length ? "Every saved scan is still listed below. Open a row to view it, or run a new scan for this site." : "Start a local site scan to fill this report with crawl evidence."}
+                title={scans.length ? "No scan report open for this site" : "No scan report yet"}
+                text={scans.length ? "Every saved scan for this site is still listed below. Open a row to view it, or run a new scan." : "Start a local site scan to fill this report with crawl evidence."}
                 action={
-                  !allScans.length
+                  !scans.length
                     ? site.domain
                       ? (
                         <Button onClick={startSelectedSite} disabled={starting}>
@@ -325,7 +325,7 @@ export function ScansPage({ site }: { site: Site }) {
           )}
         </section>
         <ReportSection
-          title="All scan history"
+          title="Scan history"
           meta={`${formatNumber(scans.length)} for this site · ${formatNumber(allScans.length)} total in the local database`}
           action={scans.length ? (
             <Button
@@ -340,8 +340,8 @@ export function ScansPage({ site }: { site: Site }) {
             </Button>
           ) : undefined}
         >
-          {allScans.length ? (
-            <ScanTable rows={allScans} showSite activeSiteId={site.id} selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingScan(allScans.find((scan) => scan.id === id) || { id })} />
+          {scans.length ? (
+            <ScanTable rows={scans} activeSiteId={site.id} selectedId={detail?.id} onInspect={inspect} onDelete={(id) => setDeletingScan(scans.find((scan) => scan.id === id) || { id })} />
           ) : (
             <EmptyState
               title="No scans yet"
@@ -449,9 +449,9 @@ export function ScanTable({
               </div>
             ) : completed ? (
               <div className="flex shrink-0 items-baseline gap-2.5">
-                <span className="metric text-xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
-                <span className="whitespace-nowrap text-xs text-muted-foreground">
-                  {formatNumber(counts.high)} high · {formatNumber(counts.medium)} med · {formatNumber(counts.low)} low
+                <span className="metric w-12 shrink-0 text-right text-xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
+                <span className="w-56 shrink-0 truncate whitespace-nowrap text-xs text-muted-foreground">
+                  {formatNumber(counts.high)} high · {formatNumber(counts.medium)} med · {formatNumber(counts.low)} low · {formatNumber(row.pages_crawled || 0)} pages
                 </span>
               </div>
             ) : (
@@ -494,9 +494,11 @@ export function ScanTable({
           <div
             key={row.id}
             className={cn(
-              "flex items-center gap-3 rounded-xl px-3 py-3 transition-colors",
-              onInspect ? "hover:bg-accent/35" : "",
-              selectedId === row.id ? "bg-muted/55" : "",
+              "relative flex items-center gap-3 rounded-xl px-3 py-3 transition-colors",
+              onInspect ? "hover:bg-accent/60" : "",
+              selectedId === row.id
+                ? "bg-accent before:absolute before:bottom-2.5 before:left-0 before:top-2.5 before:w-[3px] before:rounded-full before:bg-primary"
+                : "",
             )}
           >
             {rowContent}
@@ -1128,15 +1130,22 @@ function ScanReportOverview({
   ];
 
   return (
-    <ReportSection title={isActive ? "Live scan progress" : "Scan health"}>
+    <ReportSection
+      title={isActive ? "Live scan progress" : "Scan health"}
+      description={
+        isActive
+          ? undefined
+          : "The percentage of crawled pages without high-severity issues. Medium and low findings are listed for review but never lower the score."
+      }
+    >
       <div className="grid gap-6 xl:grid-cols-[248px_minmax(0,1fr)]">
-        <div className="flex flex-col items-center gap-4 border-b border-border/60 pb-6 text-center xl:border-b-0 xl:border-r xl:pb-0 xl:pr-6">
+        <div className="flex flex-col items-center gap-4 pb-6 text-center xl:pb-0 xl:pr-6">
           <ScoreDial
             score={isCompleted || isFailed ? finalScore : progress}
             size={148}
             color={dialColor}
             suffix={isActive ? "%" : undefined}
-            label={isCompleted ? "health score" : isFailed ? "score" : "progress"}
+            label={isCompleted ? scoreVerdict(finalScore) : isFailed ? "score" : "progress"}
           />
           {isActive ? (
             <div className="w-full space-y-2">

@@ -94,10 +94,8 @@
   --bad: #e2685f;
   --bad-soft: rgba(226, 104, 95, 0.14);
 
-  /* Depth + glow for the graphite motion system */
+  /* Accent glow for primary actions — the only shadow in the flat system */
   --accent-glow: rgba(47, 191, 163, 0.25);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 14px 36px rgba(0, 0, 0, 0.35);
-  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.4), 0 22px 48px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -201,18 +199,6 @@ button:not(:disabled) {
 
 .rise {
   animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-/* Hover lift for stat cards and metric tiles */
-.lift {
-  transition:
-    transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1),
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-}
-.lift:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-card-hover);
 }
 
 /* Fine paper grid — very restrained */

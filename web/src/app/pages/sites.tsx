@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Bot, FileSearch, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from "@/components/ui";
-import { CountUp, EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteDisplayName, sortScanRows } from "../shared";
+import { CountUp, EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, crawlSpeedOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteDisplayName, sortScanRows } from "../shared";
 import { cn } from "@/lib/utils";
 import { ScanTable } from "./scans";
 
@@ -27,7 +27,9 @@ export function Overview({
   const [firstCrawlHost, setFirstCrawlHost] = useState<Site["crawl_host"]>("auto");
   const [firstScanError, setFirstScanError] = useState("");
   const navigate = useNavigate();
-  const scanLedgerRows = sortScanRows(summary?.allScans || summary?.latestScans || []);
+  const scanLedgerRows = sortScanRows(
+    (summary?.allScans || summary?.latestScans || []).filter((row: any) => row.site_id === site.id),
+  );
 
   useEffect(() => {
     api.dashboard(site.id).then(setSummary).catch(console.error);
@@ -225,7 +227,7 @@ export function Overview({
       <div className="grid gap-x-8 gap-y-8 2xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]">
         <ReportSection title="Scan history" meta={`${formatNumber(scanLedgerRows.length)} saved`}>
           {scanLedgerRows.length ? (
-            <ScanTable rows={scanLedgerRows} showSite activeSiteId={site.id} onInspect={openScanReport} />
+            <ScanTable rows={scanLedgerRows} activeSiteId={site.id} onInspect={openScanReport} />
           ) : (
             <EmptyState
               icon={FileSearch}
@@ -366,7 +368,7 @@ function SiteCommandCenter({
           <Link
             key={tile.key}
             to={tile.to}
-            className="group lift min-w-0 rounded-2xl border border-border/70 bg-card px-4 py-4 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="group min-w-0 rounded-2xl border border-border/70 bg-card px-4 py-4 transition-colors duration-150 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="eyebrow-muted truncate">{tile.label}</span>
@@ -445,6 +447,8 @@ export function SitesManager({
     language_code: string;
     crawl_protocol: Site["crawl_protocol"];
     crawl_host: Site["crawl_host"];
+    crawl_speed: Site["crawl_speed"];
+    crawl_max_pages: number;
   };
   const initialSiteForm: SiteForm = {
     name: "",
@@ -470,6 +474,8 @@ export function SitesManager({
     language_code: defaultKeywordLanguageCode,
     crawl_protocol: "auto",
     crawl_host: "auto",
+    crawl_speed: "auto",
+    crawl_max_pages: 0,
   });
   const [error, setError] = useState("");
   const [scanningSiteId, setScanningSiteId] = useState("");
@@ -577,6 +583,8 @@ export function SitesManager({
       language_code: site.language_code || defaultKeywordLanguageCode,
       crawl_protocol: site.crawl_protocol || "auto",
       crawl_host: site.crawl_host || "auto",
+      crawl_speed: site.crawl_speed || "auto",
+      crawl_max_pages: Number(site.crawl_max_pages || 0),
     });
   }
 
@@ -761,14 +769,14 @@ export function SitesManager({
         <div className="hidden items-baseline gap-3 md:flex">
           {scanned ? (
             <>
-              <span className="metric text-2xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
-              <span className="whitespace-nowrap text-xs text-muted-foreground">
+              <span className="metric w-14 shrink-0 text-right text-2xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
+              <span className="w-44 shrink-0 truncate whitespace-nowrap text-xs text-muted-foreground">
                 <span className={sev.high ? "font-medium text-bad" : ""}>{formatNumber(sev.high)}</span> high ·{" "}
                 <span className={sev.medium ? "font-medium text-warn" : ""}>{formatNumber(sev.medium)}</span> med · {formatNumber(scan.pages_crawled)} pages
               </span>
             </>
           ) : (
-            <span className="text-xs text-muted-foreground">Not scanned</span>
+            <span className="w-[15.25rem] text-right text-xs text-muted-foreground">Not scanned</span>
           )}
         </div>
 
@@ -881,6 +889,24 @@ export function SitesManager({
                   {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </Field>
+            <Field label="Crawl speed">
+              <Select value={editForm.crawl_speed} onValueChange={(value) => setEditForm({ ...editForm, crawl_speed: value as Site["crawl_speed"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {crawlSpeedOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Max pages per scan">
+              <Input
+                type="number"
+                min={10}
+                max={1000}
+                placeholder="App default"
+                value={editForm.crawl_max_pages || ""}
+                onChange={(e) => setEditForm({ ...editForm, crawl_max_pages: Number(e.target.value) || 0 })}
+              />
             </Field>
           </div>
           <ScanPlanPreview site={editScanPlan} />

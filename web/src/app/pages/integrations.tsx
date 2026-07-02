@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent, type SyntheticEvent } f
 import { BarChart3, Bot, ExternalLink, RefreshCw, Settings, Upload } from "lucide-react";
 import { api, type Site } from "../../api";
 import { Badge, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, toast } from "@/components/ui";
-import { DatePicker, EmptyState, Field, InfoTip, JobTable, PageHeader, ReportSection, StatsBand, StatusDot, StatusEvidenceTable, cleanSiteDomain, crawlHostOptions, crawlProtocolOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatDate, formatDateInput, formatNumber, formatPercent, formatPosition, languageOptions, marketOptions, preferredScanUrl, serpProviderStatus } from "../shared";
+import { DatePicker, EmptyState, Field, InfoTip, JobTable, PageHeader, ReportSection, StatsBand, StatusDot, StatusEvidenceTable, cleanSiteDomain, crawlHostOptions, crawlProtocolOptions, crawlSpeedOptions, defaultCrawlHostFromConfig, defaultCrawlMaxPagesFromConfig, defaultCrawlProtocolFromConfig, defaultCrawlSpeedFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatDate, formatDateInput, formatNumber, formatPercent, formatPosition, languageOptions, marketOptions, preferredScanUrl, serpProviderStatus } from "../shared";
 import { cn } from "@/lib/utils";
 
 export function GscPage({ site }: { site: Site }) {
@@ -726,6 +726,8 @@ export function SettingsPage() {
       default_language_code: defaultLanguageCodeFromConfig(data),
       default_crawl_protocol: defaultCrawlProtocolFromConfig(data),
       default_crawl_host: defaultCrawlHostFromConfig(data),
+      default_crawl_speed: defaultCrawlSpeedFromConfig(data),
+      default_crawl_max_pages: defaultCrawlMaxPagesFromConfig(data),
     });
   }
   useEffect(() => {
@@ -743,6 +745,8 @@ export function SettingsPage() {
         default_language_code: String(form.default_language_code || defaultKeywordLanguageCode),
         default_crawl_protocol: String(form.default_crawl_protocol || "auto"),
         default_crawl_host: String(form.default_crawl_host || "auto"),
+        default_crawl_speed: form.default_crawl_speed === "fast" ? "fast" : "polite",
+        default_crawl_max_pages: String(Math.max(10, Math.min(1000, Number(form.default_crawl_max_pages) || 100))),
       });
       await load();
       toast.success("App settings saved locally.");
@@ -797,6 +801,23 @@ export function SettingsPage() {
                     {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </Field>
+              <Field label="Default crawl speed">
+                <Select value={form.default_crawl_speed || "polite"} onValueChange={(value) => setForm({ ...form, default_crawl_speed: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {crawlSpeedOptions.filter((option) => option.value !== "auto").map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Default max pages per scan">
+                <Input
+                  type="number"
+                  min={10}
+                  max={1000}
+                  value={form.default_crawl_max_pages ?? 100}
+                  onChange={(event) => setForm({ ...form, default_crawl_max_pages: event.target.value })}
+                />
               </Field>
             </div>
             <div className="border-t pt-5">

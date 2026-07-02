@@ -50,6 +50,8 @@ db.exec(`
     language_code TEXT NOT NULL DEFAULT '${DEFAULT_KEYWORD_LANGUAGE_CODE}',
     crawl_protocol TEXT NOT NULL DEFAULT 'auto',
     crawl_host TEXT NOT NULL DEFAULT 'auto',
+    crawl_speed TEXT NOT NULL DEFAULT 'auto',
+    crawl_max_pages INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -312,6 +314,17 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_gsc_imports_site_created ON gsc_imports(site_id, created_at DESC);
 `);
+
+// Explicit migrations for databases created before these columns existed.
+const siteColumns = new Set(
+  (db.prepare("PRAGMA table_info(sites)").all() as { name: string }[]).map((column) => column.name),
+);
+if (!siteColumns.has("crawl_speed")) {
+  db.exec("ALTER TABLE sites ADD COLUMN crawl_speed TEXT NOT NULL DEFAULT 'auto'");
+}
+if (!siteColumns.has("crawl_max_pages")) {
+  db.exec("ALTER TABLE sites ADD COLUMN crawl_max_pages INTEGER NOT NULL DEFAULT 0");
+}
 
 export function all<T = Record<string, unknown>>(sql: string, params: any[] = []): T[] {
   return db.prepare(sql).all(...params) as T[];

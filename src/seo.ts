@@ -20,12 +20,16 @@ export type Site = {
   language_code: string;
   crawl_protocol: CrawlProtocol;
   crawl_host: CrawlHost;
+  crawl_speed: CrawlSpeed;
+  crawl_max_pages: number;
   created_at: string;
   updated_at: string;
 };
 
 export type CrawlProtocol = "auto" | "https" | "http" | "both";
 export type CrawlHost = "auto" | "root" | "www" | "both";
+// "auto" follows the app-wide default crawl speed.
+export type CrawlSpeed = "auto" | "polite" | "fast";
 
 type KeywordRow = {
   keyword: string;
@@ -69,6 +73,16 @@ function normalizeCrawlProtocol(value: unknown): CrawlProtocol {
 
 function normalizeCrawlHost(value: unknown): CrawlHost {
   return value === "root" || value === "www" || value === "both" ? value : "auto";
+}
+
+export function normalizeCrawlSpeed(value: unknown): CrawlSpeed {
+  return value === "polite" || value === "fast" ? value : "auto";
+}
+
+export function normalizeCrawlMaxPages(value: unknown) {
+  const pages = Math.round(Number(value));
+  if (!Number.isFinite(pages) || pages <= 0) return 0;
+  return Math.max(10, Math.min(1000, pages));
 }
 
 function defaultLocationCode() {
@@ -222,8 +236,12 @@ export function createSite(input: {
   languageCode?: string;
   crawlProtocol?: CrawlProtocol | string;
   crawlHost?: CrawlHost | string;
+  crawlSpeed?: CrawlSpeed | string;
+  crawlMaxPages?: number;
   crawl_protocol?: CrawlProtocol | string;
   crawl_host?: CrawlHost | string;
+  crawl_speed?: CrawlSpeed | string;
+  crawl_max_pages?: number;
 }) {
   const id = randomUUID();
   const domain = normalizeDomain(input.domain || "");
@@ -234,10 +252,12 @@ export function createSite(input: {
     input.crawlProtocol ?? input.crawl_protocol ?? getConfigValue("default_crawl_protocol"),
   );
   const crawlHost = normalizeCrawlHost(input.crawlHost ?? input.crawl_host ?? getConfigValue("default_crawl_host"));
+  const crawlSpeed = normalizeCrawlSpeed(input.crawlSpeed ?? input.crawl_speed);
+  const crawlMaxPages = normalizeCrawlMaxPages(input.crawlMaxPages ?? input.crawl_max_pages);
   run(
     `
-    INSERT INTO sites (id, name, domain, notes, location_code, language_code, crawl_protocol, crawl_host)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO sites (id, name, domain, notes, location_code, language_code, crawl_protocol, crawl_host, crawl_speed, crawl_max_pages)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       id,
@@ -248,6 +268,8 @@ export function createSite(input: {
       languageCode,
       crawlProtocol,
       crawlHost,
+      crawlSpeed,
+      crawlMaxPages,
     ],
   );
   return getSite(id)!;
@@ -259,11 +281,13 @@ export function updateSite(siteId: string, input: Partial<Site>) {
   const body = input as Partial<Site> & {
     crawlProtocol?: CrawlProtocol | string;
     crawlHost?: CrawlHost | string;
+    crawlSpeed?: CrawlSpeed | string;
+    crawlMaxPages?: number;
   };
   run(
     `
     UPDATE sites
-    SET name = ?, domain = ?, notes = ?, location_code = ?, language_code = ?, crawl_protocol = ?, crawl_host = ?, updated_at = CURRENT_TIMESTAMP
+    SET name = ?, domain = ?, notes = ?, location_code = ?, language_code = ?, crawl_protocol = ?, crawl_host = ?, crawl_speed = ?, crawl_max_pages = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
     `,
     [
@@ -274,6 +298,8 @@ export function updateSite(siteId: string, input: Partial<Site>) {
       input.language_code ?? existing.language_code,
       normalizeCrawlProtocol(body.crawl_protocol ?? body.crawlProtocol ?? existing.crawl_protocol),
       normalizeCrawlHost(body.crawl_host ?? body.crawlHost ?? existing.crawl_host),
+      normalizeCrawlSpeed(body.crawl_speed ?? body.crawlSpeed ?? existing.crawl_speed),
+      normalizeCrawlMaxPages(body.crawl_max_pages ?? body.crawlMaxPages ?? existing.crawl_max_pages),
       siteId,
     ],
   );

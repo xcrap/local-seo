@@ -19,6 +19,8 @@ const APP_PREFERENCE_KEYS = new Set([
   "default_language_code",
   "default_crawl_protocol",
   "default_crawl_host",
+  "default_crawl_speed",
+  "default_crawl_max_pages",
 ]);
 
 export function isAppPreferenceKey(key: string) {
@@ -69,6 +71,8 @@ export function listPublicConfig(): Record<string, string | boolean | number> {
     "default_language_code",
     "default_crawl_protocol",
     "default_crawl_host",
+    "default_crawl_speed",
+    "default_crawl_max_pages",
   ];
   const config: Record<string, string | boolean> = Object.fromEntries(
     keys.map((key) => {

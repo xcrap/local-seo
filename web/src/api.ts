@@ -7,6 +7,8 @@ export type Site = {
   language_code: string;
   crawl_protocol: "auto" | "https" | "http" | "both";
   crawl_host: "auto" | "root" | "www" | "both";
+  crawl_speed: "auto" | "polite" | "fast";
+  crawl_max_pages: number;
 };
 
 export type KeywordResult = {

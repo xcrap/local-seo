@@ -1,8 +1,10 @@
 import * as cheerio from "cheerio";
 import { XMLParser } from "fast-xml-parser";
 import { createHash, randomUUID } from "node:crypto";
+import { getConfigValue } from "./config";
 import { all, get, jsonParse, run } from "./db";
 import { fetchText } from "./http";
+import { localHostFirst, probeScanUrl, unreachableScanUrlError } from "./site-scan-url";
 
 function getSite(siteId: string) {
   return get<any>("SELECT * FROM sites WHERE id = ?", [siteId]);
@@ -57,9 +59,12 @@ export function clearScans(siteId: string) {
   return { deleted: Number(info.changes || 0) };
 }
 
-export function startScan(siteId: string, url: string) {
+export async function startScan(siteId: string, url: string) {
   const site = getSite(siteId);
   if (!site) throw new Error("Site not found.");
+  const startUrl = /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
+  const probe = await probeScanUrl(startUrl);
+  if (!probe) throw unreachableScanUrlError(startUrl);
   const scanId = randomUUID();
   run(
     "INSERT INTO scans (id, site_id, url, status, updated_at) VALUES (?, ?, ?, 'queued', CURRENT_TIMESTAMP)",
@@ -104,6 +109,21 @@ const scanLimits = {
   maxLinkInventory: 1600,
   maxImageInventory: 1200,
 };
+
+function scanLimitsFor(maxPages: number): typeof scanLimits {
+  const factor = Math.max(1, maxPages / scanLimits.maxPages);
+  return {
+    maxPages,
+    maxQueuedUrls: Math.round(scanLimits.maxQueuedUrls * factor),
+    maxLinksToCheck: Math.round(scanLimits.maxLinksToCheck * factor),
+    maxImagesToCheck: Math.round(scanLimits.maxImagesToCheck * factor),
+    maxAssetsToCheck: Math.round(scanLimits.maxAssetsToCheck * factor),
+    maxLinkInventory: Math.round(scanLimits.maxLinkInventory * factor),
+    maxImageInventory: Math.round(scanLimits.maxImageInventory * factor),
+  };
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function cleanText(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -441,6 +461,7 @@ function parseRobots(text: string) {
   const sitemaps: string[] = [];
   let disallowCount = 0;
   let blocksAll = false;
+  let crawlDelaySeconds = 0;
   // Track the user-agent group each directive belongs to. `Disallow: /` only
   // blocks our crawl when it applies to `*` (or all agents), so a targeted block
   // like `User-agent: GPTBot\nDisallow: /` must not flag the whole site.
@@ -474,9 +495,16 @@ function parseRobots(text: string) {
       }
     } else if (key === "allow") {
       sawDirectiveInGroup = true;
+    } else if (key === "crawl-delay") {
+      sawDirectiveInGroup = true;
+      const appliesToAll = currentAgents.length === 0 || currentAgents.includes("*");
+      const seconds = Number(value);
+      if (appliesToAll && Number.isFinite(seconds) && seconds > 0) {
+        crawlDelaySeconds = Math.max(crawlDelaySeconds, seconds);
+      }
     }
   }
-  return { sitemaps: [...new Set(sitemaps)], disallowCount, blocksAll };
+  return { sitemaps: [...new Set(sitemaps)], disallowCount, blocksAll, crawlDelaySeconds };
 }
 
 async function readRobots(origin: string) {
@@ -716,6 +744,18 @@ async function runLocalScan(scanId: string) {
   ]);
   const startUrl = /^https?:\/\//i.test(scan.url) ? scan.url : `https://${scan.url}`;
   const origin = new URL(startUrl).origin;
+  const site = getSite(scan.site_id);
+  const siteSpeed = site?.crawl_speed === "polite" || site?.crawl_speed === "fast" ? site.crawl_speed : "";
+  const defaultSpeed = getConfigValue("default_crawl_speed") === "fast" ? "fast" : "polite";
+  const crawlSpeed = siteSpeed || defaultSpeed;
+  const siteMaxPages = Math.round(Number(site?.crawl_max_pages || 0));
+  const defaultMaxPages = Math.round(Number(getConfigValue("default_crawl_max_pages") || 0));
+  const maxPages = Math.max(10, Math.min(1000, siteMaxPages > 0 ? siteMaxPages : defaultMaxPages > 0 ? defaultMaxPages : scanLimits.maxPages));
+  const limits = scanLimitsFor(maxPages);
+  // Pacing only matters against real remote hosts; localhost targets crawl at full speed.
+  const politeTarget = crawlSpeed === "polite" && !localHostFirst(new URL(startUrl).hostname);
+  let pageDelayMs = 400;
+  let consecutiveRateLimits = 0;
   const startKey = normalizedUrlKey(startUrl);
   const visited = new Set<string>();
   const queued = new Set<string>([startKey]);
@@ -760,7 +800,7 @@ async function runLocalScan(scanId: string) {
       linkInventory,
       robots,
       sitemap,
-      limits: scanLimits,
+      limits,
     });
     run(
       `
@@ -778,6 +818,10 @@ async function runLocalScan(scanId: string) {
 
   phase = "robots";
   robots = await readRobots(origin);
+  const robotsDelaySeconds = Number((robots as any).crawlDelaySeconds || 0);
+  if (politeTarget && robotsDelaySeconds > 0) {
+    pageDelayMs = Math.max(pageDelayMs, Math.min(robotsDelaySeconds * 1000, 10_000));
+  }
   sitemap = await readSitemaps(origin, robots.sitemaps || []);
   const sitemapUrlSet = new Set((sitemap.urls || []).map((url: string) => normalizedUrlKey(url)));
   for (const sitemapUrl of sitemap.urls || []) {
@@ -788,7 +832,7 @@ async function runLocalScan(scanId: string) {
       sameSiteUrl(absolute, startUrl) &&
       absoluteKey !== startKey &&
       !queued.has(absoluteKey) &&
-      queue.length + visited.size < scanLimits.maxQueuedUrls
+      queue.length + visited.size < limits.maxQueuedUrls
     ) {
       queued.add(absoluteKey);
       queue.push(absolute);
@@ -852,7 +896,7 @@ async function runLocalScan(scanId: string) {
       evidence: { sitemaps: sitemap.sitemaps },
     });
   }
-  if ((sitemap.urls || []).length > scanLimits.maxQueuedUrls) {
+  if ((sitemap.urls || []).length > limits.maxQueuedUrls) {
     pushScanIssue(issues, undefined, {
       url: `${origin}/sitemap.xml`,
       severity: "low",
@@ -860,13 +904,13 @@ async function runLocalScan(scanId: string) {
       type: "sitemap-larger-than-crawl-limit",
       message: `Sitemap has more URLs than this local scan will crawl (${(sitemap.urls || []).length})`,
       recommendation: "Raise the local crawl limit for a full-site run, or scan important sections separately.",
-      evidence: { sitemapUrls: (sitemap.urls || []).length, crawlLimit: scanLimits.maxQueuedUrls },
+      evidence: { sitemapUrls: (sitemap.urls || []).length, crawlLimit: limits.maxQueuedUrls },
     });
   }
   persistProgress();
 
   phase = "crawling";
-  while (queue.length > 0 && visited.size < scanLimits.maxPages) {
+  while (queue.length > 0 && visited.size < limits.maxPages) {
     const current = queue.shift()!;
     const currentKey = normalizedUrlKey(current);
     queued.delete(currentKey);
@@ -876,9 +920,18 @@ async function runLocalScan(scanId: string) {
     const currentDepth = depthByUrl.get(currentKey) ?? 0;
 
     try {
-      const startedAt = Date.now();
-      const response = await fetchText(current);
-      const loadMs = Date.now() - startedAt;
+      let startedAt = Date.now();
+      let response = await fetchText(current);
+      let loadMs = Date.now() - startedAt;
+      if (response.status === 429 || response.status === 503) {
+        // Back off once, honoring Retry-After, before recording the response.
+        const retrySeconds = Math.min(Math.max(Number(response.retryAfter) || 5, 1), 30);
+        await sleep(retrySeconds * 1000);
+        startedAt = Date.now();
+        response = await fetchText(current);
+        loadMs = Date.now() - startedAt;
+      }
+      consecutiveRateLimits = response.status === 429 || response.status === 503 ? consecutiveRateLimits + 1 : 0;
       const isHtml = /text\/html|application\/xhtml\+xml/i.test(response.contentType) || response.text.includes("<html");
       const $ = cheerio.load(response.text);
       const title = cleanText($("title").first().text());
@@ -928,7 +981,7 @@ async function runLocalScan(scanId: string) {
       const ogDescription = cleanText($('meta[property="og:description"]').attr("content") || "");
       const ogImageRaw = cleanText($('meta[property="og:image"]').attr("content") || "");
       const ogImage = ogImageRaw ? absoluteHttpUrl(ogImageRaw, response.url || current) || ogImageRaw : "";
-      if (/^https?:\/\//i.test(ogImage) && imagesToCheck.size < scanLimits.maxImagesToCheck && !imagesToCheck.has(ogImage)) {
+      if (/^https?:\/\//i.test(ogImage) && imagesToCheck.size < limits.maxImagesToCheck && !imagesToCheck.has(ogImage)) {
         imagesToCheck.set(ogImage, { url: ogImage, from: current, purpose: "og:image" });
       }
       const twitterCard = cleanText($('meta[name="twitter:card"]').attr("content") || "");
@@ -943,12 +996,12 @@ async function runLocalScan(scanId: string) {
       const assetRows: any[] = [];
 
       const addAsset = (url: string, type: "css" | "js", meta: Record<string, unknown> = {}) => {
-        if (assetsToCheck.size >= scanLimits.maxAssetsToCheck || assetsToCheck.has(url)) return;
+        if (assetsToCheck.size >= limits.maxAssetsToCheck || assetsToCheck.has(url)) return;
         assetsToCheck.set(url, { url, from: current, type, ...meta });
       };
 
       const addImageToCheck = (url: string, meta: Record<string, unknown> = {}) => {
-        if (imagesToCheck.size >= scanLimits.maxImagesToCheck || imagesToCheck.has(url)) return;
+        if (imagesToCheck.size >= limits.maxImagesToCheck || imagesToCheck.has(url)) return;
         imagesToCheck.set(url, { url, from: current, ...meta });
       };
 
@@ -1005,7 +1058,7 @@ async function runLocalScan(scanId: string) {
         if (row.classification === "content" && Number.parseInt(row.width || "0", 10) >= 600 && row.srcsetCount === 0) row.issues.push("missing srcset");
         if (row.src && isHttpOnHttpsPage(row.src, current)) row.issues.push("mixed content");
         imageRows.push(row);
-        if (imageInventory.length < scanLimits.maxImageInventory) imageInventory.push(row);
+        if (imageInventory.length < limits.maxImageInventory) imageInventory.push(row);
         for (const imageUrl of [absolute, ...srcsetUrls].filter(Boolean) as string[]) {
           addImageToCheck(imageUrl, { purpose: pictureSrcsetUrls.includes(imageUrl) ? "picture-source" : "img" });
         }
@@ -1045,8 +1098,8 @@ async function runLocalScan(scanId: string) {
           type: isInternal ? "internal" : "external",
         };
         linkRows.push(row);
-        if (linkInventory.length < scanLimits.maxLinkInventory) linkInventory.push(row);
-        if (linksToCheck.size < scanLimits.maxLinksToCheck && !linksToCheck.has(absolute)) {
+        if (linkInventory.length < limits.maxLinkInventory) linkInventory.push(row);
+        if (linksToCheck.size < limits.maxLinksToCheck && !linksToCheck.has(absolute)) {
           linksToCheck.set(absolute, { url: absolute, from: current, type: row.type, anchor: row.anchor, rel: row.rel });
         }
         const absoluteKey = normalizedUrlKey(absolute);
@@ -1062,7 +1115,7 @@ async function runLocalScan(scanId: string) {
           isInternal &&
           !visited.has(absoluteKey) &&
           !queued.has(absoluteKey) &&
-          queue.length + visited.size < scanLimits.maxQueuedUrls
+          queue.length + visited.size < limits.maxQueuedUrls
         ) {
           queued.add(absoluteKey);
           queue.push(absolute);
@@ -1955,6 +2008,14 @@ async function runLocalScan(scanId: string) {
       });
       persistProgress();
     }
+    if (consecutiveRateLimits >= 5) {
+      throw new Error(
+        "The site keeps rate limiting the crawl (HTTP 429/503). Wait a while and scan again, or keep the polite crawl speed.",
+      );
+    }
+    if (politeTarget && queue.length > 0 && visited.size < limits.maxPages) {
+      await sleep(pageDelayMs * (0.75 + Math.random() * 0.5));
+    }
   }
   for (const page of pages) {
     const pageKey = normalizedUrlKey(page.url);
@@ -1974,8 +2035,13 @@ async function runLocalScan(scanId: string) {
     page.sitemapListed = sitemapUrlSet.has(pageKey) || sitemapUrlSet.has(finalKey);
   }
 
+  const politeResourcePause = async (url: string) => {
+    if (politeTarget && sameSiteUrl(url, startUrl)) await sleep(120 + Math.random() * 180);
+  };
+
   phase = "checking links";
   for (const candidate of [...linksToCheck.values()]) {
+    await politeResourcePause(candidate.url);
     const result = await checkResource(candidate.url);
     const row = { ...candidate, ...result };
     checkedLinks.push(row);
@@ -2008,6 +2074,7 @@ async function runLocalScan(scanId: string) {
     for (const candidate of [...imagesToCheck.values()]) {
       if (checkedImageUrls.has(candidate.url)) continue;
       checkedImageUrls.add(candidate.url);
+      await politeResourcePause(candidate.url);
       const result = await checkResource(candidate.url);
       const row = { ...candidate, ...result };
       checkedImages.push(row);
@@ -2075,6 +2142,7 @@ async function runLocalScan(scanId: string) {
 
   phase = "checking assets";
   for (const candidate of [...assetsToCheck.values()]) {
+    await politeResourcePause(candidate.url);
     const result = await checkResource(candidate.url);
     const row = { ...candidate, ...result };
     checkedAssets.push(row);
@@ -2128,7 +2196,7 @@ async function runLocalScan(scanId: string) {
       const cssResponse = await fetchText(candidate.url, 8000).catch(() => null);
       if (cssResponse?.ok) {
         for (const imageUrl of cssUrlValues(cssResponse.text, cssResponse.url || candidate.url)) {
-          if (imagesToCheck.size >= scanLimits.maxImagesToCheck || imagesToCheck.has(imageUrl)) continue;
+          if (imagesToCheck.size >= limits.maxImagesToCheck || imagesToCheck.has(imageUrl)) continue;
           imagesToCheck.set(imageUrl, { url: imageUrl, from: candidate.from, purpose: "external-css-url", css: candidate.url });
         }
       }
@@ -2250,10 +2318,20 @@ async function runLocalScan(scanId: string) {
   }
 
   phase = "completed";
-  const high = issues.filter((issue) => issue.severity === "high").length;
-  const medium = issues.filter((issue) => issue.severity === "medium").length;
-  const low = issues.filter((issue) => issue.severity === "low").length;
-  const score = pages.length === 0 ? 0 : Math.max(0, Math.min(100, 100 - high * 8 - medium * 3 - low));
+  // Ahrefs-style health score: (pages without errors / pages) × 100, where
+  // only high-severity issues count as errors. Medium and low findings
+  // inform the report but never move the score — matching
+  // https://help.ahrefs.com/en/articles/1424673
+  const pageKeys = new Set(pages.map((page) => normalizedUrlKey(page.url)));
+  const highPages = new Set<string>();
+  for (const issue of issues) {
+    if (issue.severity !== "high") continue;
+    const key = normalizedUrlKey(issue.url || "");
+    if (pageKeys.has(key)) highPages.add(key);
+  }
+  const score = pages.length === 0
+    ? 0
+    : Math.max(0, Math.min(100, Math.round((100 * (pages.length - highPages.size)) / pages.length)));
   const result = scanResult({
     startUrl,
     origin,
@@ -2267,7 +2345,7 @@ async function runLocalScan(scanId: string) {
     linkInventory,
     robots,
     sitemap,
-    limits: scanLimits,
+    limits,
   });
   run(
     `

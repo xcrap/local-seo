@@ -15,7 +15,7 @@ export function localHostFirst(domain: string) {
   return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
 }
 
-async function probeScanUrl(url: string) {
+export async function probeScanUrl(url: string) {
   async function request(method: "HEAD" | "GET") {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3500);
@@ -87,6 +87,9 @@ export function siteScanUrlCandidates(site: SavedSiteScanUrlPlan) {
   return [...new Set(urls)];
 }
 
+// Returns "" when no candidate URL answers at all (DNS/connection/timeout).
+// Callers must refuse to start a scan in that case instead of crawling a
+// dead URL and saving an empty "completed" report.
 export async function resolveSavedSiteScanUrl(site: SavedSiteScanUrlPlan) {
   const candidates = siteScanUrlCandidates(site);
   let firstAnswered = "";
@@ -96,5 +99,11 @@ export async function resolveSavedSiteScanUrl(site: SavedSiteScanUrlPlan) {
     firstAnswered ||= probe.finalUrl || candidate;
     if (probe.status < 400) return probe.finalUrl || candidate;
   }
-  return firstAnswered || candidates[0] || "";
+  return firstAnswered;
+}
+
+export function unreachableScanUrlError(domain: string) {
+  return new Error(
+    `Could not reach ${domain} on any crawl URL. Check the website address (DNS, TLS, firewall) — the scan was not started.`,
+  );
 }

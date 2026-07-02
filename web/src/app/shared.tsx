@@ -78,6 +78,21 @@ export const crawlHostOptions = [
   { value: "both", label: "Try both" },
 ] as const;
 
+export const crawlSpeedOptions = [
+  { value: "auto", label: "App default" },
+  { value: "polite", label: "Polite — paced for live sites" },
+  { value: "fast", label: "Fast — local and staging" },
+] as const;
+
+export function defaultCrawlSpeedFromConfig(config?: any): "polite" | "fast" {
+  return config?.default_crawl_speed === "fast" ? "fast" : "polite";
+}
+
+export function defaultCrawlMaxPagesFromConfig(config?: any) {
+  const pages = Math.round(Number(config?.default_crawl_max_pages || 0));
+  return Number.isFinite(pages) && pages > 0 ? Math.max(10, Math.min(1000, pages)) : 100;
+}
+
 export type ScanUrlPlan = {
   domain?: string;
   crawl_protocol?: Site["crawl_protocol"];
@@ -330,11 +345,6 @@ export function siteDisplayName(site?: Site | null) {
   return site.name;
 }
 
-export function siteSelectLabel(site: Site) {
-  const domain = site.domain || "No website address";
-  return `${siteDisplayName(site)} · ${domain} · ${scanUrlShortDetail(site)}`;
-}
-
 export function ActiveSiteSelect({
   sites,
   activeSiteId,
@@ -356,10 +366,10 @@ export function ActiveSiteSelect({
       <SelectTrigger className="min-w-0 [&_[data-slot=select-value]]:truncate">
         <SelectValue placeholder="Choose active site" />
       </SelectTrigger>
-      <SelectContent className="max-w-[min(34rem,calc(100vw-2rem))]">
+      <SelectContent>
         {sites.map((site) => (
-          <SelectItem key={site.id} value={site.id} className="whitespace-normal leading-snug">
-            {siteSelectLabel(site)}
+          <SelectItem key={site.id} value={site.id}>
+            {siteDisplayName(site)}
           </SelectItem>
         ))}
       </SelectContent>
@@ -623,7 +633,7 @@ export function StatsBand({
       ) : null}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(10.5rem,1fr))]">
         {items.map((item) => (
-          <div key={item.title} className="lift min-w-0 rounded-xl border border-border/70 bg-muted px-4.5 py-4">
+          <div key={item.title} className="min-w-0 rounded-xl border border-border/70 bg-muted px-4.5 py-4 transition-colors hover:border-input">
             <div className="flex items-center gap-1.5">
               <span className="eyebrow-muted truncate">{item.title}</span>
               {item.detail ? <InfoTip label={`About ${item.title}`}>{item.detail}</InfoTip> : null}
@@ -863,7 +873,7 @@ export function MetricTile({ label, value, hint, tone = "default" }: MetricTileP
   const valueColor =
     tone === "good" ? "text-good" : tone === "warn" ? "text-warn" : tone === "bad" ? "text-bad" : "text-foreground";
   return (
-    <div className="lift min-w-0 rounded-xl border border-border/70 bg-muted px-4.5 py-4">
+    <div className="min-w-0 rounded-xl border border-border/70 bg-muted px-4.5 py-4 transition-colors hover:border-input">
       <div className="eyebrow-muted truncate">{label}</div>
       <div className={cn("metric mt-1.5 text-[1.7rem] leading-none", valueColor)}>{value}</div>
       {hint ? <div className="mt-1.5 truncate text-xs leading-5 text-muted-foreground">{hint}</div> : null}
@@ -1323,6 +1333,22 @@ export function JobTable({
   );
 }
 
+// One-word verdicts under the health dial — the label was redundant, so it
+// editorializes instead. Tiers match scoreTone's color breaks.
+export function scoreVerdict(score: number) {
+  const value = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+  if (value >= 100) return "Flawless";
+  if (value >= 90) return "Impressive";
+  if (value >= 80) return "Looking sharp";
+  if (value >= 70) return "Respectable";
+  if (value >= 60) return "Almost there";
+  if (value >= 45) return "Needs love";
+  if (value >= 30) return "Rough ride";
+  if (value >= 15) return "Ouch";
+  if (value >= 1) return "Jesus Christ";
+  return "Send help";
+}
+
 export function scoreTone(score: number) {
   if (score >= 85) return "var(--good)";
   if (score >= 60) return "var(--gold)";
@@ -1372,11 +1398,21 @@ export function ScoreDial({
         ) : null}
       </svg>
       <div className="flex flex-col items-center leading-none">
-        <span className="metric flex items-baseline" style={{ fontSize: size * 0.3 }}>
+        <span
+          className="metric flex items-baseline"
+          style={{ fontSize: size * 0.3, fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
+        >
           {Math.round(animated)}
           {suffix ? <span style={{ fontSize: size * 0.14 }} className="ml-0.5 text-muted-foreground">{suffix}</span> : null}
         </span>
-        {label ? <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</span> : null}
+        {label ? (
+          <span
+            className="mt-2 pl-[0.14em] text-center text-[9px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: color || scoreTone(value) }}
+          >
+            {label}
+          </span>
+        ) : null}
       </div>
     </div>
   );

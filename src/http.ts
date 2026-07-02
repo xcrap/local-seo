@@ -76,6 +76,7 @@ export async function fetchText(url: string, timeoutMs = 15000) {
       contentLength: Number(response.headers.get("content-length") || 0) || null,
       contentEncoding: response.headers.get("content-encoding") || "",
       xRobotsTag: response.headers.get("x-robots-tag") || "",
+      retryAfter: response.headers.get("retry-after") || "",
       text: await readCappedBody(response, contentType),
     };
   } finally {

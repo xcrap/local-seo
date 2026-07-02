@@ -28,7 +28,7 @@ import {
   updateSavedKeywordTags,
 } from "./seo";
 import { getGscPerformance, inspectGscUrls } from "./gsc";
-import { resolveSavedSiteScanUrl, siteScanUrlCandidates } from "./site-scan-url";
+import { resolveSavedSiteScanUrl, siteScanUrlCandidates, unreachableScanUrlError } from "./site-scan-url";
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -508,8 +508,8 @@ async function callTool(name: string, args: any) {
       if (!site) throw new Error("Site not found.");
       const candidateUrls = args.url ? [String(args.url)] : site.domain ? siteScanUrlCandidates(site) : [];
       const url = args.url || (site.domain ? await resolveSavedSiteScanUrl(site) : "");
-      if (!url) throw new Error("Set a site domain or pass a URL.");
-      const scan = startScan(site.id, url);
+      if (!url) throw site.domain ? unreachableScanUrlError(site.domain) : new Error("Set a site domain or pass a URL.");
+      const scan = await startScan(site.id, url);
       return {
         site: site.domain,
         scan,

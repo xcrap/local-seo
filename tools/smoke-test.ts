@@ -128,6 +128,21 @@ const emptyEvidenceServer = Bun.serve({
 });
 const emptyEvidenceUrl = `http://localhost:${emptyEvidenceServer.port}`;
 emptyEvidenceServer.stop(true);
+// Answers the pre-flight probe once, then dies — the crawl that follows gets
+// no pages, exercising the empty-evidence (0 pages, score 0) report path.
+let brokenFixtureRequests = 0;
+const brokenFixtureServer = Bun.serve({
+  port: 0,
+  fetch() {
+    brokenFixtureRequests += 1;
+    if (brokenFixtureRequests === 1) {
+      return new Response("<html><body>probe ok</body></html>", { headers: { "content-type": "text/html" } });
+    }
+    brokenFixtureServer.stop(true);
+    return new Response("gone", { status: 500 });
+  },
+});
+const brokenFixtureUrl = `http://localhost:${brokenFixtureServer.port}`;
 
 const server = Bun.spawn([process.execPath, "src/index.ts"], {
   cwd: rootDir,
@@ -426,21 +441,31 @@ try {
     method: "POST",
     body: JSON.stringify({ name: "Smoke", domain: "example.com" }),
   });
-  if (site.crawl_protocol !== "auto" || site.crawl_host !== "auto") {
+  if (site.crawl_protocol !== "auto" || site.crawl_host !== "auto" || site.crawl_speed !== "auto" || site.crawl_max_pages !== 0) {
     throw new Error("New sites should default to automatic crawl preferences.");
   }
   const preferenceSite = await request("/api/sites", {
     method: "POST",
-    body: JSON.stringify({ name: "Preference", domain: "example.org", crawlProtocol: "https", crawlHost: "www" }),
+    body: JSON.stringify({ name: "Preference", domain: "example.org", crawlProtocol: "https", crawlHost: "www", crawlSpeed: "fast", crawlMaxPages: 120 }),
   });
-  if (preferenceSite.crawl_protocol !== "https" || preferenceSite.crawl_host !== "www") {
+  if (
+    preferenceSite.crawl_protocol !== "https" ||
+    preferenceSite.crawl_host !== "www" ||
+    preferenceSite.crawl_speed !== "fast" ||
+    preferenceSite.crawl_max_pages !== 120
+  ) {
     throw new Error("Site crawl preferences were not saved on create.");
   }
   const updatedPreference = await request(`/api/sites/${preferenceSite.id}`, {
     method: "PUT",
-    body: JSON.stringify({ ...preferenceSite, crawl_protocol: "both", crawl_host: "both" }),
+    body: JSON.stringify({ ...preferenceSite, crawl_protocol: "both", crawl_host: "both", crawl_speed: "polite", crawl_max_pages: 400 }),
   });
-  if (updatedPreference.crawl_protocol !== "both" || updatedPreference.crawl_host !== "both") {
+  if (
+    updatedPreference.crawl_protocol !== "both" ||
+    updatedPreference.crawl_host !== "both" ||
+    updatedPreference.crawl_speed !== "polite" ||
+    updatedPreference.crawl_max_pages !== 400
+  ) {
     throw new Error("Site crawl preferences were not saved on update.");
   }
   await request("/api/config", {
@@ -450,6 +475,8 @@ try {
       default_language_code: "pt",
       default_crawl_protocol: "https",
       default_crawl_host: "www",
+      default_crawl_speed: "fast",
+      default_crawl_max_pages: "250",
     }),
   });
   const rejectedSecretConfig = await requestFailure("/api/config", {
@@ -474,6 +501,9 @@ try {
     throw new Error(`New site did not use app defaults: ${JSON.stringify(defaultsSite)}`);
   }
   const localConfigStatus = await request("/api/config");
+  if (localConfigStatus.default_crawl_speed !== "fast" || Number(localConfigStatus.default_crawl_max_pages) !== 250) {
+    throw new Error(`Crawl speed defaults should round-trip through app settings: ${JSON.stringify(localConfigStatus)}`);
+  }
   if (
     localConfigStatus.local_db_path !== path.resolve(serverDbPath) ||
     Number(localConfigStatus.local_site_count || 0) < 3
@@ -585,9 +615,23 @@ try {
   ) {
     throw new Error(`Organic top pages should fall back to real local scan rows without generated metrics: ${JSON.stringify(localOrganicPages)}`);
   }
+  let unreachableScanError = "";
+  try {
+    await request("/api/scans", {
+      method: "POST",
+      body: JSON.stringify({ siteId: localSite.id, url: emptyEvidenceUrl }),
+    });
+  } catch (error) {
+    unreachableScanError = error instanceof Error ? error.message : String(error);
+  }
+  if (!unreachableScanError.includes("Could not reach")) {
+    throw new Error(
+      `Scans against unreachable URLs must be refused before starting: ${unreachableScanError || "the scan was accepted"}`,
+    );
+  }
   const emptyEvidenceScan = await request("/api/scans", {
     method: "POST",
-    body: JSON.stringify({ siteId: localSite.id, url: emptyEvidenceUrl }),
+    body: JSON.stringify({ siteId: localSite.id, url: brokenFixtureUrl }),
   });
   const emptyEvidenceResult = await waitForScan(emptyEvidenceScan.id);
   const emptyEvidenceIssueTypes = new Set((emptyEvidenceResult.result?.issues || []).map((issue: any) => issue.type));
@@ -1158,7 +1202,7 @@ try {
   }
   const directScan = await request("/api/scans", {
     method: "POST",
-    body: JSON.stringify({ siteId: site.id, url: "https://example.com" }),
+    body: JSON.stringify({ siteId: site.id, url: fixtureUrl }),
   });
   await request(`/api/scans/${directScan.id}`);
   const siteScansAfterSecondScan = await request(`/api/sites/${site.id}/scans`);
@@ -1175,7 +1219,7 @@ try {
   });
   const otherHistoryScan = await request("/api/scans", {
     method: "POST",
-    body: JSON.stringify({ siteId: otherHistorySite.id, url: "https://other-history.example" }),
+    body: JSON.stringify({ siteId: otherHistorySite.id, url: fixtureUrl }),
   });
   const allSavedScans = await request("/api/scans");
   const allSavedScanIds = new Set((allSavedScans || []).map((row: any) => row.id));
@@ -1539,5 +1583,6 @@ try {
   server.kill();
   await server.exited.catch(() => undefined);
   fixtureServer.stop(true);
+  brokenFixtureServer.stop(true);
   await rm(tempDir, { recursive: true, force: true });
 }
