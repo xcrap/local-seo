@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import dotenv from "dotenv";
 import { DEFAULT_KEYWORD_LANGUAGE_CODE, DEFAULT_KEYWORD_LOCATION_CODE } from "./defaults";
 
@@ -13,14 +13,15 @@ if (runtimeDbPath) {
   process.env.DB_PATH = runtimeDbPath;
 }
 
-const DB_PATH = process.env.DB_PATH || "./data/local-seo.sqlite";
-export const dbPath = resolve(DB_PATH);
+const DB_FILE_NAME = "local-seo.sqlite";
+const DB_DIR = process.env.DB_PATH?.trim() || "./database";
+export const dbPath = resolve(DB_DIR, DB_FILE_NAME);
 
-if (!existsSync(dirname(DB_PATH))) {
-  mkdirSync(dirname(DB_PATH), { recursive: true });
+if (!existsSync(DB_DIR)) {
+  mkdirSync(DB_DIR, { recursive: true });
 }
 
-export const db = new Database(DB_PATH);
+export const db = new Database(dbPath);
 db.exec("PRAGMA journal_mode = WAL");
 db.exec("PRAGMA foreign_keys = ON");
 
@@ -369,5 +370,5 @@ export function recoverInterruptedJobs() {
 }
 
 if (import.meta.main) {
-  console.log(`Database initialized at ${DB_PATH}`);
+  console.log(`Database initialized at ${dbPath}`);
 }

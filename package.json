@@ -13,7 +13,7 @@
     "build": "bun run --filter web build",
     "start": "NODE_ENV=production bun run src/index.ts",
     "db:init": "bun run src/db.ts",
-    "db:reset": "rm -f data/local-seo.sqlite data/local-seo.sqlite-shm data/local-seo.sqlite-wal && bun run src/db.ts",
+    "db:reset": "rm -f database/local-seo.sqlite database/local-seo.sqlite-shm database/local-seo.sqlite-wal && bun run src/db.ts",
     "admin:create": "bun run tools/create-admin.ts",
     "admin:password": "bun run tools/set-password.ts",
     "lint": "biome lint .",

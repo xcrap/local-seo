@@ -8,6 +8,7 @@ type ConfigRow = {
 };
 
 const SECRET_KEYS = new Set([
+  "auth_session_secret",
   "google_client_secret",
   "mcp_token",
 ]);

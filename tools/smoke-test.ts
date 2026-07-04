@@ -6,7 +6,9 @@ import { randomUUID } from "node:crypto";
 
 const rootDir = new URL("..", import.meta.url).pathname;
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "local-seo-smoke-"));
-process.env.DB_PATH = path.join(tempDir, "scope.sqlite");
+const dbFileName = "local-seo.sqlite";
+const scopeDbDir = path.join(tempDir, "scope");
+process.env.DB_PATH = scopeDbDir;
 process.env.CODEX_MODEL = "";
 process.env.CODEX_REASONING_EFFORT = "";
 
@@ -30,7 +32,8 @@ if (sameSiteUrl("https://blog.example.com/", "https://example.com")) {
 }
 const port = 4131 + Math.floor(Math.random() * 400);
 const baseUrl = `http://localhost:${port}`;
-const serverDbPath = path.join(tempDir, "smoke.sqlite");
+const serverDbDir = path.join(tempDir, "smoke");
+const serverDbPath = path.join(serverDbDir, dbFileName);
 const cookieJar = new Map<string, string>();
 let fixtureUrl = "";
 const fixtureServer = Bun.serve({
@@ -211,9 +214,8 @@ const server = Bun.spawn([process.execPath, "src/index.ts"], {
   stderr: "pipe",
   env: {
     ...process.env,
-    PORT: String(port),
-    DB_PATH: serverDbPath,
-    AUTH_SESSION_SECRET: "smoke-test-secret-000000000000000000000",
+    API_URL: baseUrl,
+    DB_PATH: serverDbDir,
   },
 });
 
@@ -1044,7 +1046,7 @@ try {
   if (!deletedSite.deleted) {
     throw new Error("Site delete endpoint should hard-delete the SQLite row.");
   }
-  const smokeDb = new Database(path.join(tempDir, "smoke.sqlite"), { readonly: true });
+  const smokeDb = new Database(serverDbPath, { readonly: true });
   const deletionEvidence = smokeDb
     .query<
       { siteRows: number; keywordRows: number; generatedFallbackRows: number },

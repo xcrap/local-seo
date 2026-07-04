@@ -1,4 +1,5 @@
 import { createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
+import { getStoredConfigValue, setConfigValue } from "./config";
 import { get, run } from "./db";
 
 export type AdminUser = {
@@ -23,20 +24,23 @@ export type AuthConfig = {
 };
 
 export function getAuthConfig(): AuthConfig {
-  const sessionSecret =
-    (process.env.AUTH_SESSION_SECRET || "").trim() ||
-    "local-seo-dev-fallback-secret-change-this";
-  if (!(process.env.AUTH_SESSION_SECRET || "").trim()) {
-    console.warn("AUTH_SESSION_SECRET is not set. Using a development fallback.");
-  }
   return {
-    sessionSecret,
+    sessionSecret: getSessionSecret(),
     sessionCookieName: "local_seo_session",
     sessionTtlSeconds: Number(process.env.AUTH_SESSION_TTL_SECONDS || 60 * 60 * 24 * 7),
     rememberSessionTtlSeconds: Number(
       process.env.AUTH_SESSION_REMEMBER_TTL_SECONDS || 60 * 60 * 24 * 30,
     ),
   };
+}
+
+function getSessionSecret() {
+  const stored = getStoredConfigValue("auth_session_secret");
+  if (stored) return stored;
+
+  const sessionSecret = randomBytes(32).toString("hex");
+  setConfigValue("auth_session_secret", sessionSecret);
+  return sessionSecret;
 }
 
 export function publicUser(user: AdminUser): PublicAdminUser {

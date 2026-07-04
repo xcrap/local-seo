@@ -13,7 +13,7 @@
 - React 19 + Vite app in `web/`.
 - Shadcn-style local UI components in `web/src/components/ui`.
 - Tailwind CSS v4 in the web app.
-- SQLite database in `data/`.
+- SQLite database in `database/`.
 - Biome for JavaScript/TypeScript linting.
 - TypeScript strict unused checks are enabled through root and web `tsconfig.json`.
 
@@ -24,7 +24,7 @@
 - `web/src/App.tsx` owns shell/routing only; page-level UI belongs under `web/src/app/pages/`.
 - `web/src/app/shared.tsx` is for shared app UI helpers, formatters, scan/site helpers, and reusable report widgets.
 - `tools/` contains the smoke test and admin utility scripts.
-- `data/` contains local SQLite files. Do not delete local app data unless the user explicitly asks.
+- `database/` contains local SQLite files. Do not delete local app data unless the user explicitly asks.
 
 ## Workflow
 - Keep changes focused on the requested behavior.

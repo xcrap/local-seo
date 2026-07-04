@@ -87,8 +87,19 @@ dotenv.config({ path: ".env.local", override: true });
 
 const app = new Hono();
 const isDev = process.env.NODE_ENV !== "production";
-const port = Number(process.env.PORT || 3031);
+const appUrl = process.env.APP_URL?.trim() || "http://localhost:5173";
+const apiUrl = process.env.API_URL?.trim() || "http://localhost:3031";
+const port = Number(portFromUrl(apiUrl) || 3031);
+const appPort = Number(portFromUrl(appUrl) || 5173);
 const authConfig = getAuthConfig();
+const configuredAppOrigin = normalizeOrigin(appUrl);
+const devCorsOrigins = new Set(
+  [
+    configuredAppOrigin,
+    `http://localhost:${appPort}`,
+    `http://127.0.0.1:${appPort}`,
+  ].filter((origin): origin is string => Boolean(origin)),
+);
 
 async function readJson(c: any) {
   return (await c.req.json().catch(() => ({}))) as Record<string, any>;
@@ -121,10 +132,33 @@ function siteBodyId(body: Record<string, any>) {
 }
 
 function baseUrl(c: any) {
-  const configured = process.env.APP_URL?.trim();
-  if (configured) return configured;
+  if (appUrl) return appUrl;
   const url = new URL(c.req.url);
   return `${url.protocol}//${url.host}`;
+}
+
+function normalizeOrigin(value?: string) {
+  if (!value?.trim()) return "";
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+}
+
+function portFromUrl(value?: string) {
+  if (!value?.trim()) return "";
+  try {
+    return new URL(value).port;
+  } catch {
+    return "";
+  }
+}
+
+function allowedCorsOrigin(origin?: string) {
+  if (!isDev) return origin || "";
+  if (origin && devCorsOrigins.has(origin)) return origin;
+  return configuredAppOrigin || `http://localhost:${appPort}`;
 }
 
 function currentUser(c: any) {
@@ -149,7 +183,7 @@ function safe(handler: (c: any) => Promise<Response> | Response) {
 }
 
 app.use("/api/*", async (c, next) => {
-  c.header("Access-Control-Allow-Origin", isDev ? "http://localhost:5173" : c.req.header("origin") || "");
+  c.header("Access-Control-Allow-Origin", allowedCorsOrigin(c.req.header("origin")));
   c.header("Access-Control-Allow-Credentials", "true");
   c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");

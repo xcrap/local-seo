@@ -47,6 +47,8 @@ Open `http://localhost:5173` during development. The API runs on
 optional data-source credentials such as Google OAuth, a self-hosted OpenSERP
 or SearXNG URL, MCP token, or a custom Codex
 model. In-app Settings are for app preferences, not secret fields.
+If you override storage, `DB_PATH` points to the database directory; the app
+owns the `local-seo.sqlite` filename.
 
 The first load lets you create the local admin user in the browser. You can also
 create or update it from the terminal:
@@ -102,5 +104,5 @@ bun run test:smoke
 bun run --filter web build
 ```
 
-The smoke test runs against a temporary SQLite database. It does not write to
-the local app database at `data/local-seo.sqlite`.
+The smoke test runs against a temporary SQLite database directory. It does not
+write to the local app database at `database/local-seo.sqlite`.
