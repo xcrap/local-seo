@@ -133,20 +133,26 @@ function LoginScreen({
 							truth on this machine — no hosted auth service is required.
 						</p>
 					) : null}
-					<form className="space-y-4" onSubmit={submit}>
+					<form className="space-y-4" onSubmit={submit} autoComplete="on">
 						<Field label="Email">
 							<Input
+								id="auth-email"
+								name="username"
 								value={email}
 								onChange={(event) => setEmail(event.target.value)}
 								type="email"
+								autoComplete="username"
 								required
 							/>
 						</Field>
 						<Field label="Password">
 							<Input
+								id="auth-password"
+								name="password"
 								value={password}
 								onChange={(event) => setPassword(event.target.value)}
 								type="password"
+								autoComplete={setupRequired ? "new-password" : "current-password"}
 								required
 								minLength={10}
 							/>
