@@ -68,6 +68,8 @@ const fixtureServer = Bun.serve({
 	            <a href="/forbidden-html">Forbidden HTML without noindex</a>
 	            <a href="/cdn-cgi/l/email-protection#abc123">Protected email helper</a>
 	            <a href="/linked-image.jpg">Linked image should not be a page</a>
+	            <a href="/query-page/?cat=5">Parameterized category 5</a>
+	            <a href="/query-page/?cat=6">Parameterized category 6</a>
             <a href="https://example.com" target="_blank">External target</a>
           </body>
         </html>`,
@@ -139,6 +141,23 @@ const fixtureServer = Bun.serve({
           </body>
         </html>`,
         { status: 403, headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
+    if (url.pathname === "/query-page/") {
+      return new Response(
+        `<!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="description" content="This page verifies parameterized URLs collapse into a single crawled page.">
+            <title>Query Page</title>
+          </head>
+          <body>
+            <h1>Query Page</h1>
+            <p>Different query strings should not inflate the main page crawl count.</p>
+          </body>
+        </html>`,
+        { headers: { "content-type": "text/html; charset=utf-8" } },
       );
     }
     if (url.pathname === "/text-image.png") {
@@ -626,6 +645,7 @@ try {
   const fixtureSummary = fixtureScan.result?.summary || {};
   const fixtureIssues = Array.isArray(fixtureScan.result?.issues) ? fixtureScan.result.issues : [];
   const fixtureLinkHrefs = new Set((fixtureScan.result?.linkInventory || []).map((link: any) => link.href));
+  const fixtureParameterUrls = Array.isArray(fixtureScan.result?.parameterUrls) ? fixtureScan.result.parameterUrls : [];
   if (!fixtureLinkHrefs.has(`${fixtureUrl}/base/base-target`)) {
     throw new Error("Fixture scan should resolve relative links against the document base URL.");
   }
@@ -640,6 +660,21 @@ try {
   }
   if (fixturePages.some((page: any) => page.url === `${fixtureUrl}/linked-image.jpg`)) {
     throw new Error("Fixture scan must not count linked images as crawl pages.");
+  }
+  if (!fixtureLinkHrefs.has(`${fixtureUrl}/query-page/?cat=5`) || !fixtureLinkHrefs.has(`${fixtureUrl}/query-page/?cat=6`)) {
+    throw new Error("Fixture scan should keep parameterized URLs in link evidence.");
+  }
+  if (!fixtureParameterUrls.some((row: any) => row.url === `${fixtureUrl}/query-page/?cat=5` && row.crawlUrl === `${fixtureUrl}/query-page/`)) {
+    throw new Error("Fixture scan should store parameterized URL evidence with the clean crawl target.");
+  }
+  if (!fixturePages.some((page: any) => page.url === `${fixtureUrl}/query-page/`)) {
+    throw new Error("Fixture scan should crawl the clean page target for parameterized links.");
+  }
+  if (fixturePages.some((page: any) => String(page.url).includes("?cat="))) {
+    throw new Error("Fixture scan must not count query variants as separate pages.");
+  }
+  if (fixtureSummary.parameterUrls < 2 || fixtureSummary.parameterUrlTargets < 1) {
+    throw new Error(`Fixture scan should summarize parameterized URL variants: ${JSON.stringify(fixtureSummary)}`);
   }
   if (!fixtureIssues.some((issue: any) => issue.url === `${fixtureUrl}/forbidden-html` && issue.type === "page-http-error")) {
     throw new Error("Fixture scan should preserve HTTP error evidence for forbidden HTML pages.");

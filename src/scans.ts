@@ -197,6 +197,25 @@ function normalizedUrlKey(value: string) {
   }
 }
 
+function hasQueryParams(value: string) {
+  try {
+    return new URL(value).searchParams.size > 0;
+  } catch {
+    return value.includes("?");
+  }
+}
+
+function withoutQueryUrl(value: string) {
+  try {
+    const url = new URL(value);
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 function isHttpOnHttpsPage(value: string, pageUrl: string) {
   try {
     return new URL(pageUrl).protocol === "https:" && new URL(value).protocol === "http:";
@@ -221,6 +240,18 @@ function isIgnoredCrawlUrl(value: string) {
   } catch {
     return false;
   }
+}
+
+function pageCrawlTarget(value: string, startUrl: string) {
+  if (!isLikelyPageUrl(value) || isIgnoredCrawlUrl(value)) return null;
+  const parameterized = hasQueryParams(value);
+  const exactStartUrl = normalizedUrlKey(value) === normalizedUrlKey(startUrl);
+  const url = parameterized && !exactStartUrl ? withoutQueryUrl(value) : value;
+  return {
+    url,
+    key: normalizedUrlKey(url),
+    parameterized,
+  };
 }
 
 function parseSrcsetUrls(value: string, baseUrl: string) {
@@ -624,6 +655,7 @@ function scanSummary(
   checkedAssets: any[],
   imageInventory: any[],
   linkInventory: any[],
+  parameterUrls: any[],
   phase: string,
 ) {
   const bySeverity = severityCounts(issues);
@@ -683,6 +715,8 @@ function scanSummary(
     linkTags: linkInventory.length,
     internalLinks: linkInventory.filter((link) => link.type === "internal").length,
     externalLinks: linkInventory.filter((link) => link.type === "external").length,
+    parameterUrls: parameterUrls.length,
+    parameterUrlTargets: new Set(parameterUrls.map((row) => row.crawlUrl || row.path || row.url)).size,
     emptyAnchorLinks: issues.filter((issue) => issue.type === "empty-anchor-text").length,
     internalNofollowLinks: issues.filter((issue) => issue.type === "internal-nofollow").length,
     imageTags: imageInventory.length,
@@ -721,6 +755,7 @@ function scanResult(input: {
   checkedAssets: any[];
   imageInventory: any[];
   linkInventory: any[];
+  parameterUrls: any[];
   robots: any;
   sitemap: any;
   limits: typeof scanLimits;
@@ -739,6 +774,7 @@ function scanResult(input: {
       input.checkedAssets,
       input.imageInventory,
       input.linkInventory,
+      input.parameterUrls,
       input.phase,
     ),
     robots: input.robots,
@@ -751,6 +787,7 @@ function scanResult(input: {
     images: input.checkedImages,
     imageInventory: input.imageInventory,
     assets: input.checkedAssets,
+    parameterUrls: input.parameterUrls,
   };
 }
 
@@ -788,6 +825,8 @@ async function runLocalScan(scanId: string) {
   const checkedAssets: any[] = [];
   const imageInventory: any[] = [];
   const linkInventory: any[] = [];
+  const parameterUrls: any[] = [];
+  const parameterUrlKeys = new Set<string>();
   const linksToCheck = new Map<string, any>();
   const imagesToCheck = new Map<string, any>();
   const assetsToCheck = new Map<string, any>();
@@ -804,6 +843,26 @@ async function runLocalScan(scanId: string) {
     return next;
   };
 
+  const addParameterUrl = (url: string, source: string, from?: string, crawlUrl?: string) => {
+    if (!hasQueryParams(url)) return;
+    const key = normalizedUrlKey(url);
+    if (parameterUrlKeys.has(key)) return;
+    parameterUrlKeys.add(key);
+    try {
+      const parsed = new URL(url);
+      parameterUrls.push({
+        url,
+        from,
+        source,
+        path: `${parsed.origin}${parsed.pathname}`,
+        query: parsed.search.replace(/^\?/, ""),
+        crawlUrl: crawlUrl || withoutQueryUrl(url),
+      });
+    } catch {
+      parameterUrls.push({ url, from, source, crawlUrl: crawlUrl || withoutQueryUrl(url) });
+    }
+  };
+
   const persistProgress = (status = "running") => {
     const result = scanResult({
       startUrl,
@@ -816,6 +875,7 @@ async function runLocalScan(scanId: string) {
       checkedAssets,
       imageInventory,
       linkInventory,
+      parameterUrls,
       robots,
       sitemap,
       limits,
@@ -841,22 +901,26 @@ async function runLocalScan(scanId: string) {
     pageDelayMs = Math.max(pageDelayMs, Math.min(robotsDelaySeconds * 1000, 10_000));
   }
   sitemap = await readSitemaps(origin, robots.sitemaps || []);
-  const sitemapUrlSet = new Set((sitemap.urls || []).map((url: string) => normalizedUrlKey(url)));
+  const sitemapUrlSet = new Set((sitemap.urls || []).map((url: string) => {
+    const absolute = absoluteHttpUrl(String(url), origin);
+    return absolute ? pageCrawlTarget(absolute, startUrl)?.key || normalizedUrlKey(absolute) : normalizedUrlKey(url);
+  }));
   for (const sitemapUrl of sitemap.urls || []) {
     const absolute = absoluteHttpUrl(String(sitemapUrl), origin);
-    const absoluteKey = absolute ? normalizedUrlKey(absolute) : "";
+    const target = absolute ? pageCrawlTarget(absolute, startUrl) : null;
+    if (absolute && target?.parameterized) addParameterUrl(absolute, "sitemap", undefined, target.url);
     if (
       absolute &&
       sameSiteUrl(absolute, startUrl) &&
-      isLikelyPageUrl(absolute) &&
-      absoluteKey !== startKey &&
-      !queued.has(absoluteKey) &&
+      target &&
+      target.key !== startKey &&
+      !queued.has(target.key) &&
       queue.length + visited.size < limits.maxQueuedUrls
     ) {
-      queued.add(absoluteKey);
-      queue.push(absolute);
-      depthByUrl.set(absoluteKey, 0);
-      discoveryByUrl.set(absoluteKey, "sitemap");
+      queued.add(target.key);
+      queue.push(target.url);
+      depthByUrl.set(target.key, 0);
+      discoveryByUrl.set(target.key, "sitemap");
     }
   }
   if (!robots.exists) {
@@ -1126,24 +1190,24 @@ async function runLocalScan(scanId: string) {
         if (linksToCheck.size < limits.maxLinksToCheck && !linksToCheck.has(absolute)) {
           linksToCheck.set(absolute, { url: absolute, from: current, type: row.type, anchor: row.anchor, rel: row.rel });
         }
-        const absoluteKey = normalizedUrlKey(absolute);
-        if (isInternal) {
-          internalInlinks.set(absoluteKey, (internalInlinks.get(absoluteKey) || 0) + 1);
+        const target = isInternal ? pageCrawlTarget(absolute, startUrl) : null;
+        if (target?.parameterized) addParameterUrl(absolute, "internal-link", current, target.url);
+        if (target) {
+          internalInlinks.set(target.key, (internalInlinks.get(target.key) || 0) + 1);
           const nextDepth = currentDepth + 1;
-          if (!depthByUrl.has(absoluteKey) || nextDepth < Number(depthByUrl.get(absoluteKey))) {
-            depthByUrl.set(absoluteKey, nextDepth);
+          if (!depthByUrl.has(target.key) || nextDepth < Number(depthByUrl.get(target.key))) {
+            depthByUrl.set(target.key, nextDepth);
           }
-          if (!discoveryByUrl.has(absoluteKey)) discoveryByUrl.set(absoluteKey, "internal-link");
+          if (!discoveryByUrl.has(target.key)) discoveryByUrl.set(target.key, "internal-link");
         }
         if (
-          isInternal &&
-          isLikelyPageUrl(absolute) &&
-          !visited.has(absoluteKey) &&
-          !queued.has(absoluteKey) &&
+          target &&
+          !visited.has(target.key) &&
+          !queued.has(target.key) &&
           queue.length + visited.size < limits.maxQueuedUrls
         ) {
-          queued.add(absoluteKey);
-          queue.push(absolute);
+          queued.add(target.key);
+          queue.push(target.url);
         }
       });
 
@@ -2368,6 +2432,7 @@ async function runLocalScan(scanId: string) {
     checkedAssets,
     imageInventory,
     linkInventory,
+    parameterUrls,
     robots,
     sitemap,
     limits,

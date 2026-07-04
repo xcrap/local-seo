@@ -856,6 +856,7 @@ function ScanCrawlEvidence({
     { metric: "Orphan pages", count: coverage.orphanPages, detail: "Sitemap-discovered pages with no internal inlinks", problem: true },
     { metric: "Deep pages", count: coverage.deepPages, detail: "Pages at crawl depth 4 or deeper", problem: true },
     { metric: "Link tags found", count: coverage.linkTags, detail: `${formatNumber(coverage.checkedLinks)} unique link URLs checked` },
+    { metric: "Parameterized URLs", count: coverage.parameterUrls, detail: `${formatNumber(coverage.parameterUrlTargets)} clean page targets. Query variants are checked as links, not counted as separate pages.` },
     { metric: "Image tags found", count: coverage.imageTags, detail: `${formatNumber(coverage.checkedImages)} image URLs checked` },
     { metric: "CSS/JS refs found", count: coverage.assetTags, detail: `${formatNumber(coverage.checkedAssets)} CSS/JS assets checked` },
   ];

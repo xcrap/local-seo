@@ -996,6 +996,7 @@ export function scanCoverageMetrics(scan: any, result: any = {}, summary: any = 
   const images = Array.isArray(result.images) ? result.images : [];
   const imageInventory = Array.isArray(result.imageInventory) ? result.imageInventory : [];
   const assets = Array.isArray(result.assets) ? result.assets : [];
+  const parameterUrls = Array.isArray(result.parameterUrls) ? result.parameterUrls : [];
   const sitemapUrls = Array.isArray(result.sitemap?.urls) ? result.sitemap.urls : [];
   const loadTimes = pages
     .map((page: any) => Number(page.loadMs))
@@ -1032,6 +1033,8 @@ export function scanCoverageMetrics(scan: any, result: any = {}, summary: any = 
     orphanPages: maxCount(summary.orphanPages, pages.filter((page: any) => Number(page.depth || 0) > 0 && Number(page.internalInlinks || 0) === 0).length),
     deepPages: maxCount(summary.deepPages, pages.filter((page: any) => Number(page.depth || 0) >= 4).length),
     linkTags: maxCount(summary.linkTags, linkInventory.length, pages.reduce((total: number, page: any) => total + Number(page.internalLinks || 0) + Number(page.externalLinks || 0), 0)),
+    parameterUrls: maxCount(summary.parameterUrls, parameterUrls.length),
+    parameterUrlTargets: maxCount(summary.parameterUrlTargets, new Set(parameterUrls.map((row: any) => row.crawlUrl || row.path || row.url)).size),
     imageTags: maxCount(summary.imageTags, imageInventory.length, pages.reduce((total: number, page: any) => total + Number(page.images || 0), 0)),
     assetTags: maxCount(summary.assetTags, pages.reduce((total: number, page: any) => total + Number(page.assets || 0), 0), checkedAssets),
     checkedLinks,
