@@ -1,5 +1,5 @@
 import { useEffect, useState, type SyntheticEvent, type ReactNode } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, ExternalLink, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem, toast } from "@/components/ui";
@@ -12,8 +12,9 @@ function scanStatusTone(status?: string): "good" | "warn" | "bad" {
   return "warn";
 }
 
-export function ScanReportRoute() {
+export function ScanReportRoute({ activeSiteId }: { activeSiteId?: string }) {
   const { scanId } = useParams();
+  const navigate = useNavigate();
   const [scan, setReportScan] = useState<any>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,10 @@ export function ScanReportRoute() {
       try {
         const row = await api.scan(scanId);
         if (!cancelled) {
+          if (row?.site_id && activeSiteId && row.site_id !== activeSiteId) {
+            navigate("/scans", { replace: true });
+            return;
+          }
           setReportScan(row);
           if (!row) {
             clearSelectedScanId();
@@ -58,7 +63,7 @@ export function ScanReportRoute() {
       cancelled = true;
       if (interval) window.clearInterval(interval);
     };
-  }, [scanId]);
+  }, [scanId, activeSiteId, navigate]);
 
   return (
     <>
@@ -151,6 +156,7 @@ export function ScansPage({ site }: { site: Site }) {
       try {
         const nextScan = await api.scan(detail.id);
         if (cancelled || !nextScan) return;
+        if (nextScan.site_id && nextScan.site_id !== site.id) return;
         setDetail(nextScan);
         setScans((rows) => upsertScanRow(rows, nextScan));
         setAllScans((rows) => upsertScanRow(rows, nextScan));
@@ -166,7 +172,7 @@ export function ScansPage({ site }: { site: Site }) {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [detail?.id, detail?.status]);
+  }, [detail?.id, detail?.status, site.id]);
   async function start(event: SyntheticEvent) {
     event.preventDefault();
     setError("");
@@ -1973,4 +1979,3 @@ function ScanLinkInventoryTable({ rows }: { rows: any[] }) {
     </Table>
   );
 }
-

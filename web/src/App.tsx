@@ -1,6 +1,7 @@
 import {
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 	type SyntheticEvent,
 	type ReactNode,
@@ -195,6 +196,7 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 	const [activeSiteId, setActiveSiteId] = useState(
 		localStorage.getItem(activeSiteStorageKey) || "",
 	);
+	const activeSiteIdRef = useRef(activeSiteId);
 	const [sitesLoading, setSitesLoading] = useState(true);
 	const [sitesError, setSitesError] = useState("");
 	const [shellScanning, setShellScanning] = useState(false);
@@ -205,6 +207,13 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 		[sites, activeSiteId],
 	);
 
+	function storeActiveSiteId(id: string) {
+		activeSiteIdRef.current = id;
+		setActiveSiteId(id);
+		if (id) localStorage.setItem(activeSiteStorageKey, id);
+		else localStorage.removeItem(activeSiteStorageKey);
+	}
+
 	async function loadSites() {
 		if (!sites.length) setSitesLoading(true);
 		setSitesError("");
@@ -212,14 +221,15 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 			const rows = await api.sites();
 			setSites(rows);
 			if (rows.length === 0) {
-				setActiveSiteId("");
-				localStorage.removeItem(activeSiteStorageKey);
+				storeActiveSiteId("");
 				return;
 			}
-			if (rows.length > 0 && !rows.some((site) => site.id === activeSiteId)) {
+			if (
+				rows.length > 0 &&
+				!rows.some((site) => site.id === activeSiteIdRef.current)
+			) {
 				const nextActive = rows[0];
-				setActiveSiteId(nextActive.id);
-				localStorage.setItem(activeSiteStorageKey, nextActive.id);
+				storeActiveSiteId(nextActive.id);
 			}
 		} catch (err) {
 			setSitesError(
@@ -236,8 +246,11 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 	}, []);
 
 	function selectSite(id: string) {
-		setActiveSiteId(id);
-		localStorage.setItem(activeSiteStorageKey, id);
+		const changed = id !== activeSiteIdRef.current;
+		storeActiveSiteId(id);
+		if (changed && /^\/scans\/[^/]+/.test(location.pathname)) {
+			navigate("/scans", { replace: true });
+		}
 	}
 
 	async function scanActiveSite() {
@@ -245,11 +258,17 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 			navigate("/");
 			return;
 		}
+		const scanSiteId = activeSite.id;
 		setShellScanning(true);
 		try {
-			const result = await api.scanSite(activeSite.id);
+			const result = await api.scanSite(scanSiteId);
 			if (result.scan?.id) {
-				setSelectedScanId(activeSite.id, result.scan.id);
+				setSelectedScanId(scanSiteId, result.scan.id);
+			}
+			if (activeSiteIdRef.current !== scanSiteId) {
+				return;
+			}
+			if (result.scan?.id) {
 				navigate(`/scans/${result.scan.id}`);
 			} else {
 				navigate("/scans");
@@ -439,7 +458,10 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 								activeSite ? <ScansPage site={activeSite} /> : null,
 							)}
 						/>
-						<Route path="/scans/:scanId" element={<ScanReportRoute />} />
+						<Route
+							path="/scans/:scanId"
+							element={<ScanReportRoute activeSiteId={activeSiteId} />}
+						/>
 						<Route
 							path="/gsc"
 							element={requireSite(
