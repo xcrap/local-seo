@@ -43,6 +43,7 @@ const fixtureServer = Bun.serve({
         <html>
           <head>
             <meta charset="utf-8">
+            <base href="${fixtureUrl}/base/">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Short</title>
             <style>.inline-bg { background-image: url("/missing-inline-bg.png"); }</style>
@@ -63,6 +64,10 @@ const fixtureServer = Bun.serve({
 	            </picture>
 	            <div class="inline-bg">Inline background image check</div>
 	            <a href="/missing-page">Broken fixture link</a>
+	            <a href="base-target">Document base target</a>
+	            <a href="/forbidden-html">Forbidden HTML without noindex</a>
+	            <a href="/cdn-cgi/l/email-protection#abc123">Protected email helper</a>
+	            <a href="/linked-image.jpg">Linked image should not be a page</a>
             <a href="https://example.com" target="_blank">External target</a>
           </body>
         </html>`,
@@ -102,11 +107,48 @@ const fixtureServer = Bun.serve({
         { headers: { "content-type": "text/html; charset=utf-8" } },
       );
     }
+    if (url.pathname === "/base/base-target") {
+      return new Response(
+        `<!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="description" content="This page verifies relative links honor the document base URL.">
+            <title>Document Base Target</title>
+          </head>
+          <body>
+            <h1>Document Base Target</h1>
+            <p>The scanner should discover this URL through the root page base tag.</p>
+          </body>
+        </html>`,
+        { headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
+    if (url.pathname === "/forbidden-html") {
+      return new Response(
+        `<!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="description" content="This page returns HTTP 403 but does not declare a robots noindex directive.">
+            <title>Forbidden HTML</title>
+          </head>
+          <body>
+            <h1>Forbidden HTML</h1>
+            <p>The scan should report the HTTP error without inventing a noindex directive.</p>
+          </body>
+        </html>`,
+        { status: 403, headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
     if (url.pathname === "/text-image.png") {
       return new Response("not an image", { headers: { "content-type": "text/plain" } });
     }
     if (url.pathname === "/wrong-extension.jpg") {
       return new Response("png-ish", { headers: { "content-type": "image/png", "content-length": "7" } });
+    }
+    if (url.pathname === "/linked-image.jpg") {
+      return new Response("jpeg-ish", { headers: { "content-type": "image/jpeg", "content-length": "8" } });
     }
     if (url.pathname === "/picture.webp") {
       return new Response("webp-ish", { headers: { "content-type": "image/webp", "content-length": "8" } });
@@ -582,6 +624,29 @@ try {
   const fixtureScan = await waitForScan(localSiteScan.scan.id);
   const fixturePages = Array.isArray(fixtureScan.result?.pages) ? fixtureScan.result.pages : [];
   const fixtureSummary = fixtureScan.result?.summary || {};
+  const fixtureIssues = Array.isArray(fixtureScan.result?.issues) ? fixtureScan.result.issues : [];
+  const fixtureLinkHrefs = new Set((fixtureScan.result?.linkInventory || []).map((link: any) => link.href));
+  if (!fixtureLinkHrefs.has(`${fixtureUrl}/base/base-target`)) {
+    throw new Error("Fixture scan should resolve relative links against the document base URL.");
+  }
+  if (fixtureLinkHrefs.has(`${fixtureUrl}/base-target`)) {
+    throw new Error("Fixture scan resolved a base-relative link against the current page instead of the document base URL.");
+  }
+  if (fixtureLinkHrefs.has(`${fixtureUrl}/cdn-cgi/l/email-protection`)) {
+    throw new Error("Fixture scan should ignore Cloudflare email-protection helper URLs.");
+  }
+  if (!fixtureLinkHrefs.has(`${fixtureUrl}/linked-image.jpg`)) {
+    throw new Error("Fixture scan should keep linked images in link evidence.");
+  }
+  if (fixturePages.some((page: any) => page.url === `${fixtureUrl}/linked-image.jpg`)) {
+    throw new Error("Fixture scan must not count linked images as crawl pages.");
+  }
+  if (!fixtureIssues.some((issue: any) => issue.url === `${fixtureUrl}/forbidden-html` && issue.type === "page-http-error")) {
+    throw new Error("Fixture scan should preserve HTTP error evidence for forbidden HTML pages.");
+  }
+  if (fixtureIssues.some((issue: any) => issue.url === `${fixtureUrl}/forbidden-html` && issue.type === "noindex")) {
+    throw new Error("Fixture scan must not report noindex without an actual robots noindex directive.");
+  }
   const indexableRows = fixturePages.filter((page: any) => page.indexable === true).length;
   const nonIndexableRows = fixturePages.filter((page: any) => page.indexable === false).length;
   const unknownIndexabilityRows = fixturePages.filter((page: any) => typeof page.indexable !== "boolean").length;

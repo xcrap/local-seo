@@ -205,6 +205,24 @@ function isHttpOnHttpsPage(value: string, pageUrl: string) {
   }
 }
 
+function isLikelyPageUrl(value: string) {
+  try {
+    const pathname = new URL(value).pathname.toLowerCase();
+    return !/\.(?:avif|bmp|css|csv|docx?|eot|gif|gz|ico|jpe?g|js|json|m4v|map|mov|mp3|mp4|ogg|otf|pdf|png|pptx?|rar|svg|tar|ttf|txt|wav|webm|webp|woff2?|xlsx?|xml|zip)$/i.test(pathname);
+  } catch {
+    return true;
+  }
+}
+
+function isIgnoredCrawlUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.pathname === "/cdn-cgi/l/email-protection";
+  } catch {
+    return false;
+  }
+}
+
 function parseSrcsetUrls(value: string, baseUrl: string) {
   return value
     .split(",")
@@ -830,6 +848,7 @@ async function runLocalScan(scanId: string) {
     if (
       absolute &&
       sameSiteUrl(absolute, startUrl) &&
+      isLikelyPageUrl(absolute) &&
       absoluteKey !== startKey &&
       !queued.has(absoluteKey) &&
       queue.length + visited.size < limits.maxQueuedUrls
@@ -934,6 +953,9 @@ async function runLocalScan(scanId: string) {
       consecutiveRateLimits = response.status === 429 || response.status === 503 ? consecutiveRateLimits + 1 : 0;
       const isHtml = /text\/html|application\/xhtml\+xml/i.test(response.contentType) || response.text.includes("<html");
       const $ = cheerio.load(response.text);
+      const finalUrl = response.url || current;
+      const baseHref = cleanText($("base[href]").first().attr("href") || "");
+      const documentBaseUrl = baseHref ? absoluteHttpUrl(baseHref, finalUrl) || finalUrl : finalUrl;
       const title = cleanText($("title").first().text());
       const titleCount = $("title").length;
       const description = cleanText($('meta[name="description"]').attr("content") || "");
@@ -952,7 +974,7 @@ async function runLocalScan(scanId: string) {
         return heading.level > previous.level + 1;
       });
       const canonicalRaw = $('link[rel="canonical"]').attr("href") || "";
-      const canonical = canonicalRaw ? absoluteHttpUrl(canonicalRaw, response.url || current) || canonicalRaw : "";
+      const canonical = canonicalRaw ? absoluteHttpUrl(canonicalRaw, documentBaseUrl) || canonicalRaw : "";
       const canonicalCount = $('link[rel="canonical"]').length;
       const robotsMeta = cleanText($('meta[name="robots"]').attr("content") || "");
       const xRobotsTag = cleanText(response.xRobotsTag || "");
@@ -960,7 +982,8 @@ async function runLocalScan(scanId: string) {
         .split(",")
         .map((item) => item.trim().toLowerCase())
         .filter(Boolean);
-      const indexable = !robotDirectives.some((item) => item === "noindex" || item === "none") && response.status < 400;
+      const hasNoindexDirective = robotDirectives.some((item) => item === "noindex" || item === "none");
+      const indexable = !hasNoindexDirective && response.status < 400;
       const lang = cleanText($("html").attr("lang") || "");
       const viewport = cleanText($('meta[name="viewport"]').attr("content") || "");
       const charset = cleanText($("meta[charset]").attr("charset") || $('meta[http-equiv="content-type"]').attr("content") || "");
@@ -980,7 +1003,7 @@ async function runLocalScan(scanId: string) {
       const ogTitle = cleanText($('meta[property="og:title"]').attr("content") || "");
       const ogDescription = cleanText($('meta[property="og:description"]').attr("content") || "");
       const ogImageRaw = cleanText($('meta[property="og:image"]').attr("content") || "");
-      const ogImage = ogImageRaw ? absoluteHttpUrl(ogImageRaw, response.url || current) || ogImageRaw : "";
+      const ogImage = ogImageRaw ? absoluteHttpUrl(ogImageRaw, documentBaseUrl) || ogImageRaw : "";
       if (/^https?:\/\//i.test(ogImage) && imagesToCheck.size < limits.maxImagesToCheck && !imagesToCheck.has(ogImage)) {
         imagesToCheck.set(ogImage, { url: ogImage, from: current, purpose: "og:image" });
       }
@@ -1014,14 +1037,14 @@ async function runLocalScan(scanId: string) {
           .map((_, source) => $(source).attr("srcset") || "")
           .get()
           .filter(Boolean);
-        const imgSrcsetUrls = parseSrcsetUrls(imgSrcsetRaw, response.url || current);
-        const pictureSrcsetUrls = pictureSourceSrcsets.flatMap((srcset) => parseSrcsetUrls(srcset, response.url || current));
+        const imgSrcsetUrls = parseSrcsetUrls(imgSrcsetRaw, documentBaseUrl);
+        const pictureSrcsetUrls = pictureSourceSrcsets.flatMap((srcset) => parseSrcsetUrls(srcset, documentBaseUrl));
         const srcsetUrls = [...imgSrcsetUrls, ...pictureSrcsetUrls];
         const invalidSrcsetCandidates =
           srcsetCandidateCount(imgSrcsetRaw) +
           pictureSourceSrcsets.reduce((count, srcset) => count + srcsetCandidateCount(srcset), 0) -
           srcsetUrls.length;
-        const absolute = absoluteHttpUrl(src, response.url || current) || srcsetUrls[0] || null;
+        const absolute = absoluteHttpUrl(src, documentBaseUrl) || srcsetUrls[0] || null;
         const alt = $(img).attr("alt");
         const altText = cleanText(alt || "");
         const role = cleanText($(img).attr("role") || "");
@@ -1065,25 +1088,26 @@ async function runLocalScan(scanId: string) {
       });
 
       $("source[srcset]").each((_, source) => {
-        const urls = parseSrcsetUrls($(source).attr("srcset") || "", response.url || current);
+        const urls = parseSrcsetUrls($(source).attr("srcset") || "", documentBaseUrl);
         for (const imageUrl of urls) addImageToCheck(imageUrl, { purpose: "source-srcset" });
       });
 
       $("[style]").each((_, item) => {
-        for (const imageUrl of cssUrlValues($(item).attr("style") || "", response.url || current)) {
+        for (const imageUrl of cssUrlValues($(item).attr("style") || "", documentBaseUrl)) {
           addImageToCheck(imageUrl, { purpose: "css-url" });
         }
       });
       $("style").each((_, item) => {
-        for (const imageUrl of cssUrlValues($(item).contents().text() || "", response.url || current)) {
+        for (const imageUrl of cssUrlValues($(item).contents().text() || "", documentBaseUrl)) {
           addImageToCheck(imageUrl, { purpose: "css-url" });
         }
       });
 
       $("a[href]").each((_, link) => {
         const href = $(link).attr("href") || "";
-        const absolute = absoluteHttpUrl(href, response.url || current);
+        const absolute = absoluteHttpUrl(href, documentBaseUrl);
         if (!absolute) return;
+        if (isIgnoredCrawlUrl(absolute)) return;
         const isInternal = sameSiteUrl(absolute, startUrl);
         const imageAlt = cleanText($(link).find("img[alt]").first().attr("alt") || "");
         const accessibleName = cleanText($(link).attr("aria-label") || $(link).attr("title") || imageAlt);
@@ -1113,6 +1137,7 @@ async function runLocalScan(scanId: string) {
         }
         if (
           isInternal &&
+          isLikelyPageUrl(absolute) &&
           !visited.has(absoluteKey) &&
           !queued.has(absoluteKey) &&
           queue.length + visited.size < limits.maxQueuedUrls
@@ -1123,13 +1148,13 @@ async function runLocalScan(scanId: string) {
       });
 
       $('link[rel~="stylesheet"][href]').each((_, item) => {
-        const href = absoluteHttpUrl($(item).attr("href") || "", response.url || current);
+        const href = absoluteHttpUrl($(item).attr("href") || "", documentBaseUrl);
         if (!href) return;
         assetRows.push({ type: "css", url: href });
         addAsset(href, "css", { placement: "head" });
       });
       $("script[src]").each((_, item) => {
-        const src = absoluteHttpUrl($(item).attr("src") || "", response.url || current);
+        const src = absoluteHttpUrl($(item).attr("src") || "", documentBaseUrl);
         if (!src) return;
         const scriptMeta = {
           type: "js",
@@ -1359,7 +1384,7 @@ async function runLocalScan(scanId: string) {
           message: "Missing canonical URL",
           recommendation: "Add a canonical URL so crawlers understand the preferred version.",
         });
-      } else if (canonicalRaw && !absoluteHttpUrl(canonicalRaw, response.url || current)) {
+      } else if (canonicalRaw && !absoluteHttpUrl(canonicalRaw, documentBaseUrl)) {
         pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "medium",
@@ -1399,7 +1424,7 @@ async function runLocalScan(scanId: string) {
           recommendation: "Confirm cross-domain canonicalization is intentional.",
           evidence: { canonical },
         });
-      } else if (indexable && normalizedUrl(canonical) !== normalizedUrl(response.url || current)) {
+      } else if (indexable && normalizedUrl(canonical) !== normalizedUrl(finalUrl)) {
         pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
@@ -1407,10 +1432,10 @@ async function runLocalScan(scanId: string) {
           type: "canonical-not-self",
           message: "Indexable page canonicals to a different URL",
           recommendation: "Use a self-referencing canonical unless this page is intentionally consolidated into another URL.",
-          evidence: { canonical, finalUrl: response.url || current },
+          evidence: { canonical, finalUrl },
         });
       }
-      if (!indexable) {
+      if (hasNoindexDirective) {
         pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
@@ -1836,7 +1861,7 @@ async function runLocalScan(scanId: string) {
           recommendation: "Add twitter:card metadata for pages that are likely to be shared.",
         });
       }
-      const invalidHreflangs = hreflangs.filter((item) => !item.lang || !absoluteHttpUrl(item.href, response.url || current));
+      const invalidHreflangs = hreflangs.filter((item) => !item.lang || !absoluteHttpUrl(item.href, documentBaseUrl));
       if (invalidHreflangs.length > 0) {
         pushScanIssue(issues, pageIssues, {
           url: current,
@@ -1938,7 +1963,7 @@ async function runLocalScan(scanId: string) {
 
       const page = {
         url: current,
-        finalUrl: response.url,
+        finalUrl,
         status: response.status,
         contentType: response.contentType,
         contentEncoding: response.contentEncoding,
@@ -1973,7 +1998,7 @@ async function runLocalScan(scanId: string) {
         depth: currentDepth,
         discovery: discoveryByUrl.get(currentKey) || "internal-link",
         internalInlinks: internalInlinks.get(currentKey) || 0,
-        sitemapListed: sitemapUrlSet.has(currentKey) || sitemapUrlSet.has(normalizedUrlKey(response.url || current)),
+        sitemapListed: sitemapUrlSet.has(currentKey) || sitemapUrlSet.has(normalizedUrlKey(finalUrl)),
         contentFingerprint: contentFingerprint(bodyText),
         schemaCount,
         schemaParseErrors,
