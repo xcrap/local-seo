@@ -370,7 +370,12 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 
 	return (
 		<div className="grain min-h-screen">
-			<TopBar onLogout={logout} />
+			<TopBar
+				onLogout={logout}
+				sites={sites}
+				activeSiteId={activeSite?.id || ""}
+				onSelectSite={selectSite}
+			/>
 			<WorkspaceSidebar
 				sites={sites}
 				activeSite={activeSite}
@@ -503,7 +508,17 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
 	);
 }
 
-function TopBar({ onLogout }: { onLogout: () => void }) {
+function TopBar({
+	onLogout,
+	sites,
+	activeSiteId,
+	onSelectSite,
+}: {
+	onLogout: () => void;
+	sites?: Site[];
+	activeSiteId?: string;
+	onSelectSite?: (id: string) => void;
+}) {
 	const location = useLocation();
 	const onSettings = location.pathname === "/settings";
 	return (
@@ -514,7 +529,16 @@ function TopBar({ onLogout }: { onLogout: () => void }) {
 						<BrandMark />
 					</Link>
 				</div>
-				<div className="flex items-center gap-1">
+				<div className="flex items-center gap-2">
+					{onSelectSite && sites && sites.length > 1 ? (
+						<div className="hidden w-56 lg:block">
+							<ActiveSiteSelect
+								sites={sites}
+								activeSiteId={activeSiteId || ""}
+								onSelect={onSelectSite}
+							/>
+						</div>
+					) : null}
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Button
@@ -559,9 +583,7 @@ type SidebarProps = {
 };
 
 function WorkspaceSidebar({
-	sites,
 	activeSite,
-	onSelect,
 	onScan,
 	scanning,
 }: SidebarProps) {
@@ -579,15 +601,6 @@ function WorkspaceSidebar({
 						</div>
 					</div>
 				</div>
-				{sites.length > 1 ? (
-					<div className="mt-2.5">
-						<ActiveSiteSelect
-							sites={sites}
-							activeSiteId={activeSite?.id || ""}
-							onSelect={onSelect}
-						/>
-					</div>
-				) : null}
 				{activeSite?.domain ? (
 					<Button
 						className="mt-2.5 w-full"
