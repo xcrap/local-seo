@@ -12,7 +12,23 @@ export function localHostFirst(domain: string) {
       ? domain.slice(1, domain.indexOf("]"))
       : domain.split(":")[0]
   )?.toLowerCase() || "";
-  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return true;
+  // .localhost, .test, and .internal are reserved for local use; .local is
+  // mDNS. None of them resolve on the public internet.
+  return [".localhost", ".test", ".local", ".internal"].some((suffix) => host.endsWith(suffix));
+}
+
+// Bun's fetch validates TLS against its bundled roots and never reads the OS
+// keychain, so a locally-trusted dev CA (mkcert, Caddy internal) fails with
+// "unable to get local issuer certificate" even though browsers accept it.
+// Local hosts are this machine — skip verification there only, and keep
+// strict TLS for every real site.
+export function localFetchTls(url: string): { tls?: { rejectUnauthorized: boolean } } {
+  try {
+    return localHostFirst(new URL(url).hostname) ? { tls: { rejectUnauthorized: false } } : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function probeScanUrl(url: string) {
@@ -29,6 +45,7 @@ export async function probeScanUrl(url: string) {
           accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           ...(method === "GET" ? { range: "bytes=0-2048" } : {}),
         },
+        ...localFetchTls(url),
       });
       return { status: response.status, finalUrl: response.url || url };
     } finally {

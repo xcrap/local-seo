@@ -4,7 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { getConfigValue } from "./config";
 import { all, get, jsonParse, run } from "./db";
 import { fetchText } from "./http";
-import { localHostFirst, probeScanUrl, unreachableScanUrlError } from "./site-scan-url";
+import { localFetchTls, localHostFirst, probeScanUrl, unreachableScanUrlError } from "./site-scan-url";
 
 function getSite(siteId: string) {
   return get<any>("SELECT * FROM sites WHERE id = ?", [siteId]);
@@ -592,6 +592,7 @@ async function checkResource(url: string, method: "HEAD" | "GET" = "HEAD") {
         Accept: "*/*",
         ...(method === "GET" ? { Range: "bytes=0-2048" } : {}),
       },
+      ...localFetchTls(url),
     });
     if (method === "HEAD" && [403, 405, 501].includes(response.status)) {
       response = await fetch(url, {
@@ -603,6 +604,7 @@ async function checkResource(url: string, method: "HEAD" | "GET" = "HEAD") {
           Accept: "*/*",
           Range: "bytes=0-2048",
         },
+        ...localFetchTls(url),
       });
     }
     // A ranged GET reports the partial length in Content-Length; the true total

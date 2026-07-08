@@ -1,3 +1,5 @@
+import { localFetchTls } from "./site-scan-url";
+
 // Read at most this many bytes of a response body. Real HTML pages are far
 // smaller; the cap stops a linked PDF/ZIP/video from being buffered into memory.
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
@@ -65,6 +67,7 @@ export async function fetchText(url: string, timeoutMs = 15000) {
         "User-Agent": "LocalSEO/0.1 (+https://localhost)",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
+      ...localFetchTls(url),
     });
     const contentType = response.headers.get("content-type") || "";
     return {
