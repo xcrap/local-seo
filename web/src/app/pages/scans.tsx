@@ -1,6 +1,6 @@
 import { useEffect, useState, type SyntheticEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowUpRight, CheckCircle2, ExternalLink, EyeOff, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, ExternalLink, Eye, EyeOff, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem, toast } from "@/components/ui";
 import { CountUp, EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, scoreVerdict, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
@@ -640,6 +640,12 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
         (rule) => (!rule.issue_type || rule.issue_type === issue.type) && (!rule.url || rule.url === issue.url),
       ),
     );
+  const ignoredPageUrls = new Set(ignoreRules.filter((rule) => !rule.issue_type && rule.url).map((rule) => rule.url));
+  const togglePageIgnore = (page: any) => {
+    const rule = ignoreRules.find((item) => !item.issue_type && item.url === page.url);
+    if (rule) return restoreIgnoreRules([rule]);
+    return ignoreIssueType({ type: "", url: page.url }, "page-all");
+  };
   const changeScanTab = (value: string) => {
     setActiveTab(value);
     const next = new URLSearchParams(searchParams);
@@ -871,7 +877,14 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
           <TabCard>
             {pages.length ? (
               <FilteredRows rows={pages} placeholder="Filter pages…">
-                {(rows) => <ScanPagesTable rows={rows} onShowIssues={selectPageIssues} />}
+                {(rows) => (
+                  <ScanPagesTable
+                    rows={rows}
+                    onShowIssues={selectPageIssues}
+                    onTogglePageIgnore={togglePageIgnore}
+                    ignoredPageUrls={ignoredPageUrls}
+                  />
+                )}
               </FilteredRows>
             ) : <EmptyState title="No pages yet" text="Pages will appear while the scan runs." />}
           </TabCard>
@@ -1983,7 +1996,17 @@ function SeverityInline({ issues }: { issues: any[] }) {
   );
 }
 
-function ScanPagesTable({ rows, onShowIssues }: { rows: any[]; onShowIssues?: (page: any) => void }) {
+function ScanPagesTable({
+  rows,
+  onShowIssues,
+  onTogglePageIgnore,
+  ignoredPageUrls,
+}: {
+  rows: any[];
+  onShowIssues?: (page: any) => void;
+  onTogglePageIgnore?: (page: any) => void;
+  ignoredPageUrls?: Set<string>;
+}) {
   return (
     <Table>
       <TableHeader>
@@ -1996,6 +2019,7 @@ function ScanPagesTable({ rows, onShowIssues }: { rows: any[]; onShowIssues?: (p
           <TableHead className="text-right">Words</TableHead>
           <TableHead className="text-right">Links·Img</TableHead>
           <TableHead>Issues</TableHead>
+          {onTogglePageIgnore ? <TableHead className="text-right"><span className="sr-only">Ignore page</span></TableHead> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -2027,6 +2051,29 @@ function ScanPagesTable({ rows, onShowIssues }: { rows: any[]; onShowIssues?: (p
                 <SeverityInline issues={page.issues} />
               )}
             </TableCell>
+            {onTogglePageIgnore ? (
+              <TableCell className="text-right">
+                {ignoredPageUrls?.has(page.url) ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Restore ignored issues for ${page.url}`}
+                    onClick={() => onTogglePageIgnore(page)}
+                  >
+                    <Eye />
+                  </Button>
+                ) : (page.issues || []).length ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Ignore all issues on ${page.url}`}
+                    onClick={() => onTogglePageIgnore(page)}
+                  >
+                    <EyeOff />
+                  </Button>
+                ) : null}
+              </TableCell>
+            ) : null}
           </TableRow>
         ))}
       </TableBody>
