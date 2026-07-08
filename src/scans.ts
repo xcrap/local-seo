@@ -22,8 +22,12 @@ function publicScanRow(row: any) {
   });
 }
 
+// A rule with no issue_type ignores every issue on its URL; a rule with no
+// URL ignores its issue type site-wide.
 function issueMatchesIgnore(issue: any, rules: any[]) {
-  return rules.some((rule) => rule.issue_type === issue.type && (!rule.url || rule.url === issue.url));
+  return rules.some(
+    (rule) => (!rule.issue_type || rule.issue_type === issue.type) && (!rule.url || rule.url === issue.url),
+  );
 }
 
 // Saved scan evidence stays untouched in SQLite; ignore rules are applied when
@@ -86,8 +90,8 @@ export function createIssueIgnore(siteId: string, input: { type?: string; url?: 
   const site = getSite(siteId);
   if (!site) throw new Error("Site not found.");
   const issueType = String(input?.type || "").trim();
-  if (!issueType) throw new Error("Issue type is required.");
   const url = String(input?.url || "").trim();
+  if (!issueType && !url) throw new Error("An issue type or a page URL is required.");
   const note = String(input?.note || "").trim();
   run(
     `

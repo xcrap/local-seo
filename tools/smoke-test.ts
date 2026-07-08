@@ -852,6 +852,30 @@ try {
   ) {
     throw new Error("Deleting ignore rules must restore the saved scan report exactly.");
   }
+  const pageIgnore = await request(`/api/sites/${localSite.id}/issue-ignores`, {
+    method: "POST",
+    body: JSON.stringify({ url: `${fixtureUrl}/` }),
+  });
+  if (!pageIgnore?.id || pageIgnore.issue_type !== "") {
+    throw new Error("Page-wide ignore rules must save with an empty issue type.");
+  }
+  const pageIgnoredScan = await request(`/api/scans/${fixtureScan.id}`);
+  const ignoredPageIssues = (pageIgnoredScan.result?.issues || []).filter((issue: any) => issue.url === `${fixtureUrl}/`);
+  if (!ignoredPageIssues.length || !ignoredPageIssues.every((issue: any) => issue.ignored === true)) {
+    throw new Error("A page-wide ignore rule must hide every issue on that page.");
+  }
+  if (!(pageIgnoredScan.result?.issues || []).some((issue: any) => !issue.ignored)) {
+    throw new Error("A page-wide ignore rule must not hide other pages' issues.");
+  }
+  await request(`/api/sites/${localSite.id}/issue-ignores/${pageIgnore.id}`, { method: "DELETE" });
+  const pageRestoredScan = await request(`/api/scans/${fixtureScan.id}`);
+  if (pageRestoredScan.issue_count !== fixtureScan.issue_count) {
+    throw new Error("Removing a page-wide ignore rule must restore the page's issues.");
+  }
+  await requestFailure(`/api/sites/${localSite.id}/issue-ignores`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
   const mcpFixtureScanId = localMcpScan.result?.structuredContent?.scan?.id;
   if (mcpFixtureScanId) {
     await waitForScan(mcpFixtureScanId);

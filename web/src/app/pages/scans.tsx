@@ -548,6 +548,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
   const [selectedCheckTypes, setSelectedCheckTypes] = useState<string[]>([]);
   const [selectedCheckLabel, setSelectedCheckLabel] = useState("");
   const [showIgnored, setShowIgnored] = useState(false);
+  const [pageFilter, setPageFilter] = useState("");
   const [ignoreRules, setIgnoreRules] = useState<any[]>([]);
   // Ignore rules are applied server-side at read time, so after a rule change
   // the freshest report (score, groups, summary) comes from refetching the scan.
@@ -585,6 +586,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setSelectedCheckTypes([]);
     setSelectedCheckLabel("");
     setShowIgnored(false);
+    setPageFilter("");
     setRefreshedScan(null);
   }, [scan.id]);
   useEffect(() => {
@@ -605,14 +607,19 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setIgnoreRules(rules || []);
     if (row?.id) setRefreshedScan(row);
   };
-  const ignoreIssueType = async (issue: any, scope: "site" | "page") => {
+  const ignoreIssueType = async (issue: any, scope: "site" | "page" | "page-all") => {
     try {
-      await api.createIssueIgnore(scan.site_id, { type: issue.type, url: scope === "page" ? issue.url || "" : "" });
+      await api.createIssueIgnore(scan.site_id, {
+        type: scope === "page-all" ? "" : issue.type,
+        url: scope === "site" ? "" : issue.url || "",
+      });
       await refreshIgnoreState();
       toast.success(
-        scope === "page"
-          ? `Ignoring ${String(issue.type).replaceAll("-", " ")} on this page`
-          : `Ignoring ${String(issue.type).replaceAll("-", " ")} for this site`,
+        scope === "page-all"
+          ? "Ignoring every issue on this page"
+          : scope === "page"
+            ? `Ignoring ${String(issue.type).replaceAll("-", " ")} on this page`
+            : `Ignoring ${String(issue.type).replaceAll("-", " ")} for this site`,
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save the ignore rule");
@@ -628,7 +635,11 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     }
   };
   const restoreIssue = (issue: any) =>
-    restoreIgnoreRules(ignoreRules.filter((rule) => rule.issue_type === issue.type && (!rule.url || rule.url === issue.url)));
+    restoreIgnoreRules(
+      ignoreRules.filter(
+        (rule) => (!rule.issue_type || rule.issue_type === issue.type) && (!rule.url || rule.url === issue.url),
+      ),
+    );
   const changeScanTab = (value: string) => {
     setActiveTab(value);
     const next = new URLSearchParams(searchParams);
@@ -646,6 +657,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setTypeFilter("all");
     setSelectedCheckTypes([]);
     setSelectedCheckLabel("");
+    setPageFilter("");
     showIssues();
   };
   const selectCategory = (category: string) => {
@@ -653,6 +665,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setTypeFilter("all");
     setSelectedCheckTypes([]);
     setSelectedCheckLabel("");
+    setPageFilter("");
     showIssues();
   };
   const selectIssueGroup = (group: any) => {
@@ -661,6 +674,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setTypeFilter(group.type || "all");
     setSelectedCheckTypes(group.type ? [group.type] : []);
     setSelectedCheckLabel(String(group.type || ""));
+    setPageFilter("");
     showIssues();
   };
   const selectScanCheck = (row: ScanCheckRowModel) => {
@@ -670,6 +684,16 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setTypeFilter(types.length === 1 ? types[0] : "all");
     setSelectedCheckTypes(types);
     setSelectedCheckLabel(row.label);
+    setPageFilter("");
+    showIssues();
+  };
+  const selectPageIssues = (page: any) => {
+    setSeverityFilter("all");
+    setCategoryFilter("all");
+    setTypeFilter("all");
+    setSelectedCheckTypes([]);
+    setSelectedCheckLabel("");
+    setPageFilter(String(page.url || ""));
     showIssues();
   };
   const filteredIssues = (showIgnored ? ignoredIssues : activeIssues).filter((issue: any) => {
@@ -677,13 +701,15 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     const categoryOk = categoryFilter === "all" || issue.category === categoryFilter;
     const typeOk = typeFilter === "all" || issue.type === typeFilter;
     const checkOk = selectedCheckTypes.length === 0 || selectedCheckTypes.includes(issue.type);
-    return severityOk && categoryOk && typeOk && checkOk;
+    const pageOk = !pageFilter || issue.url === pageFilter;
+    return severityOk && categoryOk && typeOk && checkOk && pageOk;
   });
   const activeIssueFilters = [
     severityFilter !== "all" ? `${severityFilter} severity` : "",
     categoryFilter !== "all" ? issueCategoryLabel(categoryFilter) : "",
     typeFilter !== "all" ? typeFilter.replaceAll("-", " ") : "",
     selectedCheckLabel,
+    pageFilter,
   ].filter(Boolean);
   const resetIssueFilters = () => {
     setSeverityFilter("all");
@@ -691,6 +717,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setTypeFilter("all");
     setSelectedCheckTypes([]);
     setSelectedCheckLabel("");
+    setPageFilter("");
     showIssues();
   };
   return (
@@ -799,7 +826,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
               <div className="mt-2 space-y-1.5">
                 {ignoreRules.map((rule) => (
                   <div key={rule.id} className="flex flex-wrap items-center gap-2 text-xs">
-                    <Badge variant="outline">{String(rule.issue_type || "").replaceAll("-", " ")}</Badge>
+                    <Badge variant="outline">{rule.issue_type ? String(rule.issue_type).replaceAll("-", " ") : "all issues"}</Badge>
                     <span className="break-all text-muted-foreground">{rule.url || "Whole site"}</span>
                     <Button
                       size="sm"
@@ -844,7 +871,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
           <TabCard>
             {pages.length ? (
               <FilteredRows rows={pages} placeholder="Filter pages…">
-                {(rows) => <ScanPagesTable rows={rows} />}
+                {(rows) => <ScanPagesTable rows={rows} onShowIssues={selectPageIssues} />}
               </FilteredRows>
             ) : <EmptyState title="No pages yet" text="Pages will appear while the scan runs." />}
           </TabCard>
@@ -1776,7 +1803,7 @@ function ScanIssuesTable({
   onRestore,
 }: {
   rows: any[];
-  onIgnore?: (issue: any, scope: "site" | "page") => void;
+  onIgnore?: (issue: any, scope: "site" | "page" | "page-all") => void;
   onRestore?: (issue: any) => void;
 }) {
   return (
@@ -1845,6 +1872,11 @@ function ScanIssuesTable({
                         <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => onIgnore(issue, "site")}>
                           Ignore this issue type site-wide
                         </Button>
+                        {issue.url ? (
+                          <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => onIgnore(issue, "page-all")}>
+                            Ignore every issue on this page
+                          </Button>
+                        ) : null}
                       </PopoverContent>
                     </Popover>
                   ) : null}
@@ -1935,7 +1967,7 @@ function ScanMetadataTable({ rows }: { rows: any[] }) {
 }
 
 function SeverityInline({ issues }: { issues: any[] }) {
-  const list = Array.isArray(issues) ? issues : [];
+  const list = (Array.isArray(issues) ? issues : []).filter((issue: any) => !issue.ignored);
   const high = list.filter((issue: any) => issue.severity === "high").length;
   const med = list.filter((issue: any) => issue.severity === "medium").length;
   const low = list.filter((issue: any) => issue.severity === "low").length;
@@ -1951,7 +1983,7 @@ function SeverityInline({ issues }: { issues: any[] }) {
   );
 }
 
-function ScanPagesTable({ rows }: { rows: any[] }) {
+function ScanPagesTable({ rows, onShowIssues }: { rows: any[]; onShowIssues?: (page: any) => void }) {
   return (
     <Table>
       <TableHeader>
@@ -1981,7 +2013,20 @@ function ScanPagesTable({ rows }: { rows: any[] }) {
             <TableCell className="whitespace-nowrap text-right text-muted-foreground nums tabular-nums">
               {formatNumber((page.internalLinks || 0) + (page.externalLinks || 0))} · {formatNumber(page.images || 0)}
             </TableCell>
-            <TableCell><SeverityInline issues={page.issues} /></TableCell>
+            <TableCell>
+              {onShowIssues && (page.issues || []).some((issue: any) => !issue.ignored) ? (
+                <button
+                  type="button"
+                  className="-mx-1.5 cursor-pointer rounded-md px-1.5 py-1 hover:bg-accent/60"
+                  aria-label={`Show issues for ${page.url}`}
+                  onClick={() => onShowIssues(page)}
+                >
+                  <SeverityInline issues={page.issues} />
+                </button>
+              ) : (
+                <SeverityInline issues={page.issues} />
+              )}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
