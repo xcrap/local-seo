@@ -13,13 +13,102 @@ function getSite(siteId: string) {
 function publicScanRow(row: any) {
   if (!row) return null;
   const { site_id: siteId, site_name: siteName, site_domain: siteDomain, result_json, ...rest } = row;
-  return {
+  return applyIssueIgnores({
     ...rest,
     site_id: siteId,
     ...(siteName ? { site_name: siteName } : {}),
     ...(siteDomain ? { site_domain: siteDomain } : {}),
     result: jsonParse(result_json, null),
+  });
+}
+
+function issueMatchesIgnore(issue: any, rules: any[]) {
+  return rules.some((rule) => rule.issue_type === issue.type && (!rule.url || rule.url === issue.url));
+}
+
+// Saved scan evidence stays untouched in SQLite; ignore rules are applied when
+// scans are read, so restoring a rule instantly brings the issues and their
+// score impact back on every saved report.
+function applyIssueIgnores(row: any) {
+  const result = row?.result;
+  if (!result || !Array.isArray(result.issues) || !result.issues.length) return row;
+  const rules = all<any>("SELECT * FROM scan_issue_ignores WHERE site_id = ?", [row.site_id]);
+  if (!rules.length) return row;
+  const issues = result.issues.map((issue: any) =>
+    issueMatchesIgnore(issue, rules) ? { ...issue, ignored: true } : issue,
+  );
+  const activeIssues = issues.filter((issue: any) => !issue.ignored);
+  const ignoredCount = issues.length - activeIssues.length;
+  if (!ignoredCount) return row;
+  const pages = Array.isArray(result.pages) ? result.pages : [];
+  const flaggedPages = pages.map((page: any) =>
+    Array.isArray(page.issues) && page.issues.length
+      ? {
+          ...page,
+          issues: page.issues.map((issue: any) =>
+            issueMatchesIgnore(issue, rules) ? { ...issue, ignored: true } : issue,
+          ),
+        }
+      : page,
+  );
+  return {
+    ...row,
+    score: row.status === "completed" ? healthScore(pages, activeIssues) : row.score,
+    issue_count: activeIssues.length,
+    ignored_issue_count: ignoredCount,
+    result: {
+      ...result,
+      summary: scanSummary(
+        activeIssues,
+        pages,
+        result.links || [],
+        result.images || [],
+        result.assets || [],
+        result.imageInventory || [],
+        result.linkInventory || [],
+        result.parameterUrls || [],
+        result.phase || "completed",
+      ),
+      issues,
+      issueGroups: groupIssueSummary(activeIssues),
+      pages: flaggedPages,
+    },
   };
+}
+
+export function listIssueIgnores(siteId: string) {
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
+  return all<any>("SELECT * FROM scan_issue_ignores WHERE site_id = ? ORDER BY created_at DESC", [site.id]);
+}
+
+export function createIssueIgnore(siteId: string, input: { type?: string; url?: string; note?: string }) {
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
+  const issueType = String(input?.type || "").trim();
+  if (!issueType) throw new Error("Issue type is required.");
+  const url = String(input?.url || "").trim();
+  const note = String(input?.note || "").trim();
+  run(
+    `
+    INSERT INTO scan_issue_ignores (id, site_id, issue_type, url, note)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(site_id, issue_type, url) DO UPDATE SET note = excluded.note
+    `,
+    [randomUUID(), site.id, issueType, url, note],
+  );
+  return get<any>("SELECT * FROM scan_issue_ignores WHERE site_id = ? AND issue_type = ? AND url = ?", [
+    site.id,
+    issueType,
+    url,
+  ]);
+}
+
+export function deleteIssueIgnore(siteId: string, ignoreId: string) {
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
+  const info = run("DELETE FROM scan_issue_ignores WHERE id = ? AND site_id = ?", [ignoreId, site.id]);
+  return { deleted: Number(info.changes || 0) > 0 };
 }
 
 export function listScans(siteId: string) {
@@ -328,6 +417,27 @@ function imageClassification(input: {
   return "content";
 }
 
+// Static crawls cannot resolve external stylesheets, so CSS sizing is accepted
+// from the evidence available in the HTML itself: inline styles and
+// Tailwind-style utility classes. Mirrors the intent of Lighthouse's
+// unsized-images audit, which passes images sized via CSS, not just attributes.
+function imageIsCssSized(className: string, style: string) {
+  const styleText = style.toLowerCase();
+  const styleWidth = /(?:^|[;\s])width\s*:/.test(styleText);
+  const styleHeight = /(?:^|[;\s])height\s*:/.test(styleText);
+  const styleAspect = /aspect-ratio\s*:/.test(styleText);
+  const tokens = className
+    .split(/\s+/)
+    .map((token) => token.split(":").pop() || "")
+    .filter(Boolean);
+  const hasToken = (pattern: RegExp) => tokens.some((token) => pattern.test(token));
+  const classWidth = hasToken(/^(?:w-(?:\d|px|full|screen|\[)|size-)/);
+  const classHeight = hasToken(/^(?:h-(?:\d|px|full|screen|\[)|size-)/);
+  const classAspect = hasToken(/^aspect-/);
+  const absoluteFill = hasToken(/^(?:absolute|fixed)$/) && hasToken(/^inset-/);
+  return ((styleWidth || classWidth) && (styleHeight || classHeight)) || styleAspect || classAspect || absoluteFill;
+}
+
 function contentFingerprint(value: string) {
   const normalized = value
     .toLowerCase()
@@ -372,6 +482,23 @@ function isLikelyTrackingUrl(value: string) {
 
 function isValidLangCode(value: string) {
   return /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(value);
+}
+
+// Ahrefs-style health score: (pages without errors / pages) × 100, where
+// only high-severity issues count as errors. Medium and low findings
+// inform the report but never move the score — matching
+// https://help.ahrefs.com/en/articles/1424673
+function healthScore(pages: any[], issues: any[]) {
+  const pageKeys = new Set(pages.map((page) => normalizedUrlKey(page.url)));
+  const highPages = new Set<string>();
+  for (const issue of issues) {
+    if (issue.severity !== "high") continue;
+    const key = normalizedUrlKey(issue.url || "");
+    if (pageKeys.has(key)) highPages.add(key);
+  }
+  return pages.length === 0
+    ? 0
+    : Math.max(0, Math.min(100, Math.round((100 * (pages.length - highPages.size)) / pages.length)));
 }
 
 function severityCounts(rows: any[]) {
@@ -1115,6 +1242,7 @@ async function runLocalScan(scanId: string) {
         const ariaHidden = cleanText($(img).attr("aria-hidden") || "");
         const width = $(img).attr("width") || "";
         const height = $(img).attr("height") || "";
+        const cssSized = imageIsCssSized($(img).attr("class") || "", $(img).attr("style") || "");
         const row = {
           from: current,
           src: absolute || src,
@@ -1131,16 +1259,21 @@ async function runLocalScan(scanId: string) {
           role,
           ariaHidden,
           classification: imageClassification({ src: absolute || src, width, height, role, ariaHidden }),
+          cssSized,
+          snippet: "",
           issues: [] as string[],
         };
         if (!src && pictureSrcsetUrls.length) row.issues.push("missing fallback src");
-        if (!row.src) row.issues.push("missing src");
+        if (!row.src) {
+          row.issues.push("missing src");
+          row.snippet = cleanText($.html(img)).slice(0, 200);
+        }
         if (row.invalidSrcsetCandidates > 0) row.issues.push("invalid srcset");
         if (row.classification === "content" && row.altState === "missing") row.issues.push("missing alt");
         if (row.classification === "content" && row.altState === "empty") row.issues.push("empty alt");
         if (row.classification === "content" && altText.length > 125) row.issues.push("alt too long");
         if (row.classification === "content" && isGenericAltText(altText, row.src || "")) row.issues.push("generic alt");
-        if (row.src && (!row.width || !row.height)) row.issues.push("missing size");
+        if (row.src && (!row.width || !row.height) && !row.cssSized) row.issues.push("missing size");
         if (row.classification === "content" && imageIndex > 1 && String(row.loading).toLowerCase() !== "lazy") row.issues.push("not lazy loaded");
         if (row.classification === "content" && Number.parseInt(row.width || "0", 10) >= 600 && row.srcsetCount === 0) row.issues.push("missing srcset");
         if (row.src && isHttpOnHttpsPage(row.src, current)) row.issues.push("mixed content");
@@ -1635,21 +1768,24 @@ async function runLocalScan(scanId: string) {
           evidence: { wordCount },
         });
       }
-      const imageMissingSrc = imageRows.filter((image) => !image.src).length;
+      const imagesMissingSrc = imageRows.filter((image) => !image.src);
       const missingFallbackSrc = imageRows.filter((image) => image.issues.includes("missing fallback src")).length;
       const invalidSrcset = imageRows.filter((image) => image.issues.includes("invalid srcset")).length;
       const missingAlt = imageRows.filter((image) => image.classification === "content" && image.altState === "missing").length;
       const emptyAlt = imageRows.filter((image) => image.classification === "content" && image.altState === "empty").length;
-      const missingDimensions = imageRows.filter((image) => image.src && (!image.width || !image.height)).length;
-      if (imageMissingSrc > 0) {
+      const missingDimensions = imageRows.filter((image) => image.issues.includes("missing size"));
+      if (imagesMissingSrc.length > 0) {
         pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
           category: "images",
           type: "image-src-missing",
-          message: `${imageMissingSrc} image tags have no source`,
+          message: `${imagesMissingSrc.length} image tags have no source`,
           recommendation: "Remove empty image tags or point them to a valid image file.",
-          evidence: { count: imageMissingSrc },
+          evidence: {
+            count: imagesMissingSrc.length,
+            samples: imagesMissingSrc.map((image) => (image.snippet ? `img #${image.position} · ${image.snippet}` : `img #${image.position}`)),
+          },
         });
       }
       if (missingFallbackSrc > 0) {
@@ -1735,15 +1871,15 @@ async function runLocalScan(scanId: string) {
           evidence: { duplicateAltTexts },
         });
       }
-      if (missingDimensions > 0) {
+      if (missingDimensions.length > 0) {
         pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
           category: "images",
           type: "image-dimensions-missing",
-          message: `${missingDimensions} images are missing width or height attributes`,
-          recommendation: "Set image dimensions or CSS aspect ratios to reduce layout shift.",
-          evidence: { count: missingDimensions },
+          message: `${missingDimensions.length} images are not sized by attributes, inline styles, or sizing classes`,
+          recommendation: "Set width/height attributes, CSS dimensions, or an aspect ratio so the browser can reserve space and avoid layout shift.",
+          evidence: { count: missingDimensions.length, samples: missingDimensions.map((image) => image.src) },
         });
       }
       const missingSrcset = imageRows.filter((image) => image.issues.includes("missing srcset"));
@@ -2075,10 +2211,10 @@ async function runLocalScan(scanId: string) {
         images: imageRows.length,
         imagesMissingAlt: missingAlt,
         imagesEmptyAlt: emptyAlt,
-        imagesMissingSrc: imageMissingSrc,
+        imagesMissingSrc: imagesMissingSrc.length,
         imagesMissingFallbackSrc: missingFallbackSrc,
         imagesInvalidSrcset: invalidSrcset,
-        imagesMissingDimensions: missingDimensions,
+        imagesMissingDimensions: missingDimensions.length,
         assets: assetRows.length,
         cssAssets: assetRows.filter((asset) => asset.type === "css").length,
         jsAssets: assetRows.filter((asset) => asset.type === "js").length,
@@ -2407,20 +2543,7 @@ async function runLocalScan(scanId: string) {
   }
 
   phase = "completed";
-  // Ahrefs-style health score: (pages without errors / pages) × 100, where
-  // only high-severity issues count as errors. Medium and low findings
-  // inform the report but never move the score — matching
-  // https://help.ahrefs.com/en/articles/1424673
-  const pageKeys = new Set(pages.map((page) => normalizedUrlKey(page.url)));
-  const highPages = new Set<string>();
-  for (const issue of issues) {
-    if (issue.severity !== "high") continue;
-    const key = normalizedUrlKey(issue.url || "");
-    if (pageKeys.has(key)) highPages.add(key);
-  }
-  const score = pages.length === 0
-    ? 0
-    : Math.max(0, Math.min(100, Math.round((100 * (pages.length - highPages.size)) / pages.length)));
+  const score = healthScore(pages, issues);
   const result = scanResult({
     startUrl,
     origin,

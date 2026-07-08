@@ -959,10 +959,17 @@ export function scanSeverityCounts(scan: any) {
   const summary = scan?.result?.summary?.bySeverity || {};
   const flatSummary = scan?.result?.summary || {};
   const issues = Array.isArray(scan?.result?.issues) ? scan.result.issues : [];
+  // A saved 0 is a real count and must not fall through to the raw issue list,
+  // which still contains ignored issues.
+  const countOf = (severity: string) => {
+    if (summary[severity] != null) return Number(summary[severity]) || 0;
+    if (flatSummary[severity] != null) return Number(flatSummary[severity]) || 0;
+    return issues.filter((issue: any) => issue.severity === severity && !issue.ignored).length;
+  };
   return {
-    high: Number(summary.high || flatSummary.high || issues.filter((issue: any) => issue.severity === "high").length || 0),
-    medium: Number(summary.medium || flatSummary.medium || issues.filter((issue: any) => issue.severity === "medium").length || 0),
-    low: Number(summary.low || flatSummary.low || issues.filter((issue: any) => issue.severity === "low").length || 0),
+    high: countOf("high"),
+    medium: countOf("medium"),
+    low: countOf("low"),
   };
 }
 

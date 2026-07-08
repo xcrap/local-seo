@@ -1,6 +1,6 @@
 import { useEffect, useState, type SyntheticEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowUpRight, CheckCircle2, ExternalLink, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, ExternalLink, EyeOff, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem, toast } from "@/components/ui";
 import { CountUp, EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, scoreVerdict, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
@@ -538,18 +538,29 @@ function scanTabFromSearch(value: string | null, scan: any) {
   return value && scanTabValues.has(value) ? value : defaultScanTab(scan);
 }
 
-function ScanDetail({ scan }: { scan: any }) {
+function ScanDetail({ scan: savedScan }: { scan: any }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = scanTabFromSearch(searchParams.get("tab"), scan);
+  const requestedTab = scanTabFromSearch(searchParams.get("tab"), savedScan);
   const [activeTab, setActiveTab] = useState(requestedTab);
   const [severityFilter, setSeverityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedCheckTypes, setSelectedCheckTypes] = useState<string[]>([]);
   const [selectedCheckLabel, setSelectedCheckLabel] = useState("");
+  const [showIgnored, setShowIgnored] = useState(false);
+  const [ignoreRules, setIgnoreRules] = useState<any[]>([]);
+  // Ignore rules are applied server-side at read time, so after a rule change
+  // the freshest report (score, groups, summary) comes from refetching the scan.
+  const [refreshedScan, setRefreshedScan] = useState<any>(null);
+  const scan =
+    refreshedScan?.id === savedScan.id && String(refreshedScan.updated_at || "") >= String(savedScan.updated_at || "")
+      ? refreshedScan
+      : savedScan;
   const result = scan.result || {};
   const pages = result.pages || [];
   const issues = result.issues || [];
+  const activeIssues = issues.filter((issue: any) => !issue.ignored);
+  const ignoredIssues = issues.filter((issue: any) => issue.ignored);
   const links = result.links || [];
   const linkInventory = result.linkInventory || [];
   const images = result.images || [];
@@ -573,7 +584,51 @@ function ScanDetail({ scan }: { scan: any }) {
     setTypeFilter("all");
     setSelectedCheckTypes([]);
     setSelectedCheckLabel("");
+    setShowIgnored(false);
+    setRefreshedScan(null);
   }, [scan.id]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!scan.site_id) return;
+    api
+      .issueIgnores(scan.site_id)
+      .then((rows) => {
+        if (!cancelled) setIgnoreRules(rows || []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [scan.site_id]);
+  const refreshIgnoreState = async () => {
+    const [rules, row] = await Promise.all([api.issueIgnores(scan.site_id), api.scan(scan.id)]);
+    setIgnoreRules(rules || []);
+    if (row?.id) setRefreshedScan(row);
+  };
+  const ignoreIssueType = async (issue: any, scope: "site" | "page") => {
+    try {
+      await api.createIssueIgnore(scan.site_id, { type: issue.type, url: scope === "page" ? issue.url || "" : "" });
+      await refreshIgnoreState();
+      toast.success(
+        scope === "page"
+          ? `Ignoring ${String(issue.type).replaceAll("-", " ")} on this page`
+          : `Ignoring ${String(issue.type).replaceAll("-", " ")} for this site`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save the ignore rule");
+    }
+  };
+  const restoreIgnoreRules = async (rules: any[]) => {
+    try {
+      await Promise.all(rules.map((rule) => api.deleteIssueIgnore(scan.site_id, rule.id)));
+      await refreshIgnoreState();
+      toast.success(rules.length === 1 ? "Ignore rule removed" : `${rules.length} ignore rules removed`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not remove the ignore rule");
+    }
+  };
+  const restoreIssue = (issue: any) =>
+    restoreIgnoreRules(ignoreRules.filter((rule) => rule.issue_type === issue.type && (!rule.url || rule.url === issue.url)));
   const changeScanTab = (value: string) => {
     setActiveTab(value);
     const next = new URLSearchParams(searchParams);
@@ -617,7 +672,7 @@ function ScanDetail({ scan }: { scan: any }) {
     setSelectedCheckLabel(row.label);
     showIssues();
   };
-  const filteredIssues = issues.filter((issue: any) => {
+  const filteredIssues = (showIgnored ? ignoredIssues : activeIssues).filter((issue: any) => {
     const severityOk = severityFilter === "all" || issue.severity === severityFilter;
     const categoryOk = categoryFilter === "all" || issue.category === categoryFilter;
     const typeOk = typeFilter === "all" || issue.type === typeFilter;
@@ -665,7 +720,12 @@ function ScanDetail({ scan }: { scan: any }) {
             activeSeverity={severityFilter}
             onSeveritySelect={selectSeverity}
           />
-          <ScanActionBoard scan={scan} issueGroups={issueGroups} onSelectGroup={selectIssueGroup} />
+          <ScanActionBoard
+            scan={scan}
+            issueGroups={issueGroups}
+            onSelectGroup={selectIssueGroup}
+            onIgnoreGroup={(group) => ignoreIssueType(group, "site")}
+          />
         </TabsContent>
         <TabsContent value="progress">
           <ScanProgressPanel scan={scan} result={result} coverage={coverage} />
@@ -706,10 +766,23 @@ function ScanDetail({ scan }: { scan: any }) {
               </SelectContent>
             </Select>
             {selectedCheckLabel ? <Badge variant="outline">Showing {selectedCheckLabel}</Badge> : null}
+            {ignoredIssues.length || ignoreRules.length ? (
+              <Button
+                size="sm"
+                variant={showIgnored ? "secondary" : "outline"}
+                className="h-8 text-xs"
+                onClick={() => setShowIgnored(!showIgnored)}
+              >
+                <EyeOff /> Ignored ({formatNumber(ignoredIssues.length)})
+              </Button>
+            ) : null}
             <div className="ml-auto flex items-center gap-1.5 text-[13px] text-muted-foreground">
               <span>
-                Showing {formatNumber(filteredIssues.length)} of {formatNumber(issues.length)} saved issues
+                {showIgnored
+                  ? `Showing ${formatNumber(filteredIssues.length)} of ${formatNumber(ignoredIssues.length)} ignored issues`
+                  : `Showing ${formatNumber(filteredIssues.length)} of ${formatNumber(activeIssues.length)} saved issues`}
                 {activeIssueFilters.length ? ` for ${activeIssueFilters.join(" · ")}` : ""}
+                {!showIgnored && ignoredIssues.length ? ` · ${formatNumber(ignoredIssues.length)} ignored` : ""}
               </span>
               {activeIssueFilters.length ? (
                 <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={resetIssueFilters}>
@@ -718,11 +791,45 @@ function ScanDetail({ scan }: { scan: any }) {
               ) : null}
             </div>
           </div>
-          {filteredIssues.length ? <ScanIssuesTable rows={filteredIssues} /> : <EmptyState title="No matching issues" text={scan.status === "completed" ? "This filter has no issues." : "Issues will appear while the scan runs."} />}
+          {showIgnored && ignoreRules.length ? (
+            <div className="rounded-lg border border-border/60 px-3.5 py-2.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                Saved ignore rules for this site — restored issues count for reports and scoring again.
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {ignoreRules.map((rule) => (
+                  <div key={rule.id} className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="outline">{String(rule.issue_type || "").replaceAll("-", " ")}</Badge>
+                    <span className="break-all text-muted-foreground">{rule.url || "Whole site"}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => restoreIgnoreRules([rule])}
+                    >
+                      Restore
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {filteredIssues.length ? (
+            <ScanIssuesTable rows={filteredIssues} onIgnore={ignoreIssueType} onRestore={restoreIssue} />
+          ) : (
+            <EmptyState
+              title={showIgnored ? "No ignored issues" : "No matching issues"}
+              text={
+                showIgnored
+                  ? "Issues you ignore stay saved here so you can restore them anytime."
+                  : scan.status === "completed" ? "This filter has no issues." : "Issues will appear while the scan runs."
+              }
+            />
+          )}
           </TabCard>
         </TabsContent>
         <TabsContent value="checks">
-          <ScanCheckMatrix summary={summary} coverage={coverage} issues={issues} onSelectCheck={selectScanCheck} />
+          <ScanCheckMatrix summary={summary} coverage={coverage} issues={activeIssues} onSelectCheck={selectScanCheck} />
         </TabsContent>
         <TabsContent value="metadata">
           <TabCard>
@@ -793,7 +900,7 @@ function ScanDetail({ scan }: { scan: any }) {
           ) : <EmptyState title="No CSS or JavaScript assets checked yet" text="Assets are checked after links and images." />}
         </TabsContent>
         <TabsContent value="speed" className="space-y-4">
-          <ScanSpeedReport pages={pages} issues={issues} assets={assets} summary={summary} coverage={coverage} />
+          <ScanSpeedReport pages={pages} issues={activeIssues} assets={assets} summary={summary} coverage={coverage} />
         </TabsContent>
         <TabsContent value="crawl" className="space-y-4">
           <ScanCrawlEvidence result={result} coverage={coverage} />
@@ -1220,10 +1327,12 @@ function ScanActionBoard({
   scan,
   issueGroups,
   onSelectGroup,
+  onIgnoreGroup,
 }: {
   scan: any;
   issueGroups: any[];
   onSelectGroup: (group: any) => void;
+  onIgnoreGroup?: (group: any) => void;
 }) {
   const priorityGroups = issueGroups
     .filter((group) => group.severity === "high" || group.severity === "medium")
@@ -1259,9 +1368,21 @@ function ScanActionBoard({
                   <div className="metric text-[26px] font-bold"><CountUp value={group.count} /></div>
                   <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Affected</div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
-                  Show issues
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  {onIgnoreGroup ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Ignore ${String(group.type || "").replaceAll("-", " ")} for this site`}
+                      onClick={() => onIgnoreGroup(group)}
+                    >
+                      <EyeOff /> Ignore
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="outline" onClick={() => onSelectGroup(group)}>
+                    Show issues
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
@@ -1649,7 +1770,15 @@ function ScanSection({ title, text, children }: { title: string; text: string; c
   );
 }
 
-function ScanIssuesTable({ rows }: { rows: any[] }) {
+function ScanIssuesTable({
+  rows,
+  onIgnore,
+  onRestore,
+}: {
+  rows: any[];
+  onIgnore?: (issue: any, scope: "site" | "page") => void;
+  onRestore?: (issue: any) => void;
+}) {
   return (
     <Table>
       <TableHeader>
@@ -1684,13 +1813,42 @@ function ScanIssuesTable({ rows }: { rows: any[] }) {
                 )) : "-"}
               </TableCell>
               <TableCell className="align-top text-right">
-                {issue.url ? (
-                  <Button asChild size="sm" variant="outline">
-                    <a href={issue.url} target="_blank" rel="noreferrer">
-                      <ExternalLink /> Page
-                    </a>
-                  </Button>
-                ) : null}
+                <div className="flex items-center justify-end gap-1.5">
+                  {issue.url ? (
+                    <Button asChild size="sm" variant="outline">
+                      <a href={issue.url} target="_blank" rel="noreferrer">
+                        <ExternalLink /> Page
+                      </a>
+                    </Button>
+                  ) : null}
+                  {onRestore && issue.ignored ? (
+                    <Button size="sm" variant="outline" onClick={() => onRestore(issue)}>
+                      Restore
+                    </Button>
+                  ) : null}
+                  {onIgnore && !issue.ignored ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button size="sm" variant="ghost" aria-label="Ignore this issue">
+                          <EyeOff />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-72 space-y-1 p-2">
+                        <p className="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+                          Ignored issues are hidden from this site's reports and scoring. The rule is saved locally and can be restored anytime.
+                        </p>
+                        {issue.url ? (
+                          <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => onIgnore(issue, "page")}>
+                            Ignore on this page only
+                          </Button>
+                        ) : null}
+                        <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => onIgnore(issue, "site")}>
+                          Ignore this issue type site-wide
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
+                  ) : null}
+                </div>
               </TableCell>
             </TableRow>
           );

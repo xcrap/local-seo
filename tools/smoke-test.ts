@@ -61,6 +61,7 @@ const fixtureServer = Bun.serve({
 	            <img src="/broken-image.png">
 	            <img src="/text-image.png" alt="photo" width="820" height="460">
 	            <img src="/wrong-extension.jpg" alt="Wrong extension sample" width="820" height="460" loading="lazy" srcset="/wrong-extension.jpg 1x">
+	            <img src="/linked-image.jpg" alt="CSS sized thumbnail" class="w-14 h-14 rounded" loading="lazy">
 	            <picture>
 	              <source srcset="/picture.webp 1x, http:// 2x" type="image/webp">
 	              <img alt="Picture without fallback" width="900" height="500">
@@ -778,11 +779,78 @@ try {
       throw new Error(`Fixture scan did not detect ${expected}.`);
     }
   }
+  const missingSrcIssue = (fixtureScan.result?.issues || []).find((issue: any) => issue.type === "image-src-missing");
+  const missingSrcSamples: string[] = missingSrcIssue?.evidence?.samples || [];
+  if (!missingSrcSamples.some((sample) => String(sample).includes("Missing source example"))) {
+    throw new Error(`image-src-missing evidence should identify the offending image tag, got ${JSON.stringify(missingSrcSamples)}.`);
+  }
+  const cssSizedImage = (fixtureScan.result?.imageInventory || []).find(
+    (image: any) => String(image.alt || "") === "CSS sized thumbnail",
+  );
+  if (cssSizedImage?.cssSized !== true || cssSizedImage.issues.includes("missing size")) {
+    throw new Error("Images sized by CSS utility classes must not be flagged as missing dimensions.");
+  }
+  const unsizedImage = (fixtureScan.result?.imageInventory || []).find(
+    (image: any) => String(image.src || "").endsWith("/broken-image.png"),
+  );
+  if (!unsizedImage?.issues.includes("missing size")) {
+    throw new Error("Images with no attribute, inline style, or class sizing must still be flagged.");
+  }
   if (!fixtureScan.result?.imageInventory?.length || !fixtureScan.result?.linkInventory?.length) {
     throw new Error("Fixture scan did not save image/link inventory.");
   }
   if (!fixtureScan.result?.summary?.cssImageResources || !fixtureScan.result?.summary?.pictureSourceImages) {
     throw new Error("Fixture scan did not check CSS image URLs and picture source URLs.");
+  }
+  const initialIgnores = await request(`/api/sites/${localSite.id}/issue-ignores`);
+  if (!Array.isArray(initialIgnores) || initialIgnores.length) {
+    throw new Error("Fixture site should start with no saved ignore rules.");
+  }
+  const fixtureHighTypes = [...new Set<string>(
+    (fixtureScan.result?.issues || [])
+      .filter((issue: any) => issue.severity === "high")
+      .map((issue: any) => String(issue.type)),
+  )];
+  for (const type of ["thin-content", ...fixtureHighTypes]) {
+    await request(`/api/sites/${localSite.id}/issue-ignores`, {
+      method: "POST",
+      body: JSON.stringify({ type }),
+    });
+  }
+  const ignoredScan = await request(`/api/scans/${fixtureScan.id}`);
+  const thinIssues = (ignoredScan.result?.issues || []).filter((issue: any) => issue.type === "thin-content");
+  if (!thinIssues.length || !thinIssues.every((issue: any) => issue.ignored === true)) {
+    throw new Error("Ignored issues must stay saved in the report payload with an ignored flag.");
+  }
+  if ((ignoredScan.result?.issueGroups || []).some((group: any) => group.type === "thin-content")) {
+    throw new Error("Ignored issue types must leave the grouped issue summary.");
+  }
+  if (ignoredScan.result?.summary?.thinPages !== 0) {
+    throw new Error("Ignored issues must leave recomputed summary counts.");
+  }
+  if (
+    !(Number(ignoredScan.ignored_issue_count) > 0) ||
+    ignoredScan.issue_count + ignoredScan.ignored_issue_count !== fixtureScan.issue_count
+  ) {
+    throw new Error("Ignored issues must move from issue_count to ignored_issue_count.");
+  }
+  if (ignoredScan.score !== 100) {
+    throw new Error(`Ignoring every high-severity type should lift the health score to 100, got ${ignoredScan.score}.`);
+  }
+  const savedIgnores = await request(`/api/sites/${localSite.id}/issue-ignores`);
+  if (savedIgnores.length !== fixtureHighTypes.length + 1) {
+    throw new Error("Ignore rules must be saved per site so they can be restored.");
+  }
+  for (const rule of savedIgnores) {
+    await request(`/api/sites/${localSite.id}/issue-ignores/${rule.id}`, { method: "DELETE" });
+  }
+  const restoredScan = await request(`/api/scans/${fixtureScan.id}`);
+  if (
+    restoredScan.score !== fixtureScan.score ||
+    restoredScan.issue_count !== fixtureScan.issue_count ||
+    (restoredScan.result?.issues || []).some((issue: any) => issue.ignored)
+  ) {
+    throw new Error("Deleting ignore rules must restore the saved scan report exactly.");
   }
   const mcpFixtureScanId = localMcpScan.result?.structuredContent?.scan?.id;
   if (mcpFixtureScanId) {

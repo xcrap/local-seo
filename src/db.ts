@@ -209,6 +209,16 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS scan_issue_ignores (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    issue_type TEXT NOT NULL,
+    url TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(site_id, issue_type, url)
+  );
+
   CREATE TABLE IF NOT EXISTS gsc_connections (
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,

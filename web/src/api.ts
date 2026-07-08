@@ -135,6 +135,11 @@ export const api = {
     request<any>(`/api/sites/${siteId}/scans`, { method: "DELETE" }),
   deleteScan: (siteId: string, scanId: string) =>
     request<any>(`/api/sites/${siteId}/scans/${scanId}`, { method: "DELETE" }),
+  issueIgnores: (siteId: string) => request<any[]>(`/api/sites/${siteId}/issue-ignores`),
+  createIssueIgnore: (siteId: string, body: any) =>
+    request<any>(`/api/sites/${siteId}/issue-ignores`, { method: "POST", body: JSON.stringify(body) }),
+  deleteIssueIgnore: (siteId: string, ignoreId: string) =>
+    request<any>(`/api/sites/${siteId}/issue-ignores/${ignoreId}`, { method: "DELETE" }),
   aiPrompts: () => request<any[]>("/api/ai/prompts"),
   aiJobs: () => request<any[]>("/api/ai/jobs"),
   createAiJob: (body: any) =>

@@ -36,9 +36,11 @@ import {
   backlinksOverview,
   brandLookup,
   clearScans,
+  createIssueIgnore,
   createSite,
   createRankTracker,
   dashboardSummary,
+  deleteIssueIgnore,
   deleteScan,
   deleteSite,
   deleteSavedKeywordTag,
@@ -58,6 +60,7 @@ import {
   importOrganicResearchCsv,
   listBacklinkSnapshots,
   listAllScans,
+  listIssueIgnores,
   listScans,
   listBrandLookupRuns,
   listDomainSnapshots,
@@ -541,6 +544,15 @@ app.get("/api/scans/:id", getScanHandler);
 app.delete("/api/sites/:id/scans", clearSiteScansHandler);
 app.delete("/api/sites/:siteId/scans/:id", deleteSiteScanHandler);
 app.post("/api/scans", startScanHandler);
+app.get("/api/sites/:id/issue-ignores", safe((c) => c.json(listIssueIgnores(c.req.param("id")))));
+app.post(
+  "/api/sites/:id/issue-ignores",
+  safe(async (c) => c.json(createIssueIgnore(c.req.param("id"), (await readJson(c)) as any))),
+);
+app.delete(
+  "/api/sites/:id/issue-ignores/:ignoreId",
+  safe((c) => c.json(deleteIssueIgnore(c.req.param("id"), c.req.param("ignoreId")))),
+);
 
 app.get("/api/ai/prompts", safe((c) => c.json(listAiPrompts())));
 app.put(
