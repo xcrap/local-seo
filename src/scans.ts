@@ -24,11 +24,30 @@ function publicScanRow(row: any) {
   });
 }
 
+// Ignore rules match by page identity, not raw URL string. The same page can be
+// recorded with a different URL between scans — a toggled trailing slash, www,
+// http/https, or a redirect that appends session/query params (e.g. a booking
+// engine's ?idchain=...). Raw string equality silently drops the ignore on the
+// next scan; comparing the normalized, query-stripped key keeps it applied.
+function ignoreUrlKey(value: string) {
+  try {
+    const url = new URL(value);
+    url.search = "";
+    url.hash = "";
+    return normalizedUrlKey(url.toString());
+  } catch {
+    return String(value || "");
+  }
+}
+
 // A rule with no issue_type ignores every issue on its URL; a rule with no
 // URL ignores its issue type site-wide.
 function issueMatchesIgnore(issue: any, rules: any[]) {
+  const issueKey = ignoreUrlKey(String(issue?.url || ""));
   return rules.some(
-    (rule) => (!rule.issue_type || rule.issue_type === issue.type) && (!rule.url || rule.url === issue.url),
+    (rule) =>
+      (!rule.issue_type || rule.issue_type === issue.type) &&
+      (!rule.url || ignoreUrlKey(String(rule.url)) === issueKey),
   );
 }
 

@@ -973,6 +973,24 @@ export function scanSeverityCounts(scan: any) {
   };
 }
 
+// Mirror of the backend ignore key (src/scans.ts): a page's ignore identity is
+// its normalized URL with query string and hash removed, so the Pages-tab
+// ignored state and issue-restore stay consistent with server-side matching
+// even when a page's URL drifts between scans (trailing slash, www, appended
+// session params).
+export function ignorePageKey(value: string) {
+  try {
+    const url = new URL(value);
+    url.search = "";
+    url.hash = "";
+    const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+    const path = url.pathname !== "/" ? url.pathname.replace(/\/+$/, "") : url.pathname;
+    return `${url.protocol.toLowerCase()}//${host}${url.port ? `:${url.port}` : ""}${path}`;
+  } catch {
+    return String(value || "");
+  }
+}
+
 export function maxCount(...values: unknown[]) {
   const numbers = values
     .map((value) => Number(value))

@@ -1091,6 +1091,20 @@ try {
   if (pageRestoredScan.issue_count !== fixtureScan.issue_count) {
     throw new Error("Removing a page-wide ignore rule must restore the page's issues.");
   }
+  // A page-wide ignore must survive URL drift between scans: the same page can be
+  // recorded with a toggled trailing slash or a redirect-appended query string
+  // (e.g. ?idchain=...), so matching is by normalized page key, not the raw URL
+  // string that was saved.
+  const driftIgnore = await request(`/api/sites/${localSite.id}/issue-ignores`, {
+    method: "POST",
+    body: JSON.stringify({ url: `${fixtureUrl}?idchain=999&utm_source=drift` }),
+  });
+  const driftScan = await request(`/api/scans/${fixtureScan.id}`);
+  const driftPageIssues = (driftScan.result?.issues || []).filter((issue: any) => issue.url === `${fixtureUrl}/`);
+  if (!driftPageIssues.length || !driftPageIssues.every((issue: any) => issue.ignored === true)) {
+    throw new Error("A page-wide ignore must still match after URL drift (trailing slash and appended query params).");
+  }
+  await request(`/api/sites/${localSite.id}/issue-ignores/${driftIgnore.id}`, { method: "DELETE" });
   await requestFailure(`/api/sites/${localSite.id}/issue-ignores`, {
     method: "POST",
     body: JSON.stringify({}),
