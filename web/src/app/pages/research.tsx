@@ -691,7 +691,12 @@ function LocalLinkEvidence({
   const checkedByUrl = new Map(checkedLinks.map((link: any) => [link.url, link]));
   const externalLinks = linkInventory.filter((link: any) => link.type === "external");
   const internalLinks = linkInventory.filter((link: any) => link.type === "internal");
-  const brokenLinks = checkedLinks.filter((link: any) => !link.ok);
+  const brokenLinks = checkedLinks.filter(
+    (link: any) => !link.ok && link.failureKind !== "tls-certificate",
+  );
+  const unverifiedLinks = checkedLinks.filter(
+    (link: any) => !link.ok && link.failureKind === "tls-certificate",
+  );
   const noInlinkPages = pages.filter((page: any) => Number(page.internalInlinks || 0) === 0);
   const pageRows = [...pages]
     .sort((a, b) => Number(b.internalInlinks || 0) - Number(a.internalInlinks || 0));
@@ -729,6 +734,7 @@ function LocalLinkEvidence({
                 { title: "External links", value: externalLinks.length },
                 { title: "Checked links", value: checkedLinks.length, detail: "Unique link URLs the scan requested and verified." },
                 { title: "Broken links", value: brokenLinks.length },
+                { title: "Unverified", value: unverifiedLinks.length, detail: "TLS certificates that could not be verified; not counted as broken." },
                 { title: "No inlinks", value: noInlinkPages.length, detail: "Pages with zero internal inlinks in this crawl." },
               ]}
             />
@@ -736,6 +742,7 @@ function LocalLinkEvidence({
               <TabsList>
                 <TabsTrigger value="external">External links</TabsTrigger>
                 <TabsTrigger value="broken">Broken links</TabsTrigger>
+                <TabsTrigger value="unverified">Unverified</TabsTrigger>
                 <TabsTrigger value="internal">Internal graph</TabsTrigger>
               </TabsList>
               <TabsContent value="external">
@@ -743,6 +750,9 @@ function LocalLinkEvidence({
               </TabsContent>
               <TabsContent value="broken">
                 {brokenLinks.length ? <ScanLinksTable rows={brokenLinks} /> : <EmptyState title="No broken links" text="This saved scan did not find failing link URLs." />}
+              </TabsContent>
+              <TabsContent value="unverified">
+                {unverifiedLinks.length ? <ScanLinksTable rows={unverifiedLinks} /> : <EmptyState title="No certificate warnings" text="Every checked link certificate was verified." />}
               </TabsContent>
               <TabsContent value="internal">
                 {pageRows.length ? <FilteredRows rows={pageRows} placeholder="Filter pages…">{(rows) => <LocalInternalGraphTable rows={rows} />}</FilteredRows> : <EmptyState title="No internal graph" text="This saved scan did not save page link rows." />}
@@ -770,13 +780,17 @@ function LocalExternalLinksTable({ rows, checkedByUrl }: { rows: any[]; checkedB
       <TableBody>
         {rows.map((row, index) => {
           const checked = checkedByUrl.get(row.href);
+          const certificateFailure = checked?.failureKind === "tls-certificate";
+          const status = checked?.finalStatus != null && checked.finalStatus !== checked.status
+            ? `${checked.status ?? "?"} → ${checked.finalStatus}`
+            : checked?.status || checked?.error || "checked";
           return (
             <TableRow key={`${row.from}:${row.href}:${index}`}>
               <TableCell className="max-w-md break-all font-medium">{row.href}</TableCell>
               <TableCell>
                 {checked ? (
-                  <Badge variant={!checked.ok ? "bad" : checked.redirected || checked.finalUrl !== checked.url ? "warn" : "good"}>
-                    {checked.status || checked.error || "checked"}
+                  <Badge variant={certificateFailure ? "warn" : !checked.ok ? "bad" : checked.redirected || checked.finalUrl !== checked.url ? "warn" : "good"}>
+                    {status}
                   </Badge>
                 ) : (
                   <Badge variant="outline">not checked</Badge>

@@ -3,8 +3,10 @@ import { XMLParser } from "fast-xml-parser";
 import { createHash, randomUUID } from "node:crypto";
 import { getConfigValue } from "./config";
 import { all, get, jsonParse, run } from "./db";
-import { fetchText } from "./http";
-import { localFetchTls, localHostFirst, probeScanUrl, unreachableScanUrlError } from "./site-scan-url";
+import { fetchText, fetchWithRedirectTrace } from "./http";
+import { localHostFirst, probeScanUrl, unreachableScanUrlError } from "./site-scan-url";
+
+const SCAN_RESULT_VERSION = 2;
 
 function getSite(siteId: string) {
   return get<any>("SELECT * FROM sites WHERE id = ?", [siteId]);
@@ -35,7 +37,7 @@ function issueMatchesIgnore(issue: any, rules: any[]) {
 // score impact back on every saved report.
 function applyIssueIgnores(row: any) {
   const result = row?.result;
-  if (!result || !Array.isArray(result.issues) || !result.issues.length) return row;
+  if (!result || !Array.isArray(result.issues)) return row;
   const rules = all<any>("SELECT * FROM scan_issue_ignores WHERE site_id = ?", [row.site_id]);
   if (!rules.length) return row;
   const issues = result.issues.map((issue: any) =>
@@ -43,7 +45,32 @@ function applyIssueIgnores(row: any) {
   );
   const activeIssues = issues.filter((issue: any) => !issue.ignored);
   const ignoredCount = issues.length - activeIssues.length;
-  if (!ignoredCount) return row;
+  const comparison = result.comparison;
+  const filteredComparison = comparison
+    ? {
+        ...comparison,
+        newIssues: (comparison.newIssues || []).filter((issue: any) => !issueMatchesIgnore(issue, rules)),
+        fixedIssues: (comparison.fixedIssues || []).filter((issue: any) => !issueMatchesIgnore(issue, rules)),
+        severityChanges: (comparison.severityChanges || []).filter(
+          (issue: any) => !issueMatchesIgnore(issue, rules),
+        ),
+      }
+    : null;
+  if (filteredComparison) {
+    filteredComparison.summary = {
+      ...(comparison.summary || {}),
+      newIssues: filteredComparison.newIssues.length,
+      fixedIssues: filteredComparison.fixedIssues.length,
+      severityChanges: filteredComparison.severityChanges.length,
+    };
+  }
+  const comparisonChanged = Boolean(
+    comparison &&
+      ((comparison.newIssues || []).length !== filteredComparison?.newIssues.length ||
+        (comparison.fixedIssues || []).length !== filteredComparison?.fixedIssues.length ||
+        (comparison.severityChanges || []).length !== filteredComparison?.severityChanges.length),
+  );
+  if (!ignoredCount && !comparisonChanged) return row;
   const pages = Array.isArray(result.pages) ? result.pages : [];
   const flaggedPages = pages.map((page: any) =>
     Array.isArray(page.issues) && page.issues.length
@@ -76,6 +103,7 @@ function applyIssueIgnores(row: any) {
       issues,
       issueGroups: groupIssueSummary(activeIssues),
       pages: flaggedPages,
+      ...(filteredComparison ? { comparison: filteredComparison } : {}),
     },
   };
 }
@@ -583,56 +611,247 @@ function groupIssueSummary(issues: any[]) {
   });
 }
 
+function issueComparisonKey(issue: any) {
+  const evidence = issue?.evidence || {};
+  const subject = evidence.linkedUrl || evidence.image || evidence.asset || evidence.canonical || evidence.finalUrl || "";
+  return [normalizedUrlKey(String(issue?.url || "")), String(issue?.type || ""), normalizedUrlKey(String(subject))].join("|");
+}
+
+function comparisonIssue(issue: any, change: string, extra: Record<string, unknown> = {}) {
+  const evidence = issue?.evidence || {};
+  return {
+    change,
+    url: issue?.url || "",
+    category: issue?.category || "",
+    type: issue?.type || "",
+    severity: issue?.severity || "low",
+    message: issue?.message || String(issue?.type || "Issue").replaceAll("-", " "),
+    subject: evidence.linkedUrl || evidence.image || evidence.asset || evidence.canonical || evidence.finalUrl || "",
+    ...extra,
+  };
+}
+
+function emptyScanComparison(reason: string, previousScan?: any) {
+  return {
+    available: false,
+    reason,
+    previousScanId: previousScan?.id || null,
+    previousCreatedAt: previousScan?.created_at || null,
+    summary: { newIssues: 0, fixedIssues: 0, severityChanges: 0, regressions: 0, pageChanges: 0 },
+    newIssues: [],
+    fixedIssues: [],
+    severityChanges: [],
+    pageChanges: [],
+  };
+}
+
+function buildScanComparison(previousScan: any, pages: any[], issues: any[], limits: typeof scanLimits) {
+  const previousResult = jsonParse<any>(previousScan?.result_json, null);
+  if (!previousScan || !previousResult) {
+    return emptyScanComparison("no-previous-scan");
+  }
+  if (Number(previousResult.scanVersion || 0) !== SCAN_RESULT_VERSION) {
+    return emptyScanComparison("incompatible-version", previousScan);
+  }
+  if (Number(previousResult.limits?.maxPages || 0) !== Number(limits.maxPages || 0)) {
+    return emptyScanComparison("scope-changed", previousScan);
+  }
+
+  const previousPages = Array.isArray(previousResult.pages) ? previousResult.pages : [];
+  const previousPageMap = new Map<string, any>(
+    previousPages.map((page: any) => [normalizedUrlKey(String(page.url || "")), page]),
+  );
+  const currentPageMap = new Map<string, any>(
+    pages.map((page: any) => [normalizedUrlKey(String(page.url || "")), page]),
+  );
+  const previousIssues = Array.isArray(previousResult.issues) ? previousResult.issues : [];
+  const previousIssueMap = new Map<string, any>(previousIssues.map((issue: any) => [issueComparisonKey(issue), issue]));
+  const currentIssueMap = new Map<string, any>(issues.map((issue: any) => [issueComparisonKey(issue), issue]));
+  const newIssues = [...currentIssueMap.entries()]
+    .filter(([key]) => !previousIssueMap.has(key))
+    .map(([, issue]) => comparisonIssue(issue, "new"));
+  const fixedIssues = [...previousIssueMap.entries()]
+    .filter(([key, issue]) => {
+      if (currentIssueMap.has(key)) return false;
+      const pageKey = normalizedUrlKey(String(issue?.url || ""));
+      return !previousPageMap.has(pageKey) || currentPageMap.has(pageKey);
+    })
+    .map(([, issue]) => comparisonIssue(issue, "fixed"));
+  const severityChanges = [...currentIssueMap.entries()].flatMap(([key, issue]) => {
+    const previous = previousIssueMap.get(key);
+    if (!previous || previous.severity === issue.severity) return [];
+    return [
+      comparisonIssue(issue, "severity-changed", {
+        previousSeverity: previous.severity || "low",
+        currentSeverity: issue.severity || "low",
+      }),
+    ];
+  });
+
+  const pageChanges: any[] = [];
+  const addPageChange = (
+    type: string,
+    label: string,
+    url: string,
+    field: string,
+    before: unknown,
+    after: unknown,
+    regression = false,
+  ) => {
+    pageChanges.push({ type, label, url, field, before, after, regression });
+  };
+
+  for (const [key, page] of currentPageMap) {
+    const previous = previousPageMap.get(key);
+    if (!previous) {
+      addPageChange("page-added", "Page discovered", page.url, "Page", "Not crawled", "Crawled");
+      continue;
+    }
+    if (typeof previous.indexable === "boolean" && typeof page.indexable === "boolean" && previous.indexable !== page.indexable) {
+      addPageChange(
+        page.indexable ? "became-indexable" : "became-non-indexable",
+        page.indexable ? "Page became indexable" : "Page became non-indexable",
+        page.url,
+        "Indexability",
+        previous.indexable ? "Indexable" : "Non-indexable",
+        page.indexable ? "Indexable" : "Non-indexable",
+        !page.indexable,
+      );
+    }
+    const previousStatus = Number(previous.status || 0);
+    const currentStatus = Number(page.status || 0);
+    if (previousStatus !== currentStatus) {
+      addPageChange(
+        "http-status-changed",
+        "HTTP status changed",
+        page.url,
+        "HTTP status",
+        previousStatus || "Unknown",
+        currentStatus || "Unknown",
+        (previousStatus < 300 && currentStatus >= 300) || (previousStatus < 400 && currentStatus >= 400),
+      );
+    }
+    const previousFinalUrl = normalizedUrl(String(previous.finalUrl || previous.url || ""));
+    const currentFinalUrl = normalizedUrl(String(page.finalUrl || page.url || ""));
+    if (previousFinalUrl !== currentFinalUrl) {
+      addPageChange("redirect-target-changed", "Redirect destination changed", page.url, "Final URL", previousFinalUrl, currentFinalUrl, true);
+    }
+    const fields = [
+      { key: "title", label: "Title changed", field: "Title" },
+      { key: "description", label: "Meta description changed", field: "Meta description" },
+      { key: "h1", label: "H1 changed", field: "H1" },
+      { key: "wordCount", label: "Word count changed", field: "Word count" },
+    ];
+    for (const item of fields) {
+      const before = previous[item.key] ?? "";
+      const after = page[item.key] ?? "";
+      if (String(before) !== String(after)) {
+        addPageChange(`${item.key}-changed`, item.label, page.url, item.field, before, after);
+      }
+    }
+    if (Boolean(previous.sitemapListed) !== Boolean(page.sitemapListed)) {
+      addPageChange(
+        page.sitemapListed ? "page-added-to-sitemap" : "page-removed-from-sitemap",
+        page.sitemapListed ? "Page added to sitemap" : "Page removed from sitemap",
+        page.url,
+        "Sitemap",
+        previous.sitemapListed ? "Listed" : "Not listed",
+        page.sitemapListed ? "Listed" : "Not listed",
+        !page.sitemapListed && page.indexable === true,
+      );
+    }
+  }
+  for (const [key, page] of previousPageMap) {
+    if (!currentPageMap.has(key)) {
+      addPageChange("page-removed", "Page no longer crawled", page.url, "Page", "Crawled", "Not crawled", true);
+    }
+  }
+
+  return {
+    available: true,
+    previousScanId: previousScan.id,
+    previousCreatedAt: previousScan.created_at,
+    summary: {
+      newIssues: newIssues.length,
+      fixedIssues: fixedIssues.length,
+      severityChanges: severityChanges.length,
+      regressions: pageChanges.filter((change) => change.regression).length,
+      pageChanges: pageChanges.length,
+    },
+    newIssues,
+    fixedIssues,
+    severityChanges,
+    pageChanges,
+  };
+}
+
+export function resourceFailureKind(error: unknown) {
+  const message = String(error || "");
+  if (/(certificate|cert\b|issuer|self[- ]signed|ssl|tls|unable to verify)/i.test(message)) return "tls-certificate";
+  if (/(abort|timeout|timed out)/i.test(message)) return "timeout";
+  if (/(dns|enotfound|name.*resolve|host.*not found)/i.test(message)) return "dns";
+  return "request";
+}
+
 async function checkResource(url: string, method: "HEAD" | "GET" = "HEAD") {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    let response = await fetch(url, {
+    let trace = await fetchWithRedirectTrace(url, {
       method,
-      redirect: "follow",
       signal: controller.signal,
       headers: {
         "User-Agent": "LocalSEO/0.1 (+https://localhost)",
         Accept: "*/*",
         ...(method === "GET" ? { Range: "bytes=0-2048" } : {}),
       },
-      ...localFetchTls(url),
     });
-    if (method === "HEAD" && [403, 405, 501].includes(response.status)) {
-      response = await fetch(url, {
+    if (method === "HEAD" && [403, 405, 501].includes(trace.finalStatus)) {
+      trace = await fetchWithRedirectTrace(url, {
         method: "GET",
-        redirect: "follow",
         signal: controller.signal,
         headers: {
           "User-Agent": "LocalSEO/0.1 (+https://localhost)",
           Accept: "*/*",
           Range: "bytes=0-2048",
         },
-        ...localFetchTls(url),
       });
     }
+    const { response } = trace;
     // A ranged GET reports the partial length in Content-Length; the true total
     // is in Content-Range ("bytes 0-2048/524288"). Prefer that so size checks work.
     const rangeTotal = Number((response.headers.get("content-range") || "").split("/")[1]) || null;
     const partialLength = Number(response.headers.get("content-length") || 0) || null;
     return {
-      ok: response.status < 400,
-      status: response.status,
-      finalUrl: response.url,
-      redirected: response.redirected,
+      ok: response.status < 400 && !trace.redirectError,
+      status: trace.originalStatus,
+      finalStatus: trace.finalStatus,
+      finalUrl: trace.finalUrl,
+      redirected: trace.redirected,
+      redirectChain: trace.redirectChain,
+      redirectLoop: trace.redirectLoop,
+      redirectError: trace.redirectError,
       contentType: response.headers.get("content-type") || "",
       contentLength: response.status === 206 ? rangeTotal ?? partialLength : partialLength,
       contentEncoding: response.headers.get("content-encoding") || "",
-      error: "",
+      error: trace.redirectError,
+      failureKind: trace.redirectError ? "redirect" : "",
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Request failed";
     return {
       ok: false,
       status: null,
+      finalStatus: null,
       finalUrl: url,
+      redirected: false,
+      redirectChain: [],
+      redirectLoop: false,
+      redirectError: "",
       contentType: "",
       contentLength: null,
-      error: error instanceof Error ? error.message : "Request failed",
+      error: message,
+      failureKind: resourceFailureKind(message),
     };
   } finally {
     clearTimeout(timeout);
@@ -694,9 +913,25 @@ async function readRobots(origin: string) {
   try {
     const response = await fetchText(url);
     if (!response.ok) {
-      return { exists: false, url, status: response.status, sitemaps: [], disallowCount: 0, blocksAll: false };
+      return {
+        exists: false,
+        url,
+        status: response.finalStatus,
+        sourceStatus: response.status,
+        redirectChain: response.redirectChain,
+        sitemaps: [],
+        disallowCount: 0,
+        blocksAll: false,
+      };
     }
-    return { exists: true, url, status: response.status, ...parseRobots(response.text) };
+    return {
+      exists: true,
+      url,
+      status: response.finalStatus,
+      sourceStatus: response.status,
+      redirectChain: response.redirectChain,
+      ...parseRobots(response.text),
+    };
   } catch (error) {
     return {
       exists: false,
@@ -746,7 +981,14 @@ async function readSitemaps(origin: string, robotsSitemaps: string[]) {
     try {
       const response = await fetchText(sitemapUrl);
       if (!response.ok) {
-        sitemaps.push({ url: sitemapUrl, status: response.status, ok: false, urlCount: 0 });
+        sitemaps.push({
+          url: sitemapUrl,
+          status: response.finalStatus,
+          sourceStatus: response.status,
+          redirectChain: response.redirectChain,
+          ok: false,
+          urlCount: 0,
+        });
         continue;
       }
       const parsed = parser.parse(response.text);
@@ -761,7 +1003,9 @@ async function readSitemaps(origin: string, robotsSitemaps: string[]) {
       }
       sitemaps.push({
         url: sitemapUrl,
-        status: response.status,
+        status: response.finalStatus,
+        sourceStatus: response.status,
+        redirectChain: response.redirectChain,
         ok: true,
         type: nestedSitemaps.length ? "index" : "urlset",
         urlCount: urlLocs.length || fallbackLocs.length,
@@ -808,6 +1052,21 @@ function scanSummary(
   const averagePageLoadMs = pageLoadTimes.length
     ? Math.round(pageLoadTimes.reduce((sum, value) => sum + value, 0) / pageLoadTimes.length)
     : 0;
+  const redirectingLinks = checkedLinks.filter(
+    (link) => link.redirected || (link.finalUrl && link.finalUrl !== link.url),
+  );
+  const redirectingLinkPages = new Set(
+    redirectingLinks.flatMap((link) =>
+      Array.isArray(link.sourcePages) && link.sourcePages.length ? link.sourcePages : link.from ? [link.from] : [],
+    ),
+  );
+  const unverifiedLinks = checkedLinks.filter((link) => link.ok === false && link.failureKind === "tls-certificate");
+  const unverifiedImages = checkedImages.filter(
+    (image) => image.ok === false && image.failureKind === "tls-certificate",
+  );
+  const unverifiedAssets = checkedAssets.filter(
+    (asset) => asset.ok === false && asset.failureKind === "tls-certificate",
+  );
   return {
     phase,
     pages: pages.length,
@@ -832,20 +1091,35 @@ function scanSummary(
     pagesMissingFromSitemap: issues.filter((issue) => issue.type === "page-missing-from-sitemap").length,
     noindexPagesInSitemap: issues.filter((issue) => issue.type === "noindex-page-in-sitemap").length,
     checkedLinks: checkedLinks.length,
-    brokenLinks: checkedLinks.filter((link) => !link.ok).length,
+    brokenLinks: checkedLinks.filter((link) => !link.ok && link.failureKind !== "tls-certificate").length,
+    unverifiedLinks: unverifiedLinks.length,
     checkedImages: checkedImages.length,
-    brokenImages: checkedImages.filter((image) => !image.ok).length,
+    brokenImages: checkedImages.filter((image) => !image.ok && image.failureKind !== "tls-certificate").length,
+    unverifiedImages: unverifiedImages.length,
     redirectedImages: checkedImages.filter((image) => image.redirected || (image.finalUrl && image.finalUrl !== image.url)).length,
     cssImageResources: checkedImages.filter((image) => image.purpose === "css-url" || image.purpose === "external-css-url").length,
     pictureSourceImages: checkedImages.filter((image) => image.purpose === "picture-source" || image.purpose === "source-srcset").length,
     largeImages: issues.filter((issue) => issue.type === "large-image").length,
     imageExtensionMismatches: issues.filter((issue) => issue.type === "image-extension-mismatch").length,
     checkedAssets: checkedAssets.length,
-    brokenAssets: checkedAssets.filter((asset) => !asset.ok).length,
+    brokenAssets: checkedAssets.filter((asset) => !asset.ok && asset.failureKind !== "tls-certificate").length,
+    unverifiedAssets: unverifiedAssets.length,
     largeAssets: issues.filter((issue) => issue.type === "large-css" || issue.type === "large-javascript").length,
     renderBlockingScripts: issues.filter((issue) => issue.type === "render-blocking-javascript").length,
-    redirectedLinks: checkedLinks.filter((link) => link.redirected || (link.finalUrl && link.finalUrl !== link.url)).length,
-    linkTags: linkInventory.length,
+    redirectedLinks: redirectingLinks.length,
+    redirectedLinkTargets: redirectingLinks.length,
+    redirectedLinkPages: redirectingLinkPages.size,
+    redirectedLinkReferences: redirectingLinks.reduce(
+      (total, link) => total + Math.max(1, Number(link.referenceCount || 0)),
+      0,
+    ),
+    linkTags: Math.max(
+      linkInventory.length,
+      pages.reduce(
+        (total, page) => total + Number(page.internalLinks || 0) + Number(page.externalLinks || 0),
+        0,
+      ),
+    ),
     internalLinks: linkInventory.filter((link) => link.type === "internal").length,
     externalLinks: linkInventory.filter((link) => link.type === "external").length,
     parameterUrls: parameterUrls.length,
@@ -892,9 +1166,11 @@ function scanResult(input: {
   robots: any;
   sitemap: any;
   limits: typeof scanLimits;
+  comparison?: any;
 }) {
   const sortedIssues = [...input.issues].sort((a, b) => issuePriority(b.severity) - issuePriority(a.severity));
   return {
+    scanVersion: SCAN_RESULT_VERSION,
     startUrl: input.startUrl,
     origin: input.origin,
     phase: input.phase,
@@ -921,6 +1197,7 @@ function scanResult(input: {
     imageInventory: input.imageInventory,
     assets: input.checkedAssets,
     parameterUrls: input.parameterUrls,
+    ...(input.comparison ? { comparison: input.comparison } : {}),
   };
 }
 
@@ -946,6 +1223,7 @@ async function runLocalScan(scanId: string) {
   let consecutiveRateLimits = 0;
   const startKey = normalizedUrlKey(startUrl);
   const visited = new Set<string>();
+  const processedContent = new Set<string>();
   const queued = new Set<string>([startKey]);
   const queue = [startUrl];
   const depthByUrl = new Map<string, number>([[startKey, 0]]);
@@ -974,6 +1252,62 @@ async function runLocalScan(scanId: string) {
     const next: any[] = [];
     pageIssueMap.set(url, next);
     return next;
+  };
+
+  const recordRedirectIssues = (url: string, pageIssues: any[], response: any) => {
+    if (response.redirected) {
+      const temporaryRedirect = response.status === 302 || response.status === 307;
+      pushScanIssue(issues, pageIssues, {
+        url,
+        severity: "low",
+        category: "crawl",
+        type: temporaryRedirect ? "temporary-redirect" : "redirected-url",
+        message: temporaryRedirect
+          ? `URL uses a temporary HTTP ${response.status} redirect`
+          : `URL redirects with HTTP ${response.status}`,
+        recommendation: temporaryRedirect
+          ? "Use 301 or 308 when the move is permanent; keep the temporary redirect only when the original URL will return."
+          : "Link directly to the final URL to reduce crawl waste and latency.",
+        evidence: {
+          status: response.status,
+          finalStatus: response.finalStatus,
+          finalUrl: response.url,
+          redirectChain: response.redirectChain,
+        },
+      });
+    }
+    if (response.redirectChain.length > 1 && !response.redirectLoop) {
+      pushScanIssue(issues, pageIssues, {
+        url,
+        severity: "medium",
+        category: "crawl",
+        type: "redirect-chain",
+        message: `URL follows a ${response.redirectChain.length}-hop redirect chain`,
+        recommendation: "Redirect directly to the final destination in one hop.",
+        evidence: { finalUrl: response.url, redirectChain: response.redirectChain },
+      });
+    }
+    if (response.redirectLoop) {
+      pushScanIssue(issues, pageIssues, {
+        url,
+        severity: "high",
+        category: "crawl",
+        type: "redirect-loop",
+        message: "URL is trapped in a redirect loop",
+        recommendation: "Break the redirect cycle so the URL resolves to one final response.",
+        evidence: { redirectChain: response.redirectChain, error: response.redirectError },
+      });
+    } else if (response.redirectError) {
+      pushScanIssue(issues, pageIssues, {
+        url,
+        severity: "high",
+        category: "crawl",
+        type: "redirect-failed",
+        message: response.redirectError,
+        recommendation: "Fix the redirect location or shorten the chain so the URL reaches a final response.",
+        evidence: { redirectChain: response.redirectChain, error: response.redirectError },
+      });
+    }
   };
 
   const addParameterUrl = (url: string, source: string, from?: string, crawlUrl?: string) => {
@@ -1127,30 +1461,97 @@ async function runLocalScan(scanId: string) {
 
   phase = "crawling";
   while (queue.length > 0 && visited.size < limits.maxPages) {
-    const current = queue.shift()!;
-    const currentKey = normalizedUrlKey(current);
-    queued.delete(currentKey);
-    if (visited.has(currentKey)) continue;
-    visited.add(currentKey);
-    const pageIssues = pageBucket(current);
-    const currentDepth = depthByUrl.get(currentKey) ?? 0;
+    const requestedUrl = queue.shift()!;
+    const requestedKey = normalizedUrlKey(requestedUrl);
+    queued.delete(requestedKey);
+    if (visited.has(requestedKey) || processedContent.has(requestedKey)) continue;
+    visited.add(requestedKey);
+    let current = requestedUrl;
+    let currentKey = requestedKey;
+    const requestedPageIssues = pageBucket(requestedUrl);
+    let pageIssues = requestedPageIssues;
+    let currentDepth = depthByUrl.get(requestedKey) ?? 0;
 
     try {
       let startedAt = Date.now();
-      let response = await fetchText(current);
+      let response = await fetchText(requestedUrl);
       let loadMs = Date.now() - startedAt;
-      if (response.status === 429 || response.status === 503) {
+      if (response.finalStatus === 429 || response.finalStatus === 503) {
         // Back off once, honoring Retry-After, before recording the response.
         const retrySeconds = Math.min(Math.max(Number(response.retryAfter) || 5, 1), 30);
         await sleep(retrySeconds * 1000);
         startedAt = Date.now();
-        response = await fetchText(current);
+        response = await fetchText(requestedUrl);
         loadMs = Date.now() - startedAt;
       }
-      consecutiveRateLimits = response.status === 429 || response.status === 503 ? consecutiveRateLimits + 1 : 0;
+      consecutiveRateLimits =
+        response.finalStatus === 429 || response.finalStatus === 503 ? consecutiveRateLimits + 1 : 0;
+      if (response.redirectError) {
+        recordRedirectIssues(requestedUrl, requestedPageIssues, response);
+        const finalUrl = response.url || requestedUrl;
+        pages.push({
+          url: requestedUrl,
+          finalUrl,
+          status: response.status,
+          finalStatus: response.finalStatus,
+          redirected: response.redirected,
+          redirectChain: response.redirectChain,
+          redirectLoop: response.redirectLoop,
+          redirectError: response.redirectError,
+          contentType: response.contentType,
+          loadMs,
+          indexable: false,
+          finalIndexable: false,
+          indexabilityReason: response.redirectLoop ? "redirect-loop" : "redirect-failed",
+          depth: currentDepth,
+          discovery: discoveryByUrl.get(requestedKey) || "internal-link",
+          internalInlinks: internalInlinks.get(requestedKey) || 0,
+          sitemapListed: sitemapUrlSet.has(requestedKey) || sitemapUrlSet.has(normalizedUrlKey(finalUrl)),
+          internalLinks: 0,
+          externalLinks: 0,
+          images: 0,
+          assets: 0,
+          issues: pageIssues,
+        });
+        persistProgress();
+        if (consecutiveRateLimits >= 5) {
+          throw new Error(
+            "The site keeps rate limiting the crawl (HTTP 429/503). Wait a while and scan again, or keep the polite crawl speed.",
+          );
+        }
+        if (politeTarget && queue.length > 0 && visited.size < limits.maxPages) {
+          await sleep(pageDelayMs * (0.75 + Math.random() * 0.5));
+        }
+        continue;
+      }
+      const finalUrl = response.url || requestedUrl;
+      const finalKey = normalizedUrlKey(finalUrl);
+      if (response.redirected) recordRedirectIssues(requestedUrl, requestedPageIssues, response);
+      if (processedContent.has(finalKey)) {
+        persistProgress();
+        if (politeTarget && queue.length > 0 && visited.size < limits.maxPages) {
+          await sleep(pageDelayMs * (0.75 + Math.random() * 0.5));
+        }
+        continue;
+      }
+      processedContent.add(finalKey);
+      if (finalKey !== requestedKey) {
+        current = finalUrl;
+        currentKey = finalKey;
+        pageIssues = pageBucket(current);
+        const finalDepth = depthByUrl.get(finalKey);
+        currentDepth = Math.min(currentDepth, finalDepth ?? currentDepth);
+        depthByUrl.set(finalKey, currentDepth);
+        if (!discoveryByUrl.has(finalKey)) {
+          discoveryByUrl.set(finalKey, discoveryByUrl.get(requestedKey) || "internal-link");
+        }
+        internalInlinks.set(
+          finalKey,
+          Math.max(internalInlinks.get(finalKey) || 0, internalInlinks.get(requestedKey) || 0),
+        );
+      }
       const isHtml = /text\/html|application\/xhtml\+xml/i.test(response.contentType) || response.text.includes("<html");
       const $ = cheerio.load(response.text);
-      const finalUrl = response.url || current;
       const baseHref = cleanText($("base[href]").first().attr("href") || "");
       const documentBaseUrl = baseHref ? absoluteHttpUrl(baseHref, finalUrl) || finalUrl : finalUrl;
       const title = cleanText($("title").first().text());
@@ -1180,7 +1581,8 @@ async function runLocalScan(scanId: string) {
         .map((item) => item.trim().toLowerCase())
         .filter(Boolean);
       const hasNoindexDirective = robotDirectives.some((item) => item === "noindex" || item === "none");
-      const indexable = !hasNoindexDirective && response.status < 400;
+      const finalIndexable = !hasNoindexDirective && response.finalStatus < 400 && !response.redirectError;
+      const indexable = finalIndexable;
       const lang = cleanText($("html").attr("lang") || "");
       const viewport = cleanText($('meta[name="viewport"]').attr("content") || "");
       const charset = cleanText($("meta[charset]").attr("charset") || $('meta[http-equiv="content-type"]').attr("content") || "");
@@ -1326,8 +1728,29 @@ async function runLocalScan(scanId: string) {
         };
         linkRows.push(row);
         if (linkInventory.length < limits.maxLinkInventory) linkInventory.push(row);
-        if (linksToCheck.size < limits.maxLinksToCheck && !linksToCheck.has(absolute)) {
-          linksToCheck.set(absolute, { url: absolute, from: current, type: row.type, anchor: row.anchor, rel: row.rel });
+        let linkCandidate = linksToCheck.get(absolute);
+        if (!linkCandidate && linksToCheck.size < limits.maxLinksToCheck) {
+          linkCandidate = {
+            url: absolute,
+            type: row.type,
+            anchor: row.anchor,
+            rel: row.rel,
+            referenceCount: 0,
+            sources: new Map<string, any>(),
+          };
+          linksToCheck.set(absolute, linkCandidate);
+        }
+        if (linkCandidate) {
+          linkCandidate.referenceCount += 1;
+          const source = linkCandidate.sources.get(current) || {
+            from: current,
+            anchor: row.anchor,
+            rel: row.rel,
+            references: 0,
+          };
+          source.references += 1;
+          if (!source.anchor && row.anchor) source.anchor = row.anchor;
+          linkCandidate.sources.set(current, source);
         }
         const target = isInternal ? pageCrawlTarget(absolute, startUrl) : null;
         if (target?.parameterized) addParameterUrl(absolute, "internal-link", current, target.url);
@@ -1375,15 +1798,20 @@ async function runLocalScan(scanId: string) {
       const bodyText = cleanText($("body").text());
       const wordCount = bodyText ? bodyText.split(/\s+/).filter(Boolean).length : 0;
 
-      if (response.status >= 400) {
+      if (response.finalStatus >= 400) {
         pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "high",
           category: "crawl",
           type: "page-http-error",
-          message: `Page returns HTTP ${response.status}`,
+          message: `Page returns HTTP ${response.finalStatus}`,
           recommendation: "Fix the URL or redirect it to a live equivalent.",
-          evidence: { status: response.status },
+          evidence: {
+            status: response.status,
+            finalStatus: response.finalStatus,
+            requestedUrl,
+            redirectChain: response.redirectChain,
+          },
         });
       }
       if (!isHtml) {
@@ -1395,17 +1823,6 @@ async function runLocalScan(scanId: string) {
           message: "Crawled URL is not HTML",
           recommendation: "Keep non-HTML files out of primary crawl paths unless they are intentionally linked.",
           evidence: { contentType: response.contentType },
-        });
-      }
-      if (response.url && response.url !== current) {
-        pushScanIssue(issues, pageIssues, {
-          url: current,
-          severity: "low",
-          category: "crawl",
-          type: "redirected-url",
-          message: "URL redirects before rendering",
-          recommendation: "Link directly to the final URL to reduce crawl waste and latency.",
-          evidence: { finalUrl: response.url },
         });
       }
       if (current.length > 115) {
@@ -1627,7 +2044,19 @@ async function runLocalScan(scanId: string) {
           recommendation: "Confirm cross-domain canonicalization is intentional.",
           evidence: { canonical },
         });
-      } else if (indexable && normalizedUrl(canonical) !== normalizedUrl(finalUrl)) {
+      } else if (
+        response.redirectChain.some((hop) => normalizedUrl(hop.url) === normalizedUrl(canonical))
+      ) {
+        pushScanIssue(issues, pageIssues, {
+          url: current,
+          severity: "low",
+          category: "canonicals",
+          type: "canonical-points-to-redirect",
+          message: "Canonical points to a redirecting URL",
+          recommendation: "Point the canonical directly to the final indexable URL.",
+          evidence: { canonical, finalUrl, redirectChain: response.redirectChain },
+        });
+      } else if (finalIndexable && normalizedUrl(canonical) !== normalizedUrl(finalUrl)) {
         pushScanIssue(issues, pageIssues, {
           url: current,
           severity: "low",
@@ -2170,7 +2599,13 @@ async function runLocalScan(scanId: string) {
       const page = {
         url: current,
         finalUrl,
-        status: response.status,
+        requestedUrl,
+        sourceStatus: response.status,
+        status: response.finalStatus,
+        finalStatus: response.finalStatus,
+        redirected: response.redirected,
+        redirectChain: response.redirectChain,
+        redirectLoop: response.redirectLoop,
         contentType: response.contentType,
         contentEncoding: response.contentEncoding,
         contentLength: response.contentLength,
@@ -2195,6 +2630,8 @@ async function runLocalScan(scanId: string) {
         robotsMeta,
         xRobotsTag,
         indexable,
+        finalIndexable,
+        indexabilityReason: hasNoindexDirective ? "noindex" : response.finalStatus >= 400 ? "http-error" : "indexable",
         lang,
         viewport,
         charset,
@@ -2204,7 +2641,10 @@ async function runLocalScan(scanId: string) {
         depth: currentDepth,
         discovery: discoveryByUrl.get(currentKey) || "internal-link",
         internalInlinks: internalInlinks.get(currentKey) || 0,
-        sitemapListed: sitemapUrlSet.has(currentKey) || sitemapUrlSet.has(normalizedUrlKey(finalUrl)),
+        sitemapListed:
+          sitemapUrlSet.has(currentKey) || sitemapUrlSet.has(normalizedUrlKey(finalUrl)),
+        sitemapSourceListed:
+          requestedKey !== currentKey && sitemapUrlSet.has(requestedKey),
         contentFingerprint: contentFingerprint(bodyText),
         schemaCount,
         schemaParseErrors,
@@ -2251,19 +2691,28 @@ async function runLocalScan(scanId: string) {
   for (const page of pages) {
     const pageKey = normalizedUrlKey(page.url);
     const finalKey = normalizedUrlKey(page.finalUrl || page.url);
+    const requestedKey = normalizedUrlKey(page.requestedUrl || page.url);
     page.internalInlinks = Math.max(
       Number(page.internalInlinks || 0),
       internalInlinks.get(pageKey) || 0,
       internalInlinks.get(finalKey) || 0,
+      internalInlinks.get(requestedKey) || 0,
     );
     page.depth = Math.min(
       Number.isFinite(Number(page.depth)) ? Number(page.depth) : 999,
       depthByUrl.get(pageKey) ?? 999,
       depthByUrl.get(finalKey) ?? 999,
+      depthByUrl.get(requestedKey) ?? 999,
     );
     if (page.depth === 999) page.depth = 0;
-    page.discovery = discoveryByUrl.get(pageKey) || discoveryByUrl.get(finalKey) || page.discovery || "internal-link";
+    page.discovery =
+      discoveryByUrl.get(pageKey) ||
+      discoveryByUrl.get(finalKey) ||
+      discoveryByUrl.get(requestedKey) ||
+      page.discovery ||
+      "internal-link";
     page.sitemapListed = sitemapUrlSet.has(pageKey) || sitemapUrlSet.has(finalKey);
+    page.sitemapSourceListed = requestedKey !== pageKey && sitemapUrlSet.has(requestedKey);
   }
 
   const politeResourcePause = async (url: string) => {
@@ -2274,28 +2723,78 @@ async function runLocalScan(scanId: string) {
   for (const candidate of [...linksToCheck.values()]) {
     await politeResourcePause(candidate.url);
     const result = await checkResource(candidate.url);
-    const row = { ...candidate, ...result };
+    const sources = [...candidate.sources.values()];
+    const sourcePages = sources.map((source) => source.from);
+    const row = {
+      url: candidate.url,
+      type: candidate.type,
+      anchor: candidate.anchor,
+      rel: candidate.rel,
+      from: sourcePages[0] || "",
+      affectedPages: sourcePages.length,
+      referenceCount: candidate.referenceCount,
+      sourcePages,
+      ...result,
+    };
     checkedLinks.push(row);
     if (!row.ok) {
-      pushScanIssue(issues, pageBucket(candidate.from), {
-        url: candidate.from,
-        severity: candidate.type === "internal" ? "high" : "medium",
+      const firstSource = sources[0];
+      const certificateFailure = row.failureKind === "tls-certificate";
+      const redirectLoop = row.redirectLoop === true;
+      pushScanIssue(issues, firstSource ? pageBucket(firstSource.from) : undefined, {
+        url: firstSource?.from || candidate.url,
+        severity: certificateFailure ? "medium" : candidate.type === "internal" ? "high" : "medium",
         category: "links",
-        type: candidate.type === "internal" ? "broken-internal-link" : "broken-external-link",
-        message: `${candidate.type === "internal" ? "Internal" : "External"} link is failing`,
-        recommendation: "Update the linked URL, remove the link, or redirect that URL to a live page.",
-        evidence: { linkedUrl: candidate.url, status: row.status, error: row.error },
+        type: redirectLoop
+          ? "link-redirect-loop"
+          : certificateFailure
+            ? `${candidate.type}-link-certificate-error`
+            : candidate.type === "internal"
+              ? "broken-internal-link"
+              : "broken-external-link",
+        message: redirectLoop
+          ? `${candidate.type === "internal" ? "Internal" : "External"} link has a redirect loop`
+          : certificateFailure
+            ? `${candidate.type === "internal" ? "Internal" : "External"} link certificate could not be verified`
+            : `${candidate.type === "internal" ? "Internal" : "External"} link is failing`,
+        recommendation: certificateFailure
+          ? "Verify the destination certificate in a browser or another trusted client before treating the URL as unavailable."
+          : redirectLoop
+            ? "Fix the redirect cycle or link directly to a working final destination."
+            : "Update the linked URL, remove the link, or redirect that URL to a live page.",
+        evidence: {
+          linkedUrl: candidate.url,
+          status: row.status,
+          finalStatus: row.finalStatus,
+          error: row.error,
+          failureKind: row.failureKind,
+          redirectChain: row.redirectChain,
+          affectedPages: sourcePages.length,
+          totalReferences: row.referenceCount,
+          sourcePages,
+        },
       });
     } else if (row.redirected || (row.finalUrl && row.finalUrl !== candidate.url)) {
-      pushScanIssue(issues, pageBucket(candidate.from), {
-        url: candidate.from,
-        severity: candidate.type === "internal" ? "medium" : "low",
-        category: "links",
-        type: candidate.type === "internal" ? "internal-link-redirects" : "external-link-redirects",
-        message: `${candidate.type === "internal" ? "Internal" : "External"} link redirects`,
-        recommendation: "Link directly to the final destination when the redirect is permanent and intentional.",
-        evidence: { linkedUrl: candidate.url, finalUrl: row.finalUrl, status: row.status },
-      });
+      for (const source of sources) {
+        pushScanIssue(issues, pageBucket(source.from), {
+          url: source.from,
+          severity: candidate.type === "internal" ? "medium" : "low",
+          category: "links",
+          type: candidate.type === "internal" ? "internal-link-redirects" : "external-link-redirects",
+          message: `${candidate.type === "internal" ? "Internal" : "External"} link redirects with HTTP ${row.status}`,
+          recommendation: "Link directly to the final destination when the redirect is permanent and intentional.",
+          evidence: {
+            linkedUrl: candidate.url,
+            finalUrl: row.finalUrl,
+            status: row.status,
+            finalStatus: row.finalStatus,
+            redirectChain: row.redirectChain,
+            affectedPages: sourcePages.length,
+            totalReferences: row.referenceCount,
+            referencesOnPage: source.references,
+          },
+        });
+      }
     }
     if (checkedLinks.length % 25 === 0) persistProgress();
   }
@@ -2310,14 +2809,25 @@ async function runLocalScan(scanId: string) {
       const row = { ...candidate, ...result };
       checkedImages.push(row);
       if (!row.ok) {
+        const certificateFailure = row.failureKind === "tls-certificate";
         pushScanIssue(issues, pageBucket(candidate.from), {
           url: candidate.from,
-          severity: "high",
+          severity: certificateFailure ? "medium" : "high",
           category: "images",
-          type: "broken-image",
-          message: "Image URL is failing",
-          recommendation: "Replace the image URL or restore the missing image asset.",
-          evidence: { image: candidate.url, status: row.status, error: row.error, purpose: candidate.purpose },
+          type: certificateFailure ? "image-certificate-error" : "broken-image",
+          message: certificateFailure ? "Image certificate could not be verified" : "Image URL is failing",
+          recommendation: certificateFailure
+            ? "Verify the image host certificate in a trusted client before treating the image as unavailable."
+            : "Replace the image URL or restore the missing image asset.",
+          evidence: {
+            image: candidate.url,
+            status: row.status,
+            finalStatus: row.finalStatus,
+            error: row.error,
+            failureKind: row.failureKind,
+            redirectChain: row.redirectChain,
+            purpose: candidate.purpose,
+          },
         });
       } else if (row.redirected || (row.finalUrl && row.finalUrl !== candidate.url)) {
         pushScanIssue(issues, pageBucket(candidate.from), {
@@ -2378,14 +2888,30 @@ async function runLocalScan(scanId: string) {
     const row = { ...candidate, ...result };
     checkedAssets.push(row);
     if (!row.ok) {
+      const certificateFailure = row.failureKind === "tls-certificate";
       pushScanIssue(issues, pageBucket(candidate.from), {
         url: candidate.from,
-        severity: "high",
+        severity: certificateFailure ? "medium" : "high",
         category: "assets",
-        type: candidate.type === "css" ? "broken-css" : "broken-javascript",
-        message: `${candidate.type.toUpperCase()} asset is failing`,
-        recommendation: "Restore the asset, fix the URL, or remove the reference.",
-        evidence: { asset: candidate.url, status: row.status, error: row.error },
+        type: certificateFailure
+          ? "asset-certificate-error"
+          : candidate.type === "css"
+            ? "broken-css"
+            : "broken-javascript",
+        message: certificateFailure
+          ? `${candidate.type.toUpperCase()} asset certificate could not be verified`
+          : `${candidate.type.toUpperCase()} asset is failing`,
+        recommendation: certificateFailure
+          ? "Verify the asset host certificate in a trusted client before treating the asset as unavailable."
+          : "Restore the asset, fix the URL, or remove the reference.",
+        evidence: {
+          asset: candidate.url,
+          status: row.status,
+          finalStatus: row.finalStatus,
+          error: row.error,
+          failureKind: row.failureKind,
+          redirectChain: row.redirectChain,
+        },
       });
     } else if (candidate.type === "css" && row.contentType && !/(text\/css|octet-stream)/i.test(row.contentType)) {
       pushScanIssue(issues, pageBucket(candidate.from), {
@@ -2439,7 +2965,7 @@ async function runLocalScan(scanId: string) {
   await checkQueuedImages();
 
   phase = "deduplicating";
-  for (const [title, rows] of groupDuplicateValues(pages, "title")) {
+  for (const [title, rows] of groupDuplicateValues(pages.filter((page) => page.indexable), "title")) {
     for (const page of rows) {
       pushScanIssue(issues, pageBucket(page.url), {
         url: page.url,
@@ -2452,7 +2978,7 @@ async function runLocalScan(scanId: string) {
       });
     }
   }
-  for (const [description, rows] of groupDuplicateValues(pages, "description")) {
+  for (const [description, rows] of groupDuplicateValues(pages.filter((page) => page.indexable), "description")) {
     for (const page of rows) {
       pushScanIssue(issues, pageBucket(page.url), {
         url: page.url,
@@ -2465,7 +2991,7 @@ async function runLocalScan(scanId: string) {
       });
     }
   }
-  for (const [h1, rows] of groupDuplicateValues(pages, "h1")) {
+  for (const [h1, rows] of groupDuplicateValues(pages.filter((page) => page.indexable), "h1")) {
     if (!firstH1Fingerprint(h1)) continue;
     for (const page of rows) {
       pushScanIssue(issues, pageBucket(page.url), {
@@ -2479,7 +3005,7 @@ async function runLocalScan(scanId: string) {
       });
     }
   }
-  for (const [, rows] of groupDuplicateValues(pages.filter((page) => page.wordCount >= 120), "contentFingerprint")) {
+  for (const [, rows] of groupDuplicateValues(pages.filter((page) => page.indexable && page.wordCount >= 120), "contentFingerprint")) {
     for (const page of rows) {
       pushScanIssue(issues, pageBucket(page.url), {
         url: page.url,
@@ -2505,7 +3031,7 @@ async function runLocalScan(scanId: string) {
         });
       }
     }
-    for (const page of pages.filter((item) => !item.indexable)) {
+    for (const page of pages.filter((item) => item.indexabilityReason === "noindex")) {
       if (sitemapUrlSet.has(normalizedUrlKey(page.finalUrl || page.url)) || sitemapUrlSet.has(normalizedUrlKey(page.url))) {
         pushScanIssue(issues, pageBucket(page.url), {
           url: page.url,
@@ -2550,6 +3076,28 @@ async function runLocalScan(scanId: string) {
 
   phase = "completed";
   const score = healthScore(pages, issues);
+  const previousCandidate = all<any>(
+    `
+    SELECT id, created_at, url FROM scans
+    WHERE site_id = ?
+      AND status = 'completed'
+      AND rowid < (SELECT rowid FROM scans WHERE id = ?)
+    ORDER BY rowid DESC
+    LIMIT 50
+    `,
+    [scan.site_id, scanId],
+  ).find((row) => {
+    const candidate = String(row.url || "");
+    const candidateUrl = /^https?:\/\//i.test(candidate) ? candidate : `https://${candidate}`;
+    return normalizedUrlKey(candidateUrl) === normalizedUrlKey(startUrl);
+  });
+  const previousResultRow = previousCandidate
+    ? get<any>("SELECT result_json FROM scans WHERE id = ?", [previousCandidate.id])
+    : null;
+  const previousScan = previousCandidate && previousResultRow
+    ? { ...previousCandidate, result_json: previousResultRow.result_json }
+    : null;
+  const comparison = buildScanComparison(previousScan, pages, issues, limits);
   const result = scanResult({
     startUrl,
     origin,
@@ -2565,6 +3113,7 @@ async function runLocalScan(scanId: string) {
     robots,
     sitemap,
     limits,
+    comparison,
   });
   run(
     `

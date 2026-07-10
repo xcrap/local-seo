@@ -521,6 +521,7 @@ function defaultScanTab(scan: any) {
 
 const scanTabValues = new Set([
   "overview",
+  "changes",
   "progress",
   "issues",
   "checks",
@@ -569,6 +570,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
   const assets = result.assets || [];
   const summary = result.summary || {};
   const issueGroups = result.issueGroups || [];
+  const comparison = result.comparison || {};
   const severityCounts = scanSeverityCounts(scan);
   const coverage = scanCoverageMetrics(scan, result, summary);
   const categories = Object.keys(summary.byCategory || {}).sort();
@@ -731,6 +733,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
       <Tabs value={activeTab} onValueChange={changeScanTab} className="space-y-4">
         <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="changes">Changes</TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>
           <TabsTrigger value="issues">Issues</TabsTrigger>
           <TabsTrigger value="checks">Checks</TabsTrigger>
@@ -759,6 +762,9 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
             onSelectGroup={selectIssueGroup}
             onIgnoreGroup={(group) => ignoreIssueType(group, "site")}
           />
+        </TabsContent>
+        <TabsContent value="changes" className="space-y-4">
+          <ScanChangesReport scan={scan} comparison={comparison} />
         </TabsContent>
         <TabsContent value="progress">
           <ScanProgressPanel scan={scan} result={result} coverage={coverage} />
@@ -891,8 +897,9 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
         </TabsContent>
         <TabsContent value="links">
           <div className="space-y-4">
+            <ScanRedirectImpact coverage={coverage} links={links} />
             {links.length ? (
-              <ScanSection title="Checked links" text="Every unique HTTP URL that the crawler verified. Broken and redirecting links are highlighted in the Status column.">
+              <ScanSection title="Checked links" text="Every unique HTTP URL the crawler verified, including source-page blast radius, reference count, redirect hops, and final response.">
                 <FilteredRows rows={links} placeholder="Filter links…">
                   {(rows) => <ScanLinksTable rows={rows} />}
                 </FilteredRows>
@@ -952,6 +959,138 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ScanChangesReport({ scan, comparison }: { scan: any; comparison: any }) {
+  if (scanIsActive(scan)) {
+    return <EmptyState title="Comparison pending" text="New, fixed, and regressed findings appear after this scan finishes." />;
+  }
+  if (!comparison.available) {
+    const emptyCopy = !scan.result?.scanVersion
+      ? {
+          title: "Comparison unavailable for this saved scan",
+          text: "This report predates versioned crawl comparisons. Fresh scans remain readable, and two new scans will establish a safe baseline.",
+        }
+      : comparison.reason === "incompatible-version"
+      ? {
+          title: "Comparison starts with this scan",
+          text: "The previous report uses older crawl semantics. Run one more scan to get an honest like-for-like comparison.",
+        }
+      : comparison.reason === "scope-changed"
+        ? {
+            title: "Crawl scope changed",
+            text: "The previous scan used a different page limit. Run the same scope again to compare like for like.",
+          }
+        : {
+            title: "First scan for this URL",
+            text: "Run another scan to compare issues, indexability, metadata, content, redirects, and sitemap membership.",
+          };
+    return <EmptyState title={emptyCopy.title} text={emptyCopy.text} />;
+  }
+
+  const summary = comparison.summary || {};
+  const issueChanges = [
+    ...(comparison.newIssues || []),
+    ...(comparison.fixedIssues || []),
+    ...(comparison.severityChanges || []),
+  ];
+  const pageChanges = comparison.pageChanges || [];
+  return (
+    <div className="space-y-4">
+      <ReportSection
+        title="Since the previous scan"
+        description="Saved crawl evidence compared by normalized page URL and stable issue identity."
+        meta={comparison.previousCreatedAt ? `Previous scan · ${formatDate(comparison.previousCreatedAt)}` : undefined}
+      >
+        <MetricTileGrid>
+          <MetricTile label="New issues" value={<CountUp value={summary.newIssues || 0} />} tone={summary.newIssues ? "warn" : "default"} hint="Issue identities not present in the previous scan" />
+          <MetricTile label="Fixed issues" value={<CountUp value={summary.fixedIssues || 0} />} hint="Previous findings absent from this scan" />
+          <MetricTile label="Regressions" value={<CountUp value={summary.regressions || 0} />} tone={summary.regressions ? "bad" : "default"} hint="Indexability, status, redirect, sitemap, or removed-page regressions" />
+          <MetricTile label="Page changes" value={<CountUp value={summary.pageChanges || 0} />} hint="Metadata, content, status, discovery, and sitemap changes" />
+        </MetricTileGrid>
+        {comparison.previousScanId ? (
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link to={`/scans/${comparison.previousScanId}`}><FileSearch /> Open previous scan</Link>
+          </Button>
+        ) : null}
+      </ReportSection>
+
+      <ScanSection title="Issue changes" text="New and fixed findings, plus issues whose severity changed.">
+        {issueChanges.length ? (
+          <FilteredRows rows={issueChanges} placeholder="Filter issue changes…">
+            {(rows) => <ScanIssueChangesTable rows={rows} />}
+          </FilteredRows>
+        ) : <EmptyState title="No issue changes" text="The saved issue identities match the previous scan." />}
+      </ScanSection>
+
+      <ScanSection title="Page changes" text="Indexability, HTTP status, redirect destination, title, description, H1, word count, sitemap, and crawl membership changes.">
+        {pageChanges.length ? (
+          <FilteredRows rows={pageChanges} placeholder="Filter page changes…">
+            {(rows) => <ScanPageChangesTable rows={rows} />}
+          </FilteredRows>
+        ) : <EmptyState title="No page changes" text="The crawled page evidence matches the previous scan." />}
+      </ScanSection>
+    </div>
+  );
+}
+
+function ScanIssueChangesTable({ rows }: { rows: any[] }) {
+  return (
+    <Table>
+      <TableHeader><TableRow><TableHead>Change</TableHead><TableHead>Severity</TableHead><TableHead>Issue</TableHead><TableHead>Page</TableHead><TableHead>Before → after</TableHead></TableRow></TableHeader>
+      <TableBody>
+        {rows.map((row, index) => (
+          <TableRow key={`${row.change}:${row.type}:${row.url}:${index}`}>
+            <TableCell><Badge variant={row.change === "fixed" ? "good" : row.change === "new" ? "warn" : "outline"}>{String(row.change || "changed").replaceAll("-", " ")}</Badge></TableCell>
+            <TableCell><Badge variant={severityVariant(row.severity)}>{row.severity || "low"}</Badge></TableCell>
+            <TableCell className="min-w-64"><div className="font-medium">{row.message}</div><div className="text-xs text-muted-foreground">{String(row.type || "").replaceAll("-", " ")}</div>{row.subject ? <div className="mt-1 max-w-md break-all text-xs text-muted-foreground">Target: {row.subject}</div> : null}</TableCell>
+            <TableCell className="max-w-sm break-all text-sm text-muted-foreground">{row.url || "-"}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">
+              {row.change === "severity-changed" ? `${row.previousSeverity || "-"} → ${row.currentSeverity || row.severity || "-"}` : "-"}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function ScanPageChangesTable({ rows }: { rows: any[] }) {
+  return (
+    <Table>
+      <TableHeader><TableRow><TableHead>Change</TableHead><TableHead>Page</TableHead><TableHead>Field</TableHead><TableHead>Before</TableHead><TableHead>After</TableHead></TableRow></TableHeader>
+      <TableBody>
+        {rows.map((row, index) => (
+          <TableRow key={`${row.type}:${row.url}:${row.field}:${index}`}>
+            <TableCell><Badge variant={row.regression ? "bad" : row.type === "became-indexable" || row.type === "page-added-to-sitemap" ? "good" : "outline"}>{row.label || String(row.type || "changed").replaceAll("-", " ")}</Badge></TableCell>
+            <TableCell className="max-w-sm break-all font-medium">{row.url}</TableCell>
+            <TableCell className="whitespace-nowrap text-muted-foreground">{row.field}</TableCell>
+            <TableCell className="max-w-md"><div className="line-clamp-3 break-words text-sm text-muted-foreground">{String(row.before ?? "-") || "-"}</div></TableCell>
+            <TableCell className="max-w-md"><div className="line-clamp-3 break-words text-sm">{String(row.after ?? "-") || "-"}</div></TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function ScanRedirectImpact({ coverage, links }: { coverage: ReturnType<typeof scanCoverageMetrics>; links: any[] }) {
+  const redirectingTargets = links.filter(
+    (link: any) => link.redirected || (link.finalUrl && link.finalUrl !== link.url),
+  );
+  const referenceHint = coverage.redirectImpactComplete
+    ? "All matching anchor occurrences, aggregated before inventory caps"
+    : "Matching occurrences retained by this older scan; rescan for a complete count";
+  return (
+    <ScanSection title="Redirect blast radius" text="Unique redirecting targets, affected source pages, and total link references are counted separately.">
+      <MetricTileGrid>
+        <MetricTile label="Redirecting targets" value={<CountUp value={coverage.redirectedLinkTargets} />} tone={coverage.redirectedLinkTargets ? "warn" : "default"} hint="Unique checked URLs that redirect" />
+        <MetricTile label="Affected pages" value={<CountUp value={coverage.redirectedLinkPages} />} tone={coverage.redirectedLinkPages ? "warn" : "default"} hint="Distinct crawled pages linking to those targets" />
+        <MetricTile label="Link references" value={<CountUp value={coverage.redirectedLinkReferences} />} tone={coverage.redirectedLinkReferences ? "warn" : "default"} hint={referenceHint} />
+        <MetricTile label="Longest chain" value={<CountUp value={redirectingTargets.reduce((max: number, link: any) => Math.max(max, Number(link.redirectChain?.length || 0)), 0)} />} hint="Maximum recorded HTTP redirect hops" />
+      </MetricTileGrid>
+    </ScanSection>
   );
 }
 
@@ -1168,17 +1307,17 @@ function ScanProgressPanel({
     {
       label: "Check links",
       detail: `${formatNumber(coverage.checkedLinks)} unique URLs checked`,
-      evidence: `${formatNumber(coverage.brokenLinks)} failing · ${formatNumber(coverage.redirectedLinks)} redirecting.`,
+      evidence: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.unverifiedLinks)} certificate-unverified · ${formatNumber(coverage.redirectedLinkTargets)} redirect targets affecting ${formatNumber(coverage.redirectedLinkPages)} pages.`,
     },
     {
       label: "Check images",
       detail: `${formatNumber(coverage.checkedImages)} image URLs checked`,
-      evidence: `${formatNumber(coverage.brokenImages)} failing · ${formatNumber(coverage.redirectedImages)} redirecting · ${formatNumber(coverage.largeImages)} large.`,
+      evidence: `${formatNumber(coverage.brokenImages)} failing · ${formatNumber(coverage.unverifiedImages)} certificate-unverified · ${formatNumber(coverage.redirectedImages)} redirecting · ${formatNumber(coverage.largeImages)} large.`,
     },
     {
       label: "Check CSS/JS",
       detail: `${formatNumber(coverage.checkedAssets)} assets checked`,
-      evidence: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(coverage.cssImageResources)} CSS image URLs found.`,
+      evidence: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(coverage.unverifiedAssets)} certificate-unverified · ${formatNumber(coverage.cssImageResources)} CSS image URLs found.`,
     },
     {
       label: "Build report",
@@ -1252,14 +1391,14 @@ function ScanReportOverview({
     {
       label: "Links checked",
       value: <CountUp value={coverage.checkedLinks} />,
-      tone: coverage.brokenLinks ? "bad" : "default",
-      hint: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.redirectedLinks)} redirecting`,
+      tone: coverage.brokenLinks ? "bad" : coverage.unverifiedLinks || coverage.redirectedLinkTargets ? "warn" : "default",
+      hint: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.unverifiedLinks)} unverified · ${formatNumber(coverage.redirectedLinkTargets)} redirect targets affecting ${formatNumber(coverage.redirectedLinkPages)} pages`,
     },
     {
       label: "Images checked",
       value: <CountUp value={coverage.checkedImages} />,
-      tone: coverage.brokenImages ? "bad" : coverage.largeImages ? "warn" : "default",
-      hint: `${formatNumber(coverage.brokenImages)} broken · ${formatNumber(coverage.largeImages || 0)} large`,
+      tone: coverage.brokenImages ? "bad" : coverage.unverifiedImages || coverage.largeImages ? "warn" : "default",
+      hint: `${formatNumber(coverage.brokenImages)} broken · ${formatNumber(coverage.unverifiedImages)} unverified · ${formatNumber(coverage.largeImages || 0)} large`,
     },
     {
       label: "Avg response",
@@ -1354,7 +1493,9 @@ function ScanReportOverview({
           <p className="text-xs leading-5 text-muted-foreground">
             {resourceFailures
               ? `Resource failures detected — ${formatNumber(coverage.brokenLinks)} links, ${formatNumber(coverage.brokenImages)} images and ${formatNumber(coverage.brokenAssets)} assets need attention. `
-              : "All checked links, images and assets responded. "}
+              : coverage.unverifiedLinks || coverage.unverifiedImages || coverage.unverifiedAssets
+                ? `${formatNumber(coverage.unverifiedLinks)} link, ${formatNumber(coverage.unverifiedImages)} image and ${formatNumber(coverage.unverifiedAssets)} asset certificates could not be verified; these are not counted as broken resources. `
+                : "All checked links, images and assets responded. "}
             Crawl started at <span className="break-all font-medium">{sourceUrl}</span>.
           </p>
         </div>
@@ -1514,8 +1655,8 @@ function ScanSpeedReport({
             {
               title: "CSS/JS requests",
               status: formatNumber(coverage.checkedAssets),
-              tone: coverage.brokenAssets ? "bad" : coverage.checkedAssets ? "good" : "outline",
-              text: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(summary.largeAssets || 0)} large · ${formatNumber(summary.renderBlockingScripts || 0)} render-blocking scripts.`,
+              tone: coverage.brokenAssets ? "bad" : coverage.unverifiedAssets ? "warn" : coverage.checkedAssets ? "good" : "outline",
+              text: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(coverage.unverifiedAssets)} certificate-unverified · ${formatNumber(summary.largeAssets || 0)} large · ${formatNumber(summary.renderBlockingScripts || 0)} render-blocking scripts.`,
             },
             {
               title: "Image loading",
@@ -1563,8 +1704,9 @@ function ScanSpeedPagesTable({ rows }: { rows: any[] }) {
           return (
             <TableRow key={page.url}>
               <TableCell className="min-w-96">
-                <div className="break-all font-medium">{page.finalUrl || page.url}</div>
+                <div className="break-all font-medium">{page.url}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{page.title || "Untitled page"}</div>
+                {page.requestedUrl && page.requestedUrl !== page.url ? <div className="mt-1 break-all text-xs text-warn">via {page.requestedUrl}</div> : null}
               </TableCell>
               <TableCell><Badge variant={page.status >= 400 ? "bad" : page.status >= 300 ? "warn" : "good"}>{page.status || "-"}</Badge></TableCell>
               <TableCell><Badge variant={speedVariant(page.loadMs) as any}>{formatMs(page.loadMs)}</Badge></TableCell>
@@ -1639,6 +1781,7 @@ function ScanCheckMatrix({
         { label: "Missing srcset", value: summary.imagesMissingSrcset, problem: true, severity: "warn", category: "images", types: ["image-srcset-missing"] },
         { label: "No lazy loading", value: summary.imagesMissingLazyLoading, problem: true, severity: "warn", category: "performance", types: ["image-lazy-loading-missing"] },
         { label: "Broken image URLs", value: coverage.brokenImages, problem: true, severity: "bad", category: "images", types: ["broken-image"] },
+        { label: "Unverified image certificates", value: coverage.unverifiedImages, problem: true, severity: "warn", category: "images", types: ["image-certificate-error"] },
         { label: "Redirecting image URLs", value: coverage.redirectedImages, problem: true, severity: "warn", category: "images", types: ["image-redirects"] },
         { label: "Large images", value: coverage.largeImages, problem: true, severity: "warn", category: "images", types: ["large-image"] },
         { label: "Wrong content type", value: issueTypeCount(issues, "image-invalid-content-type"), problem: true, severity: "bad", category: "images", types: ["image-invalid-content-type"] },
@@ -1652,8 +1795,9 @@ function ScanCheckMatrix({
       rows: [
         { label: "Links found", value: coverage.linkTags },
         { label: "Checked links", value: coverage.checkedLinks },
-        { label: "Broken links", value: coverage.brokenLinks, problem: true, severity: "bad", category: "links", types: ["broken-internal-link", "broken-external-link"] },
-        { label: "Redirecting links", value: coverage.redirectedLinks, problem: true, severity: "warn", category: "links", types: ["internal-link-redirects", "external-link-redirects"] },
+        { label: "Broken links", value: coverage.brokenLinks, problem: true, severity: "bad", category: "links", types: ["broken-internal-link", "broken-external-link", "link-redirect-loop"] },
+        { label: "Unverified certificates", value: coverage.unverifiedLinks, problem: true, severity: "warn", category: "links", types: ["internal-link-certificate-error", "external-link-certificate-error"] },
+        { label: "Pages linking to redirects", value: coverage.redirectedLinkPages, problem: true, severity: "warn", category: "links", types: ["internal-link-redirects", "external-link-redirects"] },
         { label: "Empty anchors", value: summary.emptyAnchorLinks, problem: true, severity: "warn", category: "links", types: ["empty-anchor-text"] },
         { label: "Internal nofollow", value: summary.internalNofollowLinks, problem: true, severity: "warn", category: "links", types: ["internal-nofollow"] },
         { label: "Tracked internal links", value: issueTypeCount(issues, "internal-links-with-tracking-parameters"), problem: true, severity: "warn", category: "links", types: ["internal-links-with-tracking-parameters"] },
@@ -1670,7 +1814,7 @@ function ScanCheckMatrix({
         { label: "Noindex pages", value: issueTypeCount(issues, "noindex"), problem: true, severity: "bad", category: "indexability", types: ["noindex"] },
         { label: "Page nofollow", value: issueTypeCount(issues, "meta-robots-nofollow"), problem: true, severity: "warn", category: "indexability", types: ["meta-robots-nofollow"] },
         { label: "Snippet restrictions", value: issueTypeCount(issues, "restrictive-snippet-directive"), problem: true, severity: "warn", category: "indexability", types: ["restrictive-snippet-directive"] },
-        { label: "Canonical issues", value: byCategory.canonicals, problem: true, severity: "warn", category: "canonicals", types: ["canonical-missing", "canonical-invalid", "canonical-multiple", "canonical-http-on-https", "canonical-cross-domain", "canonical-not-self"] },
+        { label: "Canonical issues", value: byCategory.canonicals, problem: true, severity: "warn", category: "canonicals", types: ["canonical-missing", "canonical-invalid", "canonical-multiple", "canonical-http-on-https", "canonical-cross-domain", "canonical-not-self", "canonical-points-to-redirect"] },
         { label: "HTTP pages", value: issueTypeCount(issues, "page-not-https"), problem: true, severity: "bad", category: "security", types: ["page-not-https"] },
         { label: "Lang or charset issues", value: issueTypesCount(issues, ["html-lang-missing", "html-lang-invalid", "charset-missing"]), problem: true, severity: "warn", category: "indexability", types: ["html-lang-missing", "html-lang-invalid", "charset-missing"] },
         { label: "Hreflang issues", value: byCategory.localization, problem: true, severity: "warn", category: "localization", types: ["hreflang-invalid", "hreflang-code-invalid", "hreflang-duplicate", "hreflang-x-default-missing"] },
@@ -1681,8 +1825,10 @@ function ScanCheckMatrix({
       text: "Sitemap, robots, discovery",
       rows: [
         { label: "Pages crawled", value: coverage.pages },
-        { label: "Page crawl failures", value: issueTypesCount(issues, ["crawl-failed", "page-http-error", "non-html-page"]), problem: true, severity: "bad", category: "crawl", types: ["crawl-failed", "page-http-error", "non-html-page"] },
-        { label: "Redirected pages", value: issueTypeCount(issues, "redirected-url"), problem: true, severity: "warn", category: "crawl", types: ["redirected-url"] },
+        { label: "Page crawl failures", value: issueTypesCount(issues, ["crawl-failed", "page-http-error", "non-html-page", "redirect-failed"]), problem: true, severity: "bad", category: "crawl", types: ["crawl-failed", "page-http-error", "non-html-page", "redirect-failed"] },
+        { label: "Redirected pages", value: issueTypesCount(issues, ["redirected-url", "temporary-redirect"]), problem: true, severity: "warn", category: "crawl", types: ["redirected-url", "temporary-redirect"] },
+        { label: "Redirect chains", value: issueTypeCount(issues, "redirect-chain"), problem: true, severity: "warn", category: "crawl", types: ["redirect-chain"] },
+        { label: "Redirect loops", value: issueTypeCount(issues, "redirect-loop"), problem: true, severity: "bad", category: "crawl", types: ["redirect-loop"] },
         { label: "Meta refresh", value: issueTypeCount(issues, "meta-refresh"), problem: true, severity: "warn", category: "crawl", types: ["meta-refresh"] },
         { label: "Long URLs", value: issueTypeCount(issues, "url-too-long"), problem: true, severity: "warn", category: "crawl", types: ["url-too-long"] },
         { label: "Tracked URLs", value: issueTypeCount(issues, "tracking-parameters-in-url"), problem: true, severity: "warn", category: "crawl", types: ["tracking-parameters-in-url"] },
@@ -1702,6 +1848,7 @@ function ScanCheckMatrix({
         { label: "Viewport issues", value: issueTypesCount(issues, ["viewport-missing", "viewport-not-responsive"]), problem: true, severity: "warn", category: "performance", types: ["viewport-missing", "viewport-not-responsive"] },
         { label: "Heavy HTML", value: issueTypesCount(issues, ["heavy-html", "html-compression-missing"]), problem: true, severity: "warn", category: "performance", types: ["heavy-html", "html-compression-missing"] },
         { label: "Broken CSS/JS", value: coverage.brokenAssets, problem: true, severity: "bad", category: "assets", types: ["broken-css", "broken-javascript"] },
+        { label: "Unverified asset certificates", value: coverage.unverifiedAssets, problem: true, severity: "warn", category: "assets", types: ["asset-certificate-error"] },
         { label: "Wrong CSS/JS type", value: issueTypesCount(issues, ["css-invalid-content-type", "javascript-invalid-content-type"]), problem: true, severity: "warn", category: "assets", types: ["css-invalid-content-type", "javascript-invalid-content-type"] },
         { label: "Large CSS/JS", value: summary.largeAssets, problem: true, severity: "warn", category: "assets", types: ["large-css", "large-javascript"] },
         { label: "Render-blocking JS", value: summary.renderBlockingScripts, problem: true, severity: "warn", category: "performance", types: ["render-blocking-javascript"] },
@@ -2028,10 +2175,18 @@ function ScanPagesTable({
             <TableCell className="max-w-sm">
               <div className="truncate font-medium">{page.title || page.url}</div>
               <div className="truncate text-xs text-muted-foreground">{page.url}</div>
+              {page.requestedUrl && page.requestedUrl !== page.url ? <div className="truncate text-xs text-warn">via {page.requestedUrl}</div> : null}
             </TableCell>
-            <TableCell><Badge variant={page.status >= 400 ? "bad" : page.status >= 300 ? "warn" : "good"}>{page.status}</Badge></TableCell>
-            <TableCell><IndexabilityBadge page={page} /></TableCell>
-            <TableCell><Badge variant={page.sitemapListed ? "good" : "warn"}>{page.sitemapListed ? "Listed" : "Missing"}</Badge></TableCell>
+            <TableCell><Badge variant={page.status >= 400 ? "bad" : page.sourceStatus >= 300 || page.status >= 300 ? "warn" : "good"}>{page.sourceStatus != null && page.sourceStatus !== page.status ? `${page.sourceStatus} → ${page.status}` : page.status}</Badge></TableCell>
+            <TableCell>
+              <IndexabilityBadge page={page} />
+              {page.indexabilityReason && page.indexabilityReason !== "indexable" ? <div className="mt-1 text-xs text-muted-foreground">{String(page.indexabilityReason).replaceAll("-", " ")}</div> : null}
+            </TableCell>
+            <TableCell>
+              <Badge variant={page.sitemapListed ? "good" : "warn"}>
+                {page.sitemapListed ? "Listed" : page.sitemapSourceListed ? "Redirect source listed" : "Missing"}
+              </Badge>
+            </TableCell>
             <TableCell className="text-right nums tabular-nums">{formatMs(page.loadMs)}</TableCell>
             <TableCell className="text-right nums tabular-nums">{formatNumber(page.wordCount)}</TableCell>
             <TableCell className="whitespace-nowrap text-right text-muted-foreground nums tabular-nums">
@@ -2129,11 +2284,15 @@ function ScanAssetsTable({ rows }: { rows: any[] }) {
     <Table>
       <TableHeader><TableRow><TableHead>Asset</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Loading</TableHead><TableHead>Content type</TableHead><TableHead>Size</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
       <TableBody>
-        {rows.map((row, index) => (
-          <TableRow key={`${row.url}:${index}`}>
+        {rows.map((row, index) => {
+          const certificateFailure = row.failureKind === "tls-certificate";
+          const status = row.finalStatus != null && row.finalStatus !== row.status
+            ? `${row.status ?? "?"} → ${row.finalStatus}`
+            : row.status || row.error || "failed";
+          return <TableRow key={`${row.url}:${index}`}>
             <TableCell className="max-w-sm break-all font-medium">{row.url}</TableCell>
             <TableCell><Badge variant="outline">{row.type}</Badge></TableCell>
-            <TableCell><Badge variant={row.ok ? "good" : "bad"}>{row.status || row.error || "failed"}</Badge></TableCell>
+            <TableCell><Badge variant={certificateFailure ? "warn" : row.ok ? "good" : "bad"}>{status}</Badge></TableCell>
             <TableCell>
               <div className="flex flex-wrap gap-1">
                 {row.type === "js" && row.placement === "head" && !row.async && !row.defer && !row.module ? <Badge variant="warn">blocking</Badge> : null}
@@ -2146,8 +2305,8 @@ function ScanAssetsTable({ rows }: { rows: any[] }) {
             <TableCell className="text-muted-foreground">{row.contentType || "-"}</TableCell>
             <TableCell className="nums">{formatBytes(row.contentLength)}</TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
-          </TableRow>
-        ))}
+          </TableRow>;
+        })}
       </TableBody>
     </Table>
   );
@@ -2158,17 +2317,21 @@ function ScanImagesTable({ rows }: { rows: any[] }) {
     <Table>
       <TableHeader><TableRow><TableHead>Image</TableHead><TableHead>Status</TableHead><TableHead>Type</TableHead><TableHead>Size</TableHead><TableHead>Purpose</TableHead><TableHead>Final URL</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
       <TableBody>
-        {rows.map((row, index) => (
-          <TableRow key={`${row.url}:${index}`}>
+        {rows.map((row, index) => {
+          const certificateFailure = row.failureKind === "tls-certificate";
+          const status = row.finalStatus != null && row.finalStatus !== row.status
+            ? `${row.status ?? "?"} → ${row.finalStatus}`
+            : row.status || row.error || "failed";
+          return <TableRow key={`${row.url}:${index}`}>
             <TableCell className="max-w-sm break-all font-medium">{row.url}</TableCell>
-            <TableCell><Badge variant={!row.ok ? "bad" : row.redirected || row.finalUrl !== row.url ? "warn" : "good"}>{row.status || row.error || "failed"}</Badge></TableCell>
+            <TableCell><Badge variant={certificateFailure ? "warn" : !row.ok ? "bad" : row.redirected || row.finalUrl !== row.url ? "warn" : "good"}>{status}</Badge></TableCell>
             <TableCell className="text-muted-foreground">{row.contentType || "-"}</TableCell>
             <TableCell className="nums">{formatBytes(row.contentLength)}</TableCell>
             <TableCell><Badge variant="outline">{row.purpose || "img"}</Badge></TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.finalUrl && row.finalUrl !== row.url ? row.finalUrl : "-"}</TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
-          </TableRow>
-        ))}
+          </TableRow>;
+        })}
       </TableBody>
     </Table>
   );

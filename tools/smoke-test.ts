@@ -13,6 +13,8 @@ process.env.CODEX_MODEL = "";
 process.env.CODEX_REASONING_EFFORT = "";
 
 const { sameSiteUrl } = await import("../src/seo");
+const { resourceFailureKind } = await import("../src/scans");
+const { fetchWithRedirectTrace } = await import("../src/http");
 const { codexModel, codexReasoningEffort } = await import("../src/config");
 const { DEFAULT_KEYWORD_LANGUAGE_CODE, DEFAULT_KEYWORD_LOCATION_CODE } = await import("../src/defaults");
 if (codexModel() !== "") {
@@ -30,12 +32,16 @@ if (!sameSiteUrl("https://example.com/about/", "https://www.example.com")) {
 if (sameSiteUrl("https://blog.example.com/", "https://example.com")) {
   throw new Error("Unrelated subdomains must not share scan scope.");
 }
+if (resourceFailureKind("unable to verify the first certificate") !== "tls-certificate") {
+  throw new Error("TLS certificate verification failures must stay distinct from broken HTTP links.");
+}
 const port = 4131 + Math.floor(Math.random() * 400);
 const baseUrl = `http://localhost:${port}`;
 const serverDbDir = path.join(tempDir, "smoke");
 const serverDbPath = path.join(serverDbDir, dbFileName);
 const cookieJar = new Map<string, string>();
 let fixtureUrl = "";
+let fixtureRevision = 1;
 const fixtureServer = Bun.serve({
   port: 0,
   fetch(request) {
@@ -74,6 +80,12 @@ const fixtureServer = Bun.serve({
 	            <a href="/linked-image.jpg">Linked image should not be a page</a>
 	            <a href="/query-page/?cat=5">Parameterized category 5</a>
 	            <a href="/query-page/?cat=6">Parameterized category 6</a>
+              <a href="/redirect-one">Redirect target first reference</a>
+              <a href="/redirect-one">Redirect target second reference</a>
+              <a href="/redirect-chain-start">Redirect chain</a>
+              <a href="/redirect-missing">Redirect to missing page</a>
+              <a href="/normalise">Normalisation redirect</a>
+              <a href="/redirect-loop-a">Redirect loop</a>
             <a href="https://example.com" target="_blank">External target</a>
           </body>
         </html>`,
@@ -91,6 +103,8 @@ const fixtureServer = Bun.serve({
         <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
           <url><loc>${fixtureUrl}/</loc></url>
           <url><loc>${fixtureUrl}/orphan-page</loc></url>
+          <url><loc>${fixtureUrl}/normalise</loc></url>
+          ${fixtureRevision > 1 ? `<url><loc>${fixtureUrl}/base/base-target</loc></url>` : ""}
         </urlset>`,
         { headers: { "content-type": "application/xml; charset=utf-8" } },
       );
@@ -119,14 +133,63 @@ const fixtureServer = Bun.serve({
         <html>
           <head>
             <meta charset="utf-8">
-            <meta name="description" content="This page verifies relative links honor the document base URL.">
-            <title>Document Base Target</title>
+            <meta name="description" content="${fixtureRevision > 1 ? "This updated description verifies scan-to-scan metadata comparisons with real saved crawl evidence." : "This page verifies relative links honor the document base URL."}">
+            <title>${fixtureRevision > 1 ? "Updated Document Base Target" : "Document Base Target"}</title>
+            ${fixtureRevision > 1 ? '<meta name="robots" content="noindex">' : ""}
           </head>
           <body>
-            <h1>Document Base Target</h1>
+            <h1>${fixtureRevision > 1 ? "Updated Document Base Target" : "Document Base Target"}</h1>
+            ${fixtureRevision > 1 ? "<h1>Second comparison heading</h1>" : ""}
             <p>The scanner should discover this URL through the root page base tag.</p>
+            ${fixtureRevision > 1 ? "<p>This second revision adds enough real text to change the saved word-count evidence.</p>" : ""}
+            <a href="/redirect-one">Redirect target from a second source page</a>
+            <a href="/missing-page">Broken fixture link from a second page</a>
           </body>
         </html>`,
+        { headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
+    if (url.pathname === "/redirect-one") {
+      return new Response(null, { status: 302, headers: { location: "/redirect-final" } });
+    }
+    if (url.pathname === "/redirect-chain-start") {
+      return new Response(null, { status: 301, headers: { location: "/redirect-chain-middle" } });
+    }
+    if (url.pathname === "/redirect-chain-middle") {
+      return new Response(null, { status: 302, headers: { location: "/redirect-final" } });
+    }
+    if (url.pathname === "/redirect-missing") {
+      return new Response(null, { status: 301, headers: { location: "/missing-after-redirect" } });
+    }
+    if (url.pathname === "/normalise") {
+      return new Response(null, { status: 301, headers: { location: "/normalised/" } });
+    }
+    if (url.pathname === "/invalid-redirect-location") {
+      return new Response(null, { status: 302, headers: { location: "http://[invalid" } });
+    }
+    if (url.pathname === "/normalised/") {
+      return new Response(
+        `<!doctype html><html><head><meta charset="utf-8"><title>Normalised URL</title><meta name="description" content="The canonical destination for a harmless URL normalisation redirect."><link rel="canonical" href="${fixtureUrl}/normalised/"></head><body><h1>Normalised URL</h1><p>This final page should remain indexable after its redirect source resolves.</p></body></html>`,
+        { headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
+    const longChainMatch = /^\/long-chain\/(\d+)$/.exec(url.pathname);
+    if (longChainMatch) {
+      const hop = Number(longChainMatch[1]);
+      if (hop < 10) {
+        return new Response(null, { status: 302, headers: { location: `/long-chain/${hop + 1}` } });
+      }
+      return new Response("done", { headers: { "content-type": "text/plain" } });
+    }
+    if (url.pathname === "/redirect-loop-a") {
+      return new Response(null, { status: 302, headers: { location: "/redirect-loop-b" } });
+    }
+    if (url.pathname === "/redirect-loop-b") {
+      return new Response(null, { status: 302, headers: { location: "/redirect-loop-a" } });
+    }
+    if (url.pathname === "/redirect-final") {
+      return new Response(
+        `<!doctype html><html><head><meta charset="utf-8"><title>Redirect Destination</title><meta name="description" content="The final destination used to verify redirect status, chains, and link blast radius."><link rel="canonical" href="${fixtureUrl}/redirect-final"></head><body><h1>Redirect Destination</h1><p>This final page resolves after the fixture redirect.</p></body></html>`,
         { headers: { "content-type": "text/html; charset=utf-8" } },
       );
     }
@@ -185,6 +248,26 @@ const fixtureServer = Bun.serve({
   },
 });
 fixtureUrl = `http://localhost:${fixtureServer.port}`;
+const exactRedirectLimit = await fetchWithRedirectTrace(`${fixtureUrl}/long-chain/0`, {}, 10);
+if (exactRedirectLimit.redirectError || exactRedirectLimit.finalStatus !== 200 || exactRedirectLimit.redirectChain.length !== 10) {
+  throw new Error(`Exactly ten redirect hops should resolve when the limit is ten: ${JSON.stringify(exactRedirectLimit)}`);
+}
+await exactRedirectLimit.response.body?.cancel().catch(() => undefined);
+const exceededRedirectLimit = await fetchWithRedirectTrace(`${fixtureUrl}/long-chain/0`, {}, 9);
+if (!/exceeds 9 hops/i.test(exceededRedirectLimit.redirectError) || exceededRedirectLimit.redirectChain.length !== 10) {
+  throw new Error(`The redirect limit should fail only after the allowed hop count: ${JSON.stringify(exceededRedirectLimit)}`);
+}
+await exceededRedirectLimit.response.body?.cancel().catch(() => undefined);
+const invalidRedirectLocation = await fetchWithRedirectTrace(`${fixtureUrl}/invalid-redirect-location`);
+if (
+  invalidRedirectLocation.redirected !== true ||
+  invalidRedirectLocation.redirectChain.length !== 1 ||
+  invalidRedirectLocation.redirectChain[0]?.targetUrl !== "" ||
+  !/location is invalid/i.test(invalidRedirectLocation.redirectError)
+) {
+  throw new Error(`Invalid redirect locations must remain visible in hop evidence: ${JSON.stringify(invalidRedirectLocation)}`);
+}
+await invalidRedirectLocation.response.body?.cancel().catch(() => undefined);
 const emptyEvidenceServer = Bun.serve({
   port: 0,
   fetch() {
@@ -644,6 +727,7 @@ try {
     throw new Error("Site scan report is missing detailed SEO evidence.");
   }
   const fixtureScan = await waitForScan(localSiteScan.scan.id);
+  const mcpFixtureScan = await waitForScan(mcpScan.scan.id);
   const fixturePages = Array.isArray(fixtureScan.result?.pages) ? fixtureScan.result.pages : [];
   const fixtureSummary = fixtureScan.result?.summary || {};
   const fixtureIssues = Array.isArray(fixtureScan.result?.issues) ? fixtureScan.result.issues : [];
@@ -695,6 +779,93 @@ try {
     indexableRows + nonIndexableRows + unknownIndexabilityRows !== fixturePages.length
   ) {
     throw new Error("Fixture scan indexability summary does not match page-level evidence.");
+  }
+  if (fixtureScan.result?.scanVersion !== 2) {
+    throw new Error("Fresh scans must identify the crawl semantics used for safe scan-to-scan comparisons.");
+  }
+  const redirectPage = fixturePages.find((page: any) => page.url === `${fixtureUrl}/redirect-final`);
+  if (
+    redirectPage?.requestedUrl !== `${fixtureUrl}/redirect-one` ||
+    redirectPage?.sourceStatus !== 302 ||
+    redirectPage?.status !== 200 ||
+    redirectPage?.finalStatus !== 200 ||
+    redirectPage?.finalUrl !== `${fixtureUrl}/redirect-final` ||
+    redirectPage?.indexable !== true ||
+    redirectPage?.indexabilityReason !== "indexable" ||
+    redirectPage?.redirectChain?.length !== 1
+  ) {
+    throw new Error(`Redirect destinations must be the content page while preserving source evidence: ${JSON.stringify(redirectPage)}`);
+  }
+  if (fixtureIssues.some((issue: any) => issue.url === `${fixtureUrl}/redirect-one` && issue.type === "page-missing-from-sitemap")) {
+    throw new Error("Redirecting source URLs must not be reported as indexable pages missing from the sitemap.");
+  }
+  const redirectChainIssue = fixtureIssues.find(
+    (issue: any) => issue.url === `${fixtureUrl}/redirect-chain-start` && issue.type === "redirect-chain",
+  );
+  const redirectLoopIssue = fixtureIssues.find(
+    (issue: any) => issue.url === `${fixtureUrl}/redirect-loop-a` && issue.type === "redirect-loop",
+  );
+  if (redirectChainIssue?.evidence?.redirectChain?.length !== 2 || !redirectLoopIssue?.evidence?.redirectChain?.length) {
+    throw new Error("Fixture scan must detect redirect chains and loops with hop evidence.");
+  }
+  const normalisedPage = fixturePages.find((page: any) => page.url === `${fixtureUrl}/normalised/`);
+  if (
+    normalisedPage?.requestedUrl !== `${fixtureUrl}/normalise` ||
+    normalisedPage?.sourceStatus !== 301 ||
+    normalisedPage?.status !== 200 ||
+    normalisedPage?.indexable !== true ||
+    normalisedPage?.sitemapListed !== false ||
+    normalisedPage?.sitemapSourceListed !== true
+  ) {
+    throw new Error(`URL normalisation redirects must resolve to one indexable content page: ${JSON.stringify(normalisedPage)}`);
+  }
+  if (
+    fixtureIssues.some(
+      (issue: any) =>
+        (issue.url === `${fixtureUrl}/normalise` || issue.url === `${fixtureUrl}/normalised/`) &&
+        issue.type === "noindex-page-in-sitemap",
+    )
+  ) {
+    throw new Error("A harmless normalisation redirect must not invent a noindex sitemap problem.");
+  }
+  const redirectErrorPage = fixturePages.find((page: any) => page.url === `${fixtureUrl}/missing-after-redirect`);
+  const redirectErrorIssue = fixtureIssues.find(
+    (issue: any) => issue.url === `${fixtureUrl}/missing-after-redirect` && issue.type === "page-http-error",
+  );
+  if (
+    redirectErrorPage?.requestedUrl !== `${fixtureUrl}/redirect-missing` ||
+    redirectErrorPage?.sourceStatus !== 301 ||
+    redirectErrorPage?.status !== 404 ||
+    redirectErrorIssue?.evidence?.finalStatus !== 404
+  ) {
+    throw new Error(`Redirects to HTTP errors must use the final response status: ${JSON.stringify(redirectErrorPage)}`);
+  }
+  const redirectLink = (fixtureScan.result?.links || []).find((link: any) => link.url === `${fixtureUrl}/redirect-one`);
+  if (
+    redirectLink?.status !== 302 ||
+    redirectLink?.finalStatus !== 200 ||
+    redirectLink?.affectedPages !== 2 ||
+    redirectLink?.referenceCount !== 3 ||
+    !redirectLink?.sourcePages?.includes(`${fixtureUrl}/`) ||
+    !redirectLink?.sourcePages?.includes(`${fixtureUrl}/base/base-target`)
+  ) {
+    throw new Error(`Redirect link blast radius should preserve targets, pages, and references: ${JSON.stringify(redirectLink)}`);
+  }
+  const redirectSourceIssues = fixtureIssues.filter(
+    (issue: any) => issue.type === "internal-link-redirects" && issue.evidence?.linkedUrl === `${fixtureUrl}/redirect-one`,
+  );
+  if (redirectSourceIssues.length !== 2 || !redirectSourceIssues.every((issue: any) => issue.evidence?.affectedPages === 2)) {
+    throw new Error(`Redirect findings must fan out to every affected source page: ${JSON.stringify(redirectSourceIssues)}`);
+  }
+  const brokenSourceIssues = fixtureIssues.filter(
+    (issue: any) => issue.type === "broken-internal-link" && issue.evidence?.linkedUrl === `${fixtureUrl}/missing-page`,
+  );
+  if (
+    brokenSourceIssues.length !== 1 ||
+    brokenSourceIssues[0]?.evidence?.affectedPages !== 2 ||
+    brokenSourceIssues[0]?.evidence?.totalReferences !== 2
+  ) {
+    throw new Error(`Broken targets should score once while retaining their full blast radius: ${JSON.stringify(brokenSourceIssues)}`);
   }
   const timedFixturePages = fixturePages.filter((page: any) => Number.isFinite(Number(page.loadMs)) && Number(page.loadMs) >= 0);
   if (
@@ -802,6 +973,54 @@ try {
   if (!fixtureScan.result?.summary?.cssImageResources || !fixtureScan.result?.summary?.pictureSourceImages) {
     throw new Error("Fixture scan did not check CSS image URLs and picture source URLs.");
   }
+  fixtureRevision = 2;
+  const comparisonScanStart = await request("/api/scans", {
+    method: "POST",
+    body: JSON.stringify({ siteId: localSite.id, url: fixtureUrl }),
+  });
+  const comparisonScan = await waitForScan(comparisonScanStart.id);
+  fixtureRevision = 1;
+  const comparison = comparisonScan.result?.comparison;
+  if (!comparison?.available || comparison.previousScanId !== mcpFixtureScan.id) {
+    throw new Error(`Completed scans must compare with the preceding saved scan: ${JSON.stringify(comparison)}`);
+  }
+  if (
+    !comparison.newIssues?.some((issue: any) => issue.url === `${fixtureUrl}/base/base-target` && issue.type === "noindex") ||
+    !comparison.fixedIssues?.some((issue: any) => issue.url === `${fixtureUrl}/base/base-target` && issue.type === "page-missing-from-sitemap")
+  ) {
+    throw new Error(`Scan comparison must surface new and fixed issue identities: ${JSON.stringify(comparison.summary)}`);
+  }
+  const comparisonPageTypes = new Set(
+    (comparison.pageChanges || [])
+      .filter((change: any) => change.url === `${fixtureUrl}/base/base-target`)
+      .map((change: any) => change.type),
+  );
+  for (const expected of [
+    "became-non-indexable",
+    "title-changed",
+    "description-changed",
+    "h1-changed",
+    "wordCount-changed",
+    "page-added-to-sitemap",
+  ]) {
+    if (!comparisonPageTypes.has(expected)) {
+      throw new Error(`Scan comparison did not save ${expected}: ${JSON.stringify([...comparisonPageTypes])}`);
+    }
+  }
+  const comparisonIgnore = await request(`/api/sites/${localSite.id}/issue-ignores`, {
+    method: "POST",
+    body: JSON.stringify({ type: "noindex" }),
+  });
+  const filteredComparisonScan = await request(`/api/scans/${comparisonScan.id}`);
+  if (
+    (filteredComparisonScan.result?.comparison?.newIssues || []).some(
+      (issue: any) => issue.type === "noindex",
+    ) ||
+    filteredComparisonScan.result?.comparison?.summary?.newIssues !== comparison.summary.newIssues - 1
+  ) {
+    throw new Error("Saved ignore rules must also filter scan-to-scan issue changes and their counts.");
+  }
+  await request(`/api/sites/${localSite.id}/issue-ignores/${comparisonIgnore.id}`, { method: "DELETE" });
   const initialIgnores = await request(`/api/sites/${localSite.id}/issue-ignores`);
   if (!Array.isArray(initialIgnores) || initialIgnores.length) {
     throw new Error("Fixture site should start with no saved ignore rules.");

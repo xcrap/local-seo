@@ -1024,6 +1024,37 @@ export function scanCoverageMetrics(scan: any, result: any = {}, summary: any = 
   const checkedLinks = maxCount(summary.checkedLinks, links.length);
   const checkedImages = maxCount(summary.checkedImages, images.length);
   const checkedAssets = maxCount(summary.checkedAssets, assets.length);
+  const redirectingLinks = links.filter(
+    (link: any) => link.redirected || (link.finalUrl && link.finalUrl !== link.url),
+  );
+  const redirectingTargetUrls = new Set(redirectingLinks.map((link: any) => String(link.url || "")));
+  const redirectInventoryRows = linkInventory.filter((link: any) => redirectingTargetUrls.has(String(link.href || "")));
+  const redirectedLinkPageFallback = new Set(
+    [
+      ...redirectingLinks.flatMap((link: any) =>
+        Array.isArray(link.sourcePages) && link.sourcePages.length ? link.sourcePages : link.from ? [link.from] : [],
+      ),
+      ...redirectInventoryRows.map((link: any) => link.from).filter(Boolean),
+    ],
+  ).size;
+  const brokenLinkFallback = links.filter(
+    (link: any) => link.ok === false && link.failureKind !== "tls-certificate",
+  ).length;
+  const unverifiedLinkFallback = links.filter(
+    (link: any) => link.ok === false && link.failureKind === "tls-certificate",
+  ).length;
+  const brokenImageFallback = images.filter(
+    (image: any) => image.ok === false && image.failureKind !== "tls-certificate",
+  ).length;
+  const unverifiedImageFallback = images.filter(
+    (image: any) => image.ok === false && image.failureKind === "tls-certificate",
+  ).length;
+  const brokenAssetFallback = assets.filter(
+    (asset: any) => asset.ok === false && asset.failureKind !== "tls-certificate",
+  ).length;
+  const unverifiedAssetFallback = assets.filter(
+    (asset: any) => asset.ok === false && asset.failureKind === "tls-certificate",
+  ).length;
   const indexabilityUnknownFromRows = Math.max(0, pageCount - indexabilityKnownPages);
   const unknownIndexabilityPages = Number.isFinite(Number(summary.unknownIndexabilityPages))
     ? Number(summary.unknownIndexabilityPages)
@@ -1035,8 +1066,12 @@ export function scanCoverageMetrics(scan: any, result: any = {}, summary: any = 
     nonIndexablePages: pages.length ? pages.filter((page: any) => page.indexable === false).length : nonIndexablePages,
     unknownIndexabilityPages,
     sitemapUrls: maxCount(summary.sitemapUrls, sitemapUrls.length, pages.filter((page: any) => page.sitemapListed).length),
-    pagesMissingFromSitemap: maxCount(summary.pagesMissingFromSitemap, pages.filter((page: any) => page.sitemapListed === false).length),
-    noindexPagesInSitemap: maxCount(summary.noindexPagesInSitemap, pages.filter((page: any) => page.sitemapListed && page.indexable === false).length),
+    pagesMissingFromSitemap: summary.pagesMissingFromSitemap != null
+      ? metricNumber(summary.pagesMissingFromSitemap)
+      : pages.filter((page: any) => page.indexable === true && page.sitemapListed === false).length,
+    noindexPagesInSitemap: summary.noindexPagesInSitemap != null
+      ? metricNumber(summary.noindexPagesInSitemap)
+      : pages.filter((page: any) => page.sitemapListed && page.indexable === false).length,
     orphanPages: maxCount(summary.orphanPages, pages.filter((page: any) => Number(page.depth || 0) > 0 && Number(page.internalInlinks || 0) === 0).length),
     deepPages: maxCount(summary.deepPages, pages.filter((page: any) => Number(page.depth || 0) >= 4).length),
     linkTags: maxCount(summary.linkTags, linkInventory.length, pages.reduce((total: number, page: any) => total + Number(page.internalLinks || 0) + Number(page.externalLinks || 0), 0)),
@@ -1055,10 +1090,25 @@ export function scanCoverageMetrics(scan: any, result: any = {}, summary: any = 
     slowPages: maxCount(summary.slowPages, loadTimes.filter((value: number) => value > 2000).length),
     verySlowPages: maxCount(summary.verySlowPages, loadTimes.filter((value: number) => value > 4000).length),
     cssImageResources: maxCount(summary.cssImageResources, images.filter((image: any) => image.purpose === "css-url" || image.purpose === "external-css-url").length),
-    brokenLinks: maxCount(summary.brokenLinks, links.filter((link: any) => link.ok === false).length),
-    brokenImages: maxCount(summary.brokenImages, images.filter((image: any) => image.ok === false).length),
-    brokenAssets: maxCount(summary.brokenAssets, assets.filter((asset: any) => asset.ok === false).length),
-    redirectedLinks: maxCount(summary.redirectedLinks, links.filter((link: any) => link.redirected || (link.finalUrl && link.finalUrl !== link.url)).length),
+    brokenLinks: summary.brokenLinks != null ? metricNumber(summary.brokenLinks) : brokenLinkFallback,
+    unverifiedLinks: summary.unverifiedLinks != null ? metricNumber(summary.unverifiedLinks) : unverifiedLinkFallback,
+    brokenImages: summary.brokenImages != null ? metricNumber(summary.brokenImages) : brokenImageFallback,
+    unverifiedImages: summary.unverifiedImages != null
+      ? metricNumber(summary.unverifiedImages)
+      : unverifiedImageFallback,
+    brokenAssets: summary.brokenAssets != null ? metricNumber(summary.brokenAssets) : brokenAssetFallback,
+    unverifiedAssets: summary.unverifiedAssets != null
+      ? metricNumber(summary.unverifiedAssets)
+      : unverifiedAssetFallback,
+    redirectedLinks: maxCount(summary.redirectedLinkTargets, summary.redirectedLinks, redirectingLinks.length),
+    redirectedLinkTargets: maxCount(summary.redirectedLinkTargets, summary.redirectedLinks, redirectingLinks.length),
+    redirectedLinkPages: maxCount(summary.redirectedLinkPages, redirectedLinkPageFallback),
+    redirectImpactComplete: summary.redirectedLinkReferences != null,
+    redirectedLinkReferences: maxCount(
+      summary.redirectedLinkReferences,
+      redirectInventoryRows.length,
+      redirectingLinks.reduce((total: number, link: any) => total + Math.max(1, Number(link.referenceCount || 0)), 0),
+    ),
     redirectedImages: maxCount(summary.redirectedImages, images.filter((image: any) => image.redirected || (image.finalUrl && image.finalUrl !== image.url)).length),
     largeImages: maxCount(summary.largeImages, images.filter((image: any) => Number(image.contentLength || 0) > 500_000).length),
   };
@@ -1288,18 +1338,36 @@ export function pageH1Status(page: any) {
 export function ScanLinksTable({ rows }: { rows: any[] }) {
   return (
     <Table>
-      <TableHeader><TableRow><TableHead>URL</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Anchor</TableHead><TableHead>Final URL</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>URL</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Affected pages</TableHead><TableHead>References</TableHead><TableHead>Hops</TableHead><TableHead>Anchor</TableHead><TableHead>Final URL</TableHead><TableHead>First found on</TableHead></TableRow></TableHeader>
       <TableBody>
-        {rows.map((row, index) => (
+        {rows.map((row, index) => {
+          const status = row.finalStatus != null && row.status != null && row.finalStatus !== row.status
+            ? `${row.status} → ${row.finalStatus}`
+            : row.status || row.error || "failed";
+          const statusVariant = row.failureKind === "tls-certificate"
+            ? "warn"
+            : !row.ok
+              ? "bad"
+              : row.redirected || row.finalUrl !== row.url
+                ? "warn"
+                : "good";
+          return (
           <TableRow key={`${row.url}:${index}`}>
             <TableCell className="max-w-sm break-all font-medium">{row.url}</TableCell>
             <TableCell><Badge variant="outline">{row.type}</Badge></TableCell>
-            <TableCell><Badge variant={!row.ok ? "bad" : row.redirected || row.finalUrl !== row.url ? "warn" : "good"}>{row.status || row.error || "failed"}</Badge></TableCell>
+            <TableCell>
+              <Badge variant={statusVariant as any}>{status}</Badge>
+              {row.failureKind === "tls-certificate" ? <div className="mt-1 text-xs text-muted-foreground">certificate unverified</div> : null}
+            </TableCell>
+            <TableCell className="nums">{formatNumber(row.affectedPages || row.sourcePages?.length || (row.from ? 1 : 0))}</TableCell>
+            <TableCell className="nums">{formatNumber(row.referenceCount || 1)}</TableCell>
+            <TableCell className="nums">{formatNumber(row.redirectChain?.length || 0)}</TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.anchor || "-"}</TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.finalUrl && row.finalUrl !== row.url ? row.finalUrl : "-"}</TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
           </TableRow>
-        ))}
+        );
+        })}
       </TableBody>
     </Table>
   );
