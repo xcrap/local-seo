@@ -268,11 +268,10 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 			if (activeSiteIdRef.current !== scanSiteId) {
 				return;
 			}
-			if (result.scan?.id) {
-				navigate(`/scans/${result.scan.id}`);
-			} else {
-				navigate("/scans");
-			}
+			// Land on the scans workspace (which carries the scan context bar and
+			// switcher) rather than the focused single-scan page, so the user can
+			// move between scans without a "Back to scans" detour.
+			navigate("/scans");
 		} catch (err) {
 			toast.error(
 				err instanceof Error ? err.message : "Could not start site scan",

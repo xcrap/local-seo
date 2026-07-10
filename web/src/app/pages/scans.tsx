@@ -902,6 +902,12 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setPageFilter("");
     showIssues();
   };
+  // Entering/leaving the ignored view drops the other filters — a leftover page or
+  // check filter would silently hide most ignored issues ("Showing 1 of 59").
+  const toggleIgnoredView = () => {
+    resetIssueFilters();
+    setShowIgnored(!showIgnored);
+  };
   return (
     <div className="space-y-5">
       <Tabs value={activeTab} onValueChange={changeScanTab} className="space-y-4">
@@ -1003,7 +1009,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
                 size="sm"
                 variant={showIgnored ? "secondary" : "outline"}
                 className="h-8 text-xs"
-                onClick={() => setShowIgnored(!showIgnored)}
+                onClick={toggleIgnoredView}
               >
                 <EyeOff /> Ignored ({formatNumber(ignoredIssues.length)})
               </Button>
@@ -1574,8 +1580,7 @@ function ScanReportOverview({
   const isCompleted = scan.status === "completed";
   const isFailed = scan.status === "failed";
   const finalScore = Number(scan.score || 0);
-  const progress = scanProgress(scan);
-  const dialColor = isFailed ? "var(--bad)" : isActive ? "var(--primary)" : undefined;
+  const dialColor = isFailed ? "var(--bad)" : undefined;
   const sourceUrl = result.startUrl || scan.url;
   const metaIssues = Number(summary.missingTitles || 0) + Number(summary.missingDescriptions || 0);
   const imageAltIssues = Number(summary.missingAlt || 0) + Number(summary.imagesMissingDimensions || 0);
@@ -1623,29 +1628,29 @@ function ScanReportOverview({
 
   return (
     <ReportSection
-      title={isActive ? "Live scan progress" : "Scan health"}
-      description={
-        isActive
-          ? undefined
-          : "The percentage of crawled pages without high-severity issues. Medium and low findings are listed for review but never lower the score."
-      }
+      title="Scan health"
+      description="The percentage of crawled pages without high-severity issues. Medium and low findings are listed for review but never lower the score."
     >
       <div className="grid gap-6 xl:grid-cols-[248px_minmax(0,1fr)]">
         <div className="flex flex-col items-center gap-4 pb-6 text-center xl:pb-0 xl:pr-6">
-          <ScoreDial
-            score={isCompleted || isFailed ? finalScore : progress}
-            size={148}
-            color={dialColor}
-            suffix={isActive ? "%" : undefined}
-            label={isCompleted ? scoreVerdict(finalScore) : isFailed ? "score" : "progress"}
-          />
           {isActive ? (
-            <div className="w-full space-y-2">
-              <ProgressBar value={progress} />
-              <p className="text-xs leading-5 text-muted-foreground">The final health score appears after the crawl, resource checks, and report build finish.</p>
+            <div className="flex flex-col items-center justify-center gap-2.5 py-10 text-center">
+              <StatusDot tone="warn" />
+              <p className="text-sm font-medium">Scan in progress</p>
+              <p className="max-w-[210px] text-xs leading-5 text-muted-foreground">
+                Your health score appears here once the crawl, resource checks, and report build finish. Follow it live on the Progress tab.
+              </p>
             </div>
           ) : (
-            <div className="w-full space-y-3">
+            <div className="w-full space-y-4">
+              <div className="flex justify-center">
+                <ScoreDial
+                  score={finalScore}
+                  size={148}
+                  color={dialColor}
+                  label={isCompleted ? scoreVerdict(finalScore) : "score"}
+                />
+              </div>
               <div className="flex items-start justify-center gap-7">
                 {[
                   { key: "high", label: "High", count: severityCounts.high, labelClass: "text-bad" },
