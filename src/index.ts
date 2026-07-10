@@ -15,7 +15,7 @@ import {
   verifyPassword,
   verifySessionToken,
 } from "./auth";
-import { isAppPreferenceKey, listPublicConfig, setConfigValue } from "./config";
+import { getConfigValue, isAppPreferenceKey, listPublicConfig, setConfigValue } from "./config";
 import { createAiJob, getAiJob, listAiJobs, listAiPrompts, saveAiPrompt } from "./codex";
 import {
   createGscAuthUrl,
@@ -94,6 +94,10 @@ const appUrl = process.env.APP_URL?.trim() || "http://localhost:5173";
 const apiUrl = process.env.API_URL?.trim() || "http://localhost:3031";
 const port = Number(portFromUrl(apiUrl) || 3031);
 const appPort = Number(portFromUrl(appUrl) || 5173);
+// Bind to loopback by default so a local-first workstation is not exposed to
+// other devices on the network. Set API_HOST=0.0.0.0 (or a LAN IP) to opt in.
+const apiHost = process.env.API_HOST?.trim() || "127.0.0.1";
+const mcpBoundBeyondLoopback = !["127.0.0.1", "::1", "localhost", ""].includes(apiHost);
 const authConfig = getAuthConfig();
 const configuredAppOrigin = normalizeOrigin(appUrl);
 const devCorsOrigins = new Set(
@@ -264,7 +268,48 @@ app.use("/api/*", async (c, next) => {
   await next();
 });
 
-app.post("/mcp", handleMcp);
+// The MCP endpoint sits outside the /api/* session guard so external MCP
+// clients (which send no session cookie) can reach it. Real MCP clients are not
+// browsers and send no Origin header; a browser page on another origin always
+// does. Rejecting cross-origin requests blocks a malicious page from silently
+// driving MCP tools (starting crawls, spawning Codex jobs) via the user's
+// session, while leaving legitimate non-browser clients and the local app
+// untouched.
+//
+// An absent Origin is only a safe proxy for "trusted local client" while the
+// server is loopback-bound. Once API_HOST exposes it to the LAN, a bearer token
+// (mcp_token) becomes mandatory — otherwise a remote HTTP client could omit
+// Origin and invoke privileged tools unauthenticated. Fail closed if no token
+// is configured in that mode.
+const mcpAllowedOrigins = new Set(
+  [
+    ...devCorsOrigins,
+    `http://localhost:${port}`,
+    `http://127.0.0.1:${port}`,
+  ].filter((origin): origin is string => Boolean(origin)),
+);
+
+function mcpOriginAllowed(origin?: string) {
+  if (!origin) return true;
+  return mcpAllowedOrigins.has(origin);
+}
+
+app.post("/mcp", (c) => {
+  if (!mcpOriginAllowed(c.req.header("origin"))) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+  if (mcpBoundBeyondLoopback) {
+    const token = getConfigValue("mcp_token");
+    const auth = c.req.header("authorization") || "";
+    if (!token || auth !== `Bearer ${token}`) {
+      return c.json(
+        { error: "MCP requires a bearer token (mcp_token) when API_HOST is not loopback." },
+        401,
+      );
+    }
+  }
+  return handleMcp(c);
+});
 app.get("/api/mcp/tools", (c) => c.json({ tools: mcpToolList() }));
 
 app.get("/api/dashboard", safe((c) => c.json(dashboardSummary(siteQueryId(c)))));
@@ -629,9 +674,15 @@ if (recovered.scans || recovered.jobs) {
   console.log(`Recovered ${recovered.scans} interrupted scan(s) and ${recovered.jobs} interrupted job(s) from a previous run.`);
 }
 
-console.log(`Local SEO API running on http://localhost:${port}`);
+console.log(`Local SEO API running on http://${apiHost === "0.0.0.0" ? "localhost" : apiHost}:${port}`);
+if (mcpBoundBeyondLoopback && !getConfigValue("mcp_token")) {
+  console.warn(
+    `API_HOST=${apiHost} exposes this server beyond loopback but no mcp_token is set — the MCP endpoint is disabled until you configure one.`,
+  );
+}
 
 export default {
   port,
+  hostname: apiHost,
   fetch: app.fetch,
 };

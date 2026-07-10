@@ -8,7 +8,9 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repoRoot, "");
   const appUrl = env.APP_URL || "http://localhost:5173";
-  const apiTarget = env.API_URL || "http://localhost:3031";
+  // Use 127.0.0.1 (not localhost) so the proxy matches the API's loopback bind
+  // without depending on IPv4/IPv6 resolution order for "localhost".
+  const apiTarget = env.API_URL || "http://127.0.0.1:3031";
   const appPort = portFromUrl(appUrl) || "5173";
 
   return {

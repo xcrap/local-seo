@@ -36,7 +36,7 @@ if (resourceFailureKind("unable to verify the first certificate") !== "tls-certi
   throw new Error("TLS certificate verification failures must stay distinct from broken HTTP links.");
 }
 const port = 4131 + Math.floor(Math.random() * 400);
-const baseUrl = `http://localhost:${port}`;
+const baseUrl = `http://127.0.0.1:${port}`;
 const serverDbDir = path.join(tempDir, "smoke");
 const serverDbPath = path.join(serverDbDir, dbFileName);
 const cookieJar = new Map<string, string>();

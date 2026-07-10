@@ -107,6 +107,9 @@ export function ScansPage({ site }: { site: Site }) {
   const [showCustomUrl, setShowCustomUrl] = useState(false);
   const [manualLedgerScanId, setManualLedgerScanId] = useState("");
   const [manualLedgerSiteId, setManualLedgerSiteId] = useState("");
+  // The scan the user just started from this page. Kept so a new scan announces
+  // itself in a banner instead of silently replacing the report being read.
+  const [startedScanId, setStartedScanId] = useState("");
   async function load() {
     const [siteRows, ledgerRows] = await Promise.all([
       api.scans(site.id),
@@ -181,10 +184,7 @@ export function ScansPage({ site }: { site: Site }) {
     setManualLedgerSiteId("");
     try {
       const scan = await api.startScan({ siteId: site.id, url });
-      setDetail(scan);
-      setScans((rows) => upsertScanRow(rows, scan));
-      setAllScans((rows) => upsertScanRow(rows, scan));
-      if (scan?.id) setSelectedScanId(site.id, scan.id);
+      openStartedScan(scan);
       setShowCustomUrl(false);
       load().catch(console.error);
     } catch (err) {
@@ -201,16 +201,29 @@ export function ScansPage({ site }: { site: Site }) {
     setManualLedgerSiteId("");
     try {
       const result = await api.scanSite(site.id);
-      setDetail(result.scan);
-      setScans((rows) => upsertScanRow(rows, result.scan));
-      setAllScans((rows) => upsertScanRow(rows, result.scan));
-      if (result.scan?.id) setSelectedScanId(site.id, result.scan.id);
+      openStartedScan(result.scan);
       load().catch(console.error);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start site scan");
     } finally {
       setStarting(false);
     }
+  }
+  // A freshly started scan is added to the lists and tracked, but the open
+  // report is only replaced when nothing is being viewed yet — otherwise the
+  // new run is announced in a banner so the user keeps their place.
+  function openStartedScan(scan: any) {
+    if (!scan?.id) return;
+    setScans((rows) => upsertScanRow(rows, scan));
+    setAllScans((rows) => upsertScanRow(rows, scan));
+    setStartedScanId(scan.id);
+    if (!detail) {
+      setDetail(scan);
+      setSelectedScanId(site.id, scan.id);
+    }
+  }
+  function viewStartedScan() {
+    if (startedScanId) inspect(startedScanId).catch(console.error);
   }
   async function inspect(id: string, row?: any) {
     setManualLedgerScanId(id);
@@ -255,6 +268,14 @@ export function ScansPage({ site }: { site: Site }) {
       setClearingScans(false);
     }
   }
+  const runningOther = scans.find((row) => scanIsActive(row) && row.id !== detail?.id) || null;
+  const startedScan = startedScanId ? scans.find((row) => row.id === startedScanId) : null;
+  const startedFinished =
+    startedScan && !scanIsActive(startedScan) && startedScan.id !== detail?.id ? startedScan : null;
+  const viewedTime = detail ? new Date(detail.created_at || detail.updated_at || 0).getTime() : 0;
+  const newerCount = detail
+    ? scans.filter((row) => new Date(row.created_at || row.updated_at || 0).getTime() > viewedTime).length
+    : 0;
   return (
     <>
       <PageHeader
@@ -301,15 +322,34 @@ export function ScansPage({ site }: { site: Site }) {
       ) : null}
       <div className="space-y-8">
         <section>
-          <div className="mb-4 flex flex-wrap items-baseline gap-2.5">
-            <h2 className="font-heading text-lg leading-tight">Scan report</h2>
-            {detail ? (
-              <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                <StatusDot tone={scanStatusTone(detail.status)} />
-                {scanStatusLabel(detail.status)} · {formatDate(detail.created_at || detail.updated_at)}
-              </span>
-            ) : null}
-          </div>
+          {runningOther ? (
+            <NewScanBanner
+              tone="running"
+              title="A newer scan is running"
+              detailText={`${runningOther.url} · ${scanPhaseLabel(runningOther)} · ${formatNumber(runningOther.pages_crawled || 0)} pages`}
+              onView={() => inspect(runningOther.id, runningOther).catch(console.error)}
+            />
+          ) : startedFinished ? (
+            <NewScanBanner
+              tone="done"
+              title="Your new scan finished"
+              detailText={`${startedFinished.url} · score ${formatNumber(Number(startedFinished.score || 0))} · ${formatNumber(startedFinished.pages_crawled || 0)} pages`}
+              onView={viewStartedScan}
+              onDismiss={() => setStartedScanId("")}
+            />
+          ) : null}
+          {detail ? (
+            <ScanContextBar
+              scan={detail}
+              siteRows={scans}
+              newerCount={newerCount}
+              onSwitch={(id) => inspect(id, scans.find((row) => row.id === id)).catch(console.error)}
+            />
+          ) : (
+            <div className="mb-4">
+              <h2 className="font-heading text-lg leading-tight">Scan report</h2>
+            </div>
+          )}
           {detail ? <ScanDetail scan={detail} /> : (
             <TabCard>
               <EmptyState
@@ -397,6 +437,115 @@ export function ScansPage({ site }: { site: Site }) {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function ScanContextBar({
+  scan,
+  siteRows,
+  newerCount,
+  onSwitch,
+}: {
+  scan: any;
+  siteRows: any[];
+  newerCount: number;
+  onSwitch: (id: string) => void;
+}) {
+  const running = scanIsActive(scan);
+  const completed = scan.status === "completed";
+  const score = Number(scan.score || 0);
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-4 py-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Viewing scan
+          {newerCount > 0 ? (
+            <Badge variant="warn">{newerCount} newer {newerCount === 1 ? "scan" : "scans"}</Badge>
+          ) : (
+            <Badge variant="outline">Latest</Badge>
+          )}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+          <span className="min-w-0 max-w-full break-all font-medium">{scan.url}</span>
+          <span className="text-border">·</span>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
+            <StatusDot tone={scanStatusTone(scan.status)} />
+            {scanStatusLabel(scan.status)} · {formatDate(scan.created_at || scan.updated_at)}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {running ? (
+          <div className="w-40">
+            <div className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+              <StatusDot tone="warn" /> {scanPhaseLabel(scan)}
+            </div>
+            <div className="mt-1"><ProgressBar value={scanProgress(scan)} /></div>
+          </div>
+        ) : completed ? (
+          <span className="whitespace-nowrap text-sm text-muted-foreground">
+            <span className="metric text-lg leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
+            {" · "}{scoreVerdict(score)}
+          </span>
+        ) : null}
+        {siteRows.length > 1 ? (
+          <Select value={scan.id} onValueChange={onSwitch}>
+            <SelectTrigger className="h-8 w-auto min-w-[190px]" aria-label="Switch to another saved scan">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {siteRows.map((row) => (
+                <SelectItem key={row.id} value={row.id}>
+                  {formatDate(row.created_at || row.updated_at)} · {scanIsActive(row) ? scanStatusLabel(row.status) : formatNumber(Number(row.score || 0))}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+        <Button asChild size="icon" variant="ghost" className="size-8 text-muted-foreground hover:text-foreground">
+          <Link to={`/scans/${scan.id}`} aria-label="Open this scan in a full-page report"><ExternalLink /></Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function NewScanBanner({
+  tone,
+  title,
+  detailText,
+  onView,
+  onDismiss,
+}: {
+  tone: "running" | "done";
+  title: string;
+  detailText: string;
+  onView: () => void;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm",
+        tone === "done" ? "border-good/30 bg-good-soft" : "border-warn/30 bg-warn-soft",
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        {tone === "done" ? <CheckCircle2 className="size-4 shrink-0 text-good" /> : <StatusDot tone="warn" />}
+        <span className="min-w-0">
+          <span className="font-medium">{title}</span>
+          <span className="ml-2 break-all text-muted-foreground">{detailText}</span>
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button size="sm" variant={tone === "done" ? "default" : "outline"} onClick={onView}>
+          {tone === "done" ? "Open report" : "View progress"}
+        </Button>
+        {onDismiss ? (
+          <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -535,14 +684,11 @@ const scanTabValues = new Set([
   "raw",
 ]);
 
-function scanTabFromSearch(value: string | null, scan: any) {
-  return value && scanTabValues.has(value) ? value : defaultScanTab(scan);
-}
-
 function ScanDetail({ scan: savedScan }: { scan: any }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = scanTabFromSearch(searchParams.get("tab"), savedScan);
-  const [activeTab, setActiveTab] = useState(requestedTab);
+  const urlTab = searchParams.get("tab");
+  const explicitTab = urlTab && scanTabValues.has(urlTab) ? urlTab : "";
+  const [activeTab, setActiveTab] = useState(explicitTab || defaultScanTab(savedScan));
   const [severityFilter, setSeverityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -576,9 +722,12 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
   const categories = Object.keys(summary.byCategory || {}).sort();
   const issueTypes = Array.from(new Set<string>(issues.map((issue: any) => String(issue.type || "")).filter(Boolean))).sort();
   const categoryCounts: Record<string, number> = summary.byCategory || {};
+  // Re-seed the tab only when a different scan opens or the URL explicitly names
+  // a tab — never on scan status — so a scan finishing does not yank the user
+  // off the Progress tab they are watching.
   useEffect(() => {
-    setActiveTab(requestedTab);
-  }, [scan.id, requestedTab]);
+    setActiveTab(explicitTab || defaultScanTab(savedScan));
+  }, [scan.id, explicitTab]);
   // Reset issue filters when a different scan is opened from the ledger, so a
   // filter from the previous scan doesn't hide the new scan's issues.
   useEffect(() => {
