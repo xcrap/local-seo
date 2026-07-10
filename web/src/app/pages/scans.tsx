@@ -95,7 +95,9 @@ export function ScanReportRoute({ activeSiteId }: { activeSiteId?: string }) {
 }
 
 export function ScansPage({ site }: { site: Site }) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { scanId: routeScanId } = useParams();
+  const [searchParams] = useSearchParams();
   const [url, setUrl] = useState(preferredScanUrl(site));
   const [scans, setScans] = useState<any[]>([]);
   const [allScans, setAllScans] = useState<any[]>([]);
@@ -125,12 +127,17 @@ export function ScansPage({ site }: { site: Site }) {
     const manualScan = manualLedgerScanId && manualLedgerSiteId === site.id
       ? ledger.find((row) => row.id === manualLedgerScanId)
       : null;
+    const routeScan = routeScanId ? rows.find((row) => row.id === routeScanId) || null : null;
     const selectedScanId = getSelectedScanId(site.id);
     const selectedScan = selectedScanId ? rows.find((row) => row.id === selectedScanId) : null;
-    const nextDetail = manualScan || (currentDetailBelongsToSite ? currentDetail : null) || selectedScan || rows[0] || null;
+    const nextDetail = routeScan || manualScan || (currentDetailBelongsToSite ? currentDetail : null) || selectedScan || rows[0] || null;
     setDetail(nextDetail);
-    if (nextDetail?.id) setSelectedScanId(nextDetail.site_id || site.id, nextDetail.id);
-    else clearSelectedScanId(site.id);
+    if (nextDetail?.id) {
+      setSelectedScanId(nextDetail.site_id || site.id, nextDetail.id);
+      // Keep the URL pointed at the viewed scan so a scan report is always
+      // deep-linkable and its history/switcher stay on the same page.
+      if (nextDetail.id !== routeScanId) navigate(`/scans/${nextDetail.id}`, { replace: true });
+    } else clearSelectedScanId(site.id);
     if (manualLedgerScanId && !manualScan) {
       setManualLedgerScanId("");
       setManualLedgerSiteId("");
@@ -139,7 +146,7 @@ export function ScansPage({ site }: { site: Site }) {
   }
   useEffect(() => {
     load().catch(console.error);
-  }, [site.id]);
+  }, [site.id, routeScanId]);
   useEffect(() => {
     setUrl(preferredScanUrl(site));
     setError("");
@@ -223,18 +230,20 @@ export function ScansPage({ site }: { site: Site }) {
     // a banner pointing elsewhere.
     setDetail(scan);
     setSelectedScanId(site.id, scan.id);
-    const next = new URLSearchParams(searchParams);
-    next.delete("tab");
-    setSearchParams(next, { replace: true });
+    // Navigating (no query string) opens the new scan on its default Progress
+    // tab and puts its id in the URL.
+    navigate(`/scans/${scan.id}`);
   }
   function viewStartedScan() {
-    if (startedScanId) inspect(startedScanId).catch(console.error);
+    if (startedScanId) inspect(startedScanId);
   }
-  async function inspect(id: string, row?: any) {
+  function inspect(id: string, row?: any) {
+    const known = row || scans.find((scan) => scan.id === id) || allScans.find((scan) => scan.id === id) || null;
+    if (known) setDetail(known);
     setManualLedgerScanId(id);
     setManualLedgerSiteId(site.id);
-    setSelectedScanId(row?.site_id || site.id, id);
-    setDetail(await api.scan(id));
+    setSelectedScanId(known?.site_id || site.id, id);
+    navigate(`/scans/${id}`);
   }
   async function remove(id: string, row?: any) {
     const siteId = row?.site_id || site.id;
@@ -338,7 +347,7 @@ export function ScansPage({ site }: { site: Site }) {
               tone="running"
               title="A newer scan is running"
               detailText={`${runningOther.url} · ${scanPhaseLabel(runningOther)} · ${formatNumber(runningOther.pages_crawled || 0)} pages`}
-              onView={() => inspect(runningOther.id, runningOther).catch(console.error)}
+              onView={() => inspect(runningOther.id, runningOther)}
             />
           ) : startedFinished ? (
             <NewScanBanner
@@ -354,7 +363,7 @@ export function ScansPage({ site }: { site: Site }) {
               scan={detail}
               siteRows={scans}
               newerCount={newerCount}
-              onSwitch={(id) => inspect(id, scans.find((row) => row.id === id)).catch(console.error)}
+              onSwitch={(id) => inspect(id, scans.find((row) => row.id === id))}
             />
           ) : (
             <div className="mb-4">
@@ -512,9 +521,6 @@ function ScanContextBar({
             </SelectContent>
           </Select>
         ) : null}
-        <Button asChild size="icon" variant="ghost" className="size-8 text-muted-foreground hover:text-foreground">
-          <Link to={`/scans/${scan.id}`} aria-label="Open this scan in a full-page report"><ExternalLink /></Link>
-        </Button>
       </div>
     </div>
   );

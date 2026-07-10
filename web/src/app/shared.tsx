@@ -8,6 +8,13 @@ import { cn } from "@/lib/utils";
 export const navGroups: { label: string; items: { to: string; label: string; icon: any }[] }[] = [
   { label: "Workspace", items: [{ to: "/overview", label: "Overview", icon: Gauge }] },
   {
+    label: "Technical",
+    items: [
+      { to: "/scans", label: "Site scans", icon: FileSearch },
+      { to: "/links", label: "Links", icon: Link2 },
+    ],
+  },
+  {
     label: "Research",
     items: [
       { to: "/keywords", label: "Keywords", icon: Search },
@@ -21,13 +28,6 @@ export const navGroups: { label: string; items: { to: string; label: string; ico
     items: [
       { to: "/rank", label: "Rank tracking", icon: Target },
       { to: "/gsc", label: "Search Console", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Technical",
-    items: [
-      { to: "/scans", label: "Site scans", icon: FileSearch },
-      { to: "/links", label: "Links", icon: Link2 },
     ],
   },
   {
