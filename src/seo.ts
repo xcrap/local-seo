@@ -7,9 +7,9 @@ import { all, get, jsonParse, nowIso, run } from "./db";
 import { getConfigValue } from "./config";
 import { DEFAULT_KEYWORD_LANGUAGE_CODE, DEFAULT_KEYWORD_LOCATION_CODE } from "./defaults";
 import { fetchJson, fetchText } from "./http";
-import { clearScans, createIssueIgnore, deleteIssueIgnore, deleteScan, getScan, listAllScans, listIssueIgnores, listScans, sameSiteUrl, startScan } from "./scans";
+import { clearIssueIgnores, clearScans, createIssueIgnore, deleteIssueIgnore, deleteScan, getScan, listAllScans, listIssueIgnores, listScans, sameSiteUrl, startScan } from "./scans";
 
-export { clearScans, createIssueIgnore, deleteIssueIgnore, deleteScan, getScan, listAllScans, listIssueIgnores, listScans, sameSiteUrl, startScan };
+export { clearIssueIgnores, clearScans, createIssueIgnore, deleteIssueIgnore, deleteScan, getScan, listAllScans, listIssueIgnores, listScans, sameSiteUrl, startScan };
 
 export type Site = {
   id: string;

@@ -1,6 +1,6 @@
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Activity, BarChart3, Bot, Cable, CalendarDays, FileSearch, Gauge, Globe2, Info, Link2, Plus, Search, Sparkles, TableProperties, Target, Zap } from "lucide-react";
+import { Activity, BarChart3, Bot, Cable, CalendarDays, Check, ChevronDown, FileSearch, Gauge, Globe2, Info, Link2, Plus, Search, Sparkles, TableProperties, Target, Zap } from "lucide-react";
 import type { Site } from "../api";
 import { Badge, Button, Calendar, Input, Label, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -354,6 +354,9 @@ export function ActiveSiteSelect({
   activeSiteId: string;
   onSelect: (id: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filterRef = useRef<HTMLInputElement>(null);
   if (!sites.length) {
     return (
       <Button asChild variant="secondary" className="w-full justify-start">
@@ -361,19 +364,71 @@ export function ActiveSiteSelect({
       </Button>
     );
   }
+  const active = sites.find((site) => site.id === activeSiteId);
+  const trimmed = query.trim().toLowerCase();
+  const filtered = trimmed
+    ? sites.filter((site) => siteDisplayName(site).toLowerCase().includes(trimmed))
+    : sites;
+  const showFilter = sites.length > 6;
   return (
-    <Select value={activeSiteId} onValueChange={onSelect}>
-      <SelectTrigger className="min-w-0 [&_[data-slot=select-value]]:truncate">
-        <SelectValue placeholder="Choose active site" />
-      </SelectTrigger>
-      <SelectContent>
-        {sites.map((site) => (
-          <SelectItem key={site.id} value={site.id}>
-            {siteDisplayName(site)}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) setQuery(""); }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-9 w-full min-w-0 justify-between gap-2 font-normal"
+        >
+          <span className="truncate">{active ? siteDisplayName(active) : "Choose active site"}</span>
+          <ChevronDown className="size-4 shrink-0 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-64 p-0"
+        onOpenAutoFocus={(event) => {
+          if (showFilter) {
+            event.preventDefault();
+            filterRef.current?.focus();
+          }
+        }}
+      >
+        {showFilter ? (
+          <div className="border-b border-border/60 p-1.5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                ref={filterRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Filter sites…"
+                className="h-8 pl-7 text-sm"
+              />
+            </div>
+          </div>
+        ) : null}
+        <div className="max-h-72 overflow-y-auto p-1">
+          {filtered.length ? (
+            filtered.map((site) => (
+              <button
+                key={site.id}
+                type="button"
+                onClick={() => { onSelect(site.id); setOpen(false); }}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent",
+                  site.id === activeSiteId ? "bg-accent/60" : "",
+                )}
+              >
+                <Check className={cn("size-4 shrink-0", site.id === activeSiteId ? "opacity-100 text-primary" : "opacity-0")} />
+                <span className="truncate">{siteDisplayName(site)}</span>
+              </button>
+            ))
+          ) : (
+            <div className="px-2 py-3 text-center text-xs text-muted-foreground">No sites match “{query}”.</div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

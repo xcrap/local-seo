@@ -1105,6 +1105,17 @@ try {
     throw new Error("A page-wide ignore must still match after URL drift (trailing slash and appended query params).");
   }
   await request(`/api/sites/${localSite.id}/issue-ignores/${driftIgnore.id}`, { method: "DELETE" });
+  // Bulk clear: a single request removes every saved ignore rule for the site.
+  await request(`/api/sites/${localSite.id}/issue-ignores`, { method: "POST", body: JSON.stringify({ type: "thin-content" }) });
+  await request(`/api/sites/${localSite.id}/issue-ignores`, { method: "POST", body: JSON.stringify({ url: `${fixtureUrl}/` }) });
+  const clearResult = await request(`/api/sites/${localSite.id}/issue-ignores`, { method: "DELETE" });
+  if (!(Number(clearResult.deleted) >= 2)) {
+    throw new Error(`Clearing all ignore rules must delete every saved rule, got ${JSON.stringify(clearResult)}.`);
+  }
+  const afterClear = await request(`/api/sites/${localSite.id}/issue-ignores`);
+  if (!Array.isArray(afterClear) || afterClear.length) {
+    throw new Error("No ignore rules should remain after a bulk clear.");
+  }
   await requestFailure(`/api/sites/${localSite.id}/issue-ignores`, {
     method: "POST",
     body: JSON.stringify({}),

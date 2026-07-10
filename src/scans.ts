@@ -162,6 +162,13 @@ export function deleteIssueIgnore(siteId: string, ignoreId: string) {
   return { deleted: Number(info.changes || 0) > 0 };
 }
 
+export function clearIssueIgnores(siteId: string) {
+  const site = getSite(siteId);
+  if (!site) throw new Error("Site not found.");
+  const info = run("DELETE FROM scan_issue_ignores WHERE site_id = ?", [site.id]);
+  return { deleted: Number(info.changes || 0) };
+}
+
 export function listScans(siteId: string) {
   return all<any>("SELECT * FROM scans WHERE site_id = ? ORDER BY created_at DESC", [
     siteId,

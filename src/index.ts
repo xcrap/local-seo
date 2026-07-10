@@ -35,6 +35,7 @@ import {
   addRankKeywords,
   backlinksOverview,
   brandLookup,
+  clearIssueIgnores,
   clearScans,
   createIssueIgnore,
   createSite,
@@ -594,6 +595,7 @@ app.post(
   "/api/sites/:id/issue-ignores",
   safe(async (c) => c.json(createIssueIgnore(c.req.param("id"), (await readJson(c)) as any))),
 );
+app.delete("/api/sites/:id/issue-ignores", safe((c) => c.json(clearIssueIgnores(c.req.param("id")))));
 app.delete(
   "/api/sites/:id/issue-ignores/:ignoreId",
   safe((c) => c.json(deleteIssueIgnore(c.req.param("id"), c.req.param("ignoreId")))),

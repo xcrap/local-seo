@@ -95,7 +95,7 @@ export function ScanReportRoute({ activeSiteId }: { activeSiteId?: string }) {
 }
 
 export function ScansPage({ site }: { site: Site }) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [url, setUrl] = useState(preferredScanUrl(site));
   const [scans, setScans] = useState<any[]>([]);
   const [allScans, setAllScans] = useState<any[]>([]);
@@ -218,10 +218,14 @@ export function ScansPage({ site }: { site: Site }) {
     setScans((rows) => upsertScanRow(rows, scan));
     setAllScans((rows) => upsertScanRow(rows, scan));
     setStartedScanId(scan.id);
-    if (!detail) {
-      setDetail(scan);
-      setSelectedScanId(site.id, scan.id);
-    }
+    // The user explicitly started this scan, so open it right away (running, on
+    // its default Progress tab) instead of stranding them on an older scan with
+    // a banner pointing elsewhere.
+    setDetail(scan);
+    setSelectedScanId(site.id, scan.id);
+    const next = new URLSearchParams(searchParams);
+    next.delete("tab");
+    setSearchParams(next, { replace: true });
   }
   function viewStartedScan() {
     if (startedScanId) inspect(startedScanId).catch(console.error);
@@ -485,12 +489,9 @@ function ScanContextBar({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {running ? (
-          <div className="w-40">
-            <div className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
-              <StatusDot tone="warn" /> {scanPhaseLabel(scan)}
-            </div>
-            <div className="mt-1"><ProgressBar value={scanProgress(scan)} /></div>
-          </div>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+            <StatusDot tone="warn" /> {scanPhaseLabel(scan)}
+          </span>
         ) : completed ? (
           <span className="whitespace-nowrap text-sm text-muted-foreground">
             <span className="metric text-lg leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
@@ -903,17 +904,6 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
   };
   return (
     <div className="space-y-5">
-      {scanIsActive(scan) ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-2 text-xs">
-          <span className="inline-flex items-center gap-1.5 font-medium">
-            <StatusDot tone="warn" /> Scanning · {scanPhaseLabel(scan)}
-          </span>
-          <span className="text-muted-foreground">
-            {formatNumber(scan.pages_crawled || coverage.pages || 0)} pages crawled · every section below fills in live as the crawl runs.
-          </span>
-          <div className="ml-auto w-40 min-w-32"><ProgressBar value={scanProgress(scan)} /></div>
-        </div>
-      ) : null}
       <Tabs value={activeTab} onValueChange={changeScanTab} className="space-y-4">
         <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -2303,18 +2293,18 @@ function ScanGroupedIssues({
                         </Button>
                       ) : null}
                       {item.ignored && onRestore ? (
-                        <Button size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs" onClick={() => onRestore(item)}>
+                        <Button size="sm" variant="secondary" className="h-7 shrink-0 gap-1.5 px-2 text-xs" onClick={() => onRestore(item)}>
                           <Eye /> Restore
                         </Button>
                       ) : !item.ignored && onIgnore ? (
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 shrink-0 px-2 text-xs"
+                          className="h-7 shrink-0 gap-1.5 px-2 text-xs text-muted-foreground"
                           aria-label="Ignore this issue on this page"
                           onClick={() => onIgnore(item, "page")}
                         >
-                          <EyeOff />
+                          <EyeOff /> Ignore
                         </Button>
                       ) : null}
                     </div>
@@ -2583,20 +2573,23 @@ function ScanPagesTable({
                 {ignoredPageKeys?.has(ignorePageKey(page.url)) ? (
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
+                    className="h-7 gap-1.5 text-xs"
+                    title="This page is ignored — click to restore its issues"
                     aria-label={`Restore ignored issues for ${page.url}`}
                     onClick={() => onTogglePageIgnore(page)}
                   >
-                    <Eye />
+                    <EyeOff /> Ignored
                   </Button>
                 ) : (page.issues || []).length ? (
                   <Button
                     size="sm"
                     variant="ghost"
+                    className="h-7 gap-1.5 text-xs text-muted-foreground"
                     aria-label={`Ignore all issues on ${page.url}`}
                     onClick={() => onTogglePageIgnore(page)}
                   >
-                    <EyeOff />
+                    <EyeOff /> Ignore
                   </Button>
                 ) : null}
               </TableCell>

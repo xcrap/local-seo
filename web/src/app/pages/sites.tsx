@@ -482,6 +482,8 @@ export function SitesManager({
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
   const [deletingSiteId, setDeletingSiteId] = useState("");
   const [editingSiteId, setEditingSiteId] = useState("");
+  const [editIgnoreCount, setEditIgnoreCount] = useState<number | null>(null);
+  const [clearingIgnores, setClearingIgnores] = useState(false);
   const [allScans, setAllScans] = useState<any[]>([]);
   const navigate = useNavigate();
 
@@ -575,6 +577,11 @@ export function SitesManager({
     setEditing(site);
     setShowEditKeywordDefaults(false);
     setError("");
+    setEditIgnoreCount(null);
+    api
+      .issueIgnores(site.id)
+      .then((rules) => setEditIgnoreCount(Array.isArray(rules) ? rules.length : 0))
+      .catch(() => setEditIgnoreCount(0));
     setEditForm({
       name: site.name,
       domain: site.domain || "",
@@ -604,6 +611,20 @@ export function SitesManager({
       toast.error(message);
     } finally {
       setEditingSiteId("");
+    }
+  }
+
+  async function clearIgnores() {
+    if (!editing) return;
+    setClearingIgnores(true);
+    try {
+      const result = await api.clearIssueIgnores(editing.id);
+      setEditIgnoreCount(0);
+      toast.success(result.deleted === 1 ? "1 ignore rule cleared" : `${result.deleted} ignore rules cleared`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not clear ignore rules");
+    } finally {
+      setClearingIgnores(false);
     }
   }
 
@@ -911,6 +932,19 @@ export function SitesManager({
           </div>
           <ScanPlanPreview site={editScanPlan} />
           <Field label="Notes"><Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></Field>
+          {editIgnoreCount ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 px-3.5 py-2.5">
+              <div className="text-sm">
+                <div className="font-medium">Ignored issues</div>
+                <p className="text-xs text-muted-foreground">
+                  {formatNumber(editIgnoreCount)} saved ignore {editIgnoreCount === 1 ? "rule" : "rules"} hide issues from this site's reports and scoring.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" disabled={clearingIgnores} onClick={clearIgnores}>
+                <Trash2 /> {clearingIgnores ? "Clearing" : "Clear all"}
+              </Button>
+            </div>
+          ) : null}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" disabled={Boolean(editingSiteId)}>
             <Pencil /> {editingSiteId ? "Saving changes" : "Save changes"}
