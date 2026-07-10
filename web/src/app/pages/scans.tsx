@@ -1,6 +1,6 @@
-import { useEffect, useState, type SyntheticEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type SyntheticEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowUpRight, CheckCircle2, ExternalLink, Eye, EyeOff, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, ChevronRight, ExternalLink, Eye, EyeOff, FileSearch, LayoutList, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem, toast } from "@/components/ui";
 import { CountUp, EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, ignorePageKey, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, scoreVerdict, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
@@ -95,6 +95,7 @@ export function ScanReportRoute({ activeSiteId }: { activeSiteId?: string }) {
 }
 
 export function ScansPage({ site }: { site: Site }) {
+  const [searchParams] = useSearchParams();
   const [url, setUrl] = useState(preferredScanUrl(site));
   const [scans, setScans] = useState<any[]>([]);
   const [allScans, setAllScans] = useState<any[]>([]);
@@ -276,6 +277,12 @@ export function ScansPage({ site }: { site: Site }) {
   const newerCount = detail
     ? scans.filter((row) => new Date(row.created_at || row.updated_at || 0).getTime() > viewedTime).length
     : 0;
+  // Scan history lives on the Overview tab only — the context bar's switcher
+  // already moves between scans everywhere else, so repeating the full history
+  // under every tab was noise.
+  const tabParam = searchParams.get("tab");
+  const effectiveTab = tabParam && scanTabValues.has(tabParam) ? tabParam : defaultScanTab(detail);
+  const showHistory = !detail || effectiveTab === "overview";
   return (
     <>
       <PageHeader
@@ -370,6 +377,7 @@ export function ScansPage({ site }: { site: Site }) {
             </TabCard>
           )}
         </section>
+        {showHistory ? (
         <ReportSection
           title="Scan history"
           meta={`${formatNumber(scans.length)} for this site · ${formatNumber(allScans.length)} total in the local database`}
@@ -402,6 +410,7 @@ export function ScansPage({ site }: { site: Site }) {
             />
           )}
         </ReportSection>
+        ) : null}
       </div>
       <AlertDialog open={Boolean(deletingScan)} onOpenChange={(nextOpen) => !nextOpen && setDeletingScan(null)}>
         <AlertDialogContent>
@@ -695,6 +704,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
   const [selectedCheckTypes, setSelectedCheckTypes] = useState<string[]>([]);
   const [selectedCheckLabel, setSelectedCheckLabel] = useState("");
   const [showIgnored, setShowIgnored] = useState(false);
+  const [issueGroupMode, setIssueGroupMode] = useState<"type" | "page">("type");
   const [pageFilter, setPageFilter] = useState("");
   const [ignoreRules, setIgnoreRules] = useState<any[]>([]);
   // Ignore rules are applied server-side at read time, so after a rule change
@@ -717,6 +727,13 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
   const summary = result.summary || {};
   const issueGroups = result.issueGroups || [];
   const comparison = result.comparison || {};
+  const comparisonSummary = comparison.summary || {};
+  const comparisonChangeCount = comparison.available
+    ? Number(comparisonSummary.newIssues || 0) +
+      Number(comparisonSummary.fixedIssues || 0) +
+      Number(comparisonSummary.severityChanges || 0) +
+      Number(comparisonSummary.pageChanges || 0)
+    : 0;
   const severityCounts = scanSeverityCounts(scan);
   const coverage = scanCoverageMetrics(scan, result, summary);
   const categories = Object.keys(summary.byCategory || {}).sort();
@@ -886,10 +903,28 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
   };
   return (
     <div className="space-y-5">
+      {scanIsActive(scan) ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-2 text-xs">
+          <span className="inline-flex items-center gap-1.5 font-medium">
+            <StatusDot tone="warn" /> Scanning · {scanPhaseLabel(scan)}
+          </span>
+          <span className="text-muted-foreground">
+            {formatNumber(scan.pages_crawled || coverage.pages || 0)} pages crawled · every section below fills in live as the crawl runs.
+          </span>
+          <div className="ml-auto w-40 min-w-32"><ProgressBar value={scanProgress(scan)} /></div>
+        </div>
+      ) : null}
       <Tabs value={activeTab} onValueChange={changeScanTab} className="space-y-4">
         <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="changes">Changes</TabsTrigger>
+          <TabsTrigger value="changes" className="gap-1.5">
+            Changes
+            {comparisonChangeCount ? (
+              <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-warn-soft px-1.5 text-[10px] font-semibold text-warn">
+                {formatNumber(comparisonChangeCount)}
+              </span>
+            ) : null}
+          </TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>
           <TabsTrigger value="issues">Issues</TabsTrigger>
           <TabsTrigger value="checks">Checks</TabsTrigger>
@@ -961,6 +996,18 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
               </SelectContent>
             </Select>
             {selectedCheckLabel ? <Badge variant="outline">Showing {selectedCheckLabel}</Badge> : null}
+            <ToggleGroup
+              type="single"
+              value={issueGroupMode}
+              onValueChange={(value) => value && setIssueGroupMode(value as "type" | "page")}
+            >
+              <ToggleGroupItem value="type" aria-label="Group issues by type" className="gap-1.5 text-xs">
+                <ListChecks /> By type
+              </ToggleGroupItem>
+              <ToggleGroupItem value="page" aria-label="Group issues by page" className="gap-1.5 text-xs">
+                <LayoutList /> By page
+              </ToggleGroupItem>
+            </ToggleGroup>
             {ignoredIssues.length || ignoreRules.length ? (
               <Button
                 size="sm"
@@ -1010,7 +1057,13 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
             </div>
           ) : null}
           {filteredIssues.length ? (
-            <ScanIssuesTable rows={filteredIssues} onIgnore={ignoreIssueType} onRestore={restoreIssue} />
+            <ScanGroupedIssues
+              issues={filteredIssues}
+              mode={issueGroupMode}
+              showingIgnored={showIgnored}
+              onIgnore={ignoreIssueType}
+              onRestore={restoreIssue}
+            />
           ) : (
             <EmptyState
               title={showIgnored ? "No ignored issues" : "No matching issues"}
@@ -2110,6 +2163,169 @@ function ScanSection({ title, text, children }: { title: string; text: string; c
     <ReportSection title={title} description={text}>
       {children}
     </ReportSection>
+  );
+}
+
+const ISSUE_SEVERITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+function worseSeverity(a: string, b: string) {
+  return (ISSUE_SEVERITY_RANK[a] || 0) >= (ISSUE_SEVERITY_RANK[b] || 0) ? a : b;
+}
+
+function issueEvidenceText(issue: any) {
+  const ev = issue?.evidence || {};
+  const value = ev.linkedUrl || ev.image || ev.asset || ev.canonical || ev.finalUrl || ev.robotsMeta || "";
+  return typeof value === "string" ? value : "";
+}
+
+// Group the already-filtered issue list into collapsible sections — one row per
+// issue type ("fix this everywhere") or one row per page ("fix this page").
+function buildIssueGroups(issues: any[], mode: "type" | "page") {
+  const map = new Map<string, any>();
+  for (const issue of issues) {
+    const key = mode === "type" ? String(issue.type || "issue") : String(issue.url || "—");
+    const group = map.get(key) || {
+      key,
+      severity: "low",
+      title: mode === "type" ? issue.message || String(issue.type || "").replaceAll("-", " ") : issue.url || "—",
+      category: issue.category,
+      type: issue.type,
+      items: [] as any[],
+    };
+    if (worseSeverity(group.severity, issue.severity || "low") !== group.severity) {
+      group.severity = issue.severity || "low";
+      if (mode === "type") group.title = issue.message || group.title;
+    }
+    group.items.push(issue);
+    map.set(key, group);
+  }
+  return [...map.values()]
+    .map((group) => ({ ...group, count: group.items.length }))
+    .sort(
+      (a, b) =>
+        (ISSUE_SEVERITY_RANK[b.severity] || 0) - (ISSUE_SEVERITY_RANK[a.severity] || 0) || b.count - a.count,
+    );
+}
+
+function ScanGroupedIssues({
+  issues,
+  mode,
+  showingIgnored,
+  onIgnore,
+  onRestore,
+}: {
+  issues: any[];
+  mode: "type" | "page";
+  showingIgnored?: boolean;
+  onIgnore?: (issue: any, scope: "site" | "page" | "page-all") => void;
+  onRestore?: (issue: any) => void;
+}) {
+  const groups = useMemo(() => buildIssueGroups(issues, mode), [issues, mode]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  return (
+    <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60">
+      {groups.map((group) => {
+        const open = expanded.has(group.key);
+        const unit = mode === "type" ? (group.count === 1 ? "page" : "pages") : group.count === 1 ? "issue" : "issues";
+        return (
+          <div key={group.key}>
+            <div className="flex items-center gap-3 px-3.5 py-3 hover:bg-accent/40">
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                onClick={() => toggle(group.key)}
+                aria-expanded={open}
+              >
+                <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+                <Badge variant={severityVariant(group.severity) as any} className="shrink-0 text-[10.5px] font-semibold uppercase">
+                  {group.severity}
+                </Badge>
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{group.title}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {mode === "type"
+                      ? `${issueCategoryLabel(group.category)} · ${String(group.type || "").replaceAll("-", " ")}`
+                      : group.key}
+                  </div>
+                </div>
+              </button>
+              <span className="metric shrink-0 whitespace-nowrap text-sm text-muted-foreground">
+                {formatNumber(group.count)} {unit}
+              </span>
+              {!showingIgnored && onIgnore ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 shrink-0 px-2 text-xs"
+                  aria-label={mode === "type" ? "Ignore this issue type for the whole site" : "Ignore every issue on this page"}
+                  onClick={() =>
+                    mode === "type"
+                      ? onIgnore(group.items[0], "site")
+                      : onIgnore({ type: "", url: group.key }, "page-all")
+                  }
+                >
+                  <EyeOff /> Ignore
+                </Button>
+              ) : null}
+            </div>
+            {open ? (
+              <div className="divide-y divide-border/40 border-t border-border/50 bg-muted/20">
+                {group.items.map((item: any, index: number) => {
+                  const evidence = issueEvidenceText(item);
+                  return (
+                    <div key={`${group.key}:${index}`} className="flex items-center gap-3 px-3.5 py-2 pl-10 text-sm">
+                      <div className="min-w-0 flex-1">
+                        {mode === "type" ? (
+                          <>
+                            <div className="truncate text-muted-foreground">{item.url || "—"}</div>
+                            {evidence ? <div className="truncate text-xs text-muted-foreground/70">{evidence}</div> : null}
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={severityVariant(item.severity) as any} className="text-[10px] uppercase">{item.severity}</Badge>
+                              <span className="truncate font-medium">{item.message}</span>
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">{String(item.type || "").replaceAll("-", " ")}</div>
+                          </>
+                        )}
+                      </div>
+                      {item.url ? (
+                        <Button asChild size="icon" variant="ghost" className="size-7 shrink-0 text-muted-foreground hover:text-foreground">
+                          <a href={item.url} target="_blank" rel="noreferrer" aria-label={`Open ${item.url}`}><ExternalLink /></a>
+                        </Button>
+                      ) : null}
+                      {item.ignored && onRestore ? (
+                        <Button size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs" onClick={() => onRestore(item)}>
+                          <Eye /> Restore
+                        </Button>
+                      ) : !item.ignored && onIgnore ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 shrink-0 px-2 text-xs"
+                          aria-label="Ignore this issue on this page"
+                          onClick={() => onIgnore(item, "page")}
+                        >
+                          <EyeOff />
+                        </Button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
