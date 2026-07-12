@@ -24,6 +24,10 @@ if (!existsSync(DB_DIR)) {
 export const db = new Database(dbPath);
 db.exec("PRAGMA journal_mode = WAL");
 db.exec("PRAGMA foreign_keys = ON");
+// Background scans write progress while HTTP handlers write imports, config,
+// and sessions. Without a busy timeout, any lock overlap fails immediately with
+// SQLITE_BUSY; wait briefly for the current writer to finish instead.
+db.exec("PRAGMA busy_timeout = 5000");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS admin_users (

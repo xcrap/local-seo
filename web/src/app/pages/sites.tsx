@@ -20,6 +20,7 @@ export function Overview({
   const [scan, setScan] = useState<any>(null);
   const [scanRun, setScanRun] = useState<any>(null);
   const [scanning, setScanning] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [scanError, setScanError] = useState("");
   const [firstDomain, setFirstDomain] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -147,8 +148,8 @@ export function Overview({
         action={
           site.domain ? (
             <>
-              <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-                <Link to="/"><Pencil /> Edit site</Link>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setEditOpen(true)}>
+                <Pencil /> Edit site
               </Button>
               <Button size="sm" onClick={scanSite} disabled={scanning}>
                 <FileSearch /> {scanning ? "Starting" : "Scan website"}
@@ -258,6 +259,7 @@ export function Overview({
           )}
         </ReportSection>
       </div>
+      <EditSiteDialog site={site} open={editOpen} onOpenChange={setEditOpen} onSaved={reloadSites} />
     </>
   );
 }
@@ -417,6 +419,186 @@ function ScanCoverageList({ rows, scanStatus }: { rows: any[]; scanStatus?: stri
   );
 }
 
+type SiteEditForm = {
+  name: string;
+  domain: string;
+  notes: string;
+  location_code: number;
+  language_code: string;
+  crawl_protocol: Site["crawl_protocol"];
+  crawl_host: Site["crawl_host"];
+  crawl_speed: Site["crawl_speed"];
+  crawl_max_pages: number;
+};
+
+const emptyEditForm: SiteEditForm = {
+  name: "",
+  domain: "",
+  notes: "",
+  location_code: defaultKeywordLocationCode,
+  language_code: defaultKeywordLanguageCode,
+  crawl_protocol: "auto",
+  crawl_host: "auto",
+  crawl_speed: "auto",
+  crawl_max_pages: 0,
+};
+
+// Self-contained edit dialog so "Edit site" opens in place on any page (the
+// workspace overview, the site list, …) without navigating away.
+export function EditSiteDialog({
+  site,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  site: Site | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved?: () => void | Promise<void>;
+}) {
+  const [editForm, setEditForm] = useState<SiteEditForm>(emptyEditForm);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [ignoreCount, setIgnoreCount] = useState<number | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const [showKeywordDefaults, setShowKeywordDefaults] = useState(false);
+
+  useEffect(() => {
+    if (!open || !site) return;
+    setError("");
+    setShowKeywordDefaults(false);
+    setEditForm({
+      name: site.name,
+      domain: site.domain || "",
+      notes: site.notes || "",
+      location_code: site.location_code || defaultKeywordLocationCode,
+      language_code: site.language_code || defaultKeywordLanguageCode,
+      crawl_protocol: site.crawl_protocol || "auto",
+      crawl_host: site.crawl_host || "auto",
+      crawl_speed: site.crawl_speed || "auto",
+      crawl_max_pages: Number(site.crawl_max_pages || 0),
+    });
+    setIgnoreCount(null);
+    api
+      .issueIgnores(site.id)
+      .then((rules) => setIgnoreCount(Array.isArray(rules) ? rules.length : 0))
+      .catch(() => setIgnoreCount(0));
+  }, [open, site?.id]);
+
+  async function submit(event: SyntheticEvent) {
+    event.preventDefault();
+    if (!site) return;
+    setError("");
+    setSaving(true);
+    try {
+      const updated = await api.updateSite(site.id, editForm);
+      await onSaved?.();
+      onOpenChange(false);
+      toast.success(`${cleanSiteDomain(updated.domain) || updated.name || "Site"} updated locally.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not update site";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function clearIgnores() {
+    if (!site) return;
+    setClearing(true);
+    try {
+      const result = await api.clearIssueIgnores(site.id);
+      setIgnoreCount(0);
+      toast.success(result.deleted === 1 ? "1 ignore rule cleared" : `${result.deleted} ignore rules cleared`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not clear ignore rules");
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  const editScanPlan = { domain: editForm.domain, crawl_protocol: editForm.crawl_protocol, crawl_host: editForm.crawl_host };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit site</DialogTitle>
+          <DialogDescription>Changes apply to this saved website address and future scans.</DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={submit}>
+          <Field label="Site name"><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></Field>
+          <Field label="Website address"><Input value={editForm.domain} onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })} /></Field>
+          <KeywordToolDefaultsPanel
+            expanded={showKeywordDefaults}
+            locationCode={editForm.location_code}
+            languageCode={editForm.language_code}
+            onToggle={() => setShowKeywordDefaults((value) => !value)}
+            onLocationCodeChange={(value) => setEditForm({ ...editForm, location_code: value })}
+            onLanguageCodeChange={(value) => setEditForm({ ...editForm, language_code: value })}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Scan protocol">
+              <Select value={editForm.crawl_protocol} onValueChange={(value) => setEditForm({ ...editForm, crawl_protocol: value as Site["crawl_protocol"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {crawlProtocolOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Host variant">
+              <Select value={editForm.crawl_host} onValueChange={(value) => setEditForm({ ...editForm, crawl_host: value as Site["crawl_host"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {crawlHostOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Crawl speed">
+              <Select value={editForm.crawl_speed} onValueChange={(value) => setEditForm({ ...editForm, crawl_speed: value as Site["crawl_speed"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {crawlSpeedOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Max pages per scan">
+              <Input
+                type="number"
+                min={10}
+                max={1000}
+                placeholder="App default"
+                value={editForm.crawl_max_pages || ""}
+                onChange={(e) => setEditForm({ ...editForm, crawl_max_pages: Number(e.target.value) || 0 })}
+              />
+            </Field>
+          </div>
+          <ScanPlanPreview site={editScanPlan} />
+          <Field label="Notes"><Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></Field>
+          {ignoreCount ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 px-3.5 py-2.5">
+              <div className="text-sm">
+                <div className="font-medium">Ignored issues</div>
+                <p className="text-xs text-muted-foreground">
+                  {formatNumber(ignoreCount)} saved ignore {ignoreCount === 1 ? "rule" : "rules"} hide issues from this site's reports and scoring.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" disabled={clearing} onClick={clearIgnores}>
+                <Trash2 /> {clearing ? "Clearing" : "Clear all"}
+              </Button>
+            </div>
+          ) : null}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" disabled={saving}>
+            <Pencil /> {saving ? "Saving changes" : "Save changes"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function SitesManager({
   variant,
   sites,
@@ -482,6 +664,8 @@ export function SitesManager({
   const [creatingAction, setCreatingAction] = useState<"scan" | "save" | "">("");
   const [deletingSiteId, setDeletingSiteId] = useState("");
   const [editingSiteId, setEditingSiteId] = useState("");
+  const [editIgnoreCount, setEditIgnoreCount] = useState<number | null>(null);
+  const [clearingIgnores, setClearingIgnores] = useState(false);
   const [allScans, setAllScans] = useState<any[]>([]);
   const navigate = useNavigate();
 
@@ -575,6 +759,11 @@ export function SitesManager({
     setEditing(site);
     setShowEditKeywordDefaults(false);
     setError("");
+    setEditIgnoreCount(null);
+    api
+      .issueIgnores(site.id)
+      .then((rules) => setEditIgnoreCount(Array.isArray(rules) ? rules.length : 0))
+      .catch(() => setEditIgnoreCount(0));
     setEditForm({
       name: site.name,
       domain: site.domain || "",
@@ -604,6 +793,20 @@ export function SitesManager({
       toast.error(message);
     } finally {
       setEditingSiteId("");
+    }
+  }
+
+  async function clearIgnores() {
+    if (!editing) return;
+    setClearingIgnores(true);
+    try {
+      const result = await api.clearIssueIgnores(editing.id);
+      setEditIgnoreCount(0);
+      toast.success(result.deleted === 1 ? "1 ignore rule cleared" : `${result.deleted} ignore rules cleared`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not clear ignore rules");
+    } finally {
+      setClearingIgnores(false);
     }
   }
 
@@ -911,6 +1114,19 @@ export function SitesManager({
           </div>
           <ScanPlanPreview site={editScanPlan} />
           <Field label="Notes"><Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></Field>
+          {editIgnoreCount ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 px-3.5 py-2.5">
+              <div className="text-sm">
+                <div className="font-medium">Ignored issues</div>
+                <p className="text-xs text-muted-foreground">
+                  {formatNumber(editIgnoreCount)} saved ignore {editIgnoreCount === 1 ? "rule" : "rules"} hide issues from this site's reports and scoring.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" disabled={clearingIgnores} onClick={clearIgnores}>
+                <Trash2 /> {clearingIgnores ? "Clearing" : "Clear all"}
+              </Button>
+            </div>
+          ) : null}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" disabled={Boolean(editingSiteId)}>
             <Pencil /> {editingSiteId ? "Saving changes" : "Save changes"}

@@ -1,9 +1,9 @@
-import { useEffect, useState, type SyntheticEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type SyntheticEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowUpRight, CheckCircle2, ExternalLink, Eye, EyeOff, FileSearch, ListChecks, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, ChevronRight, ExternalLink, Eye, EyeOff, FileSearch, LayoutList, ListChecks, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem, toast } from "@/components/ui";
-import { CountUp, EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, scoreVerdict, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
+import { CountUp, EmptyState, Field, FilteredRows, Hint, IndexabilityBadge, LengthBadge, MetricTile, MetricTileGrid, MetricTileProps, PageHeader, ProgressBar, ReportSection, ScanCheckRowModel, ScanCheckSectionModel, ScanLinksTable, ScoreDial, StatusDot, StatusEvidenceTable, clearSelectedScanId, formatBytes, formatDate, formatMs, formatNumber, getSelectedScanId, ignorePageKey, issueCategoryLabel, issueTypeCount, issueTypesCount, JsonBlock, pageH1Status, pageIssueTypeCount, pageIssueTypesCount, preferredScanUrl, scanCoverageMetrics, scanIsActive, scanPhaseKey, scanPhaseLabel, scanProgress, scanSeverityCounts, scanStatusLabel, scanSiteName, scanUrlShortDetail, scoreTone, scoreVerdict, setSelectedScanId, sortScanRows, upsertScanRow } from "../shared";
 import { cn } from "@/lib/utils";
 
 function scanStatusTone(status?: string): "good" | "warn" | "bad" {
@@ -95,6 +95,9 @@ export function ScanReportRoute({ activeSiteId }: { activeSiteId?: string }) {
 }
 
 export function ScansPage({ site }: { site: Site }) {
+  const navigate = useNavigate();
+  const { scanId: routeScanId } = useParams();
+  const [searchParams] = useSearchParams();
   const [url, setUrl] = useState(preferredScanUrl(site));
   const [scans, setScans] = useState<any[]>([]);
   const [allScans, setAllScans] = useState<any[]>([]);
@@ -107,6 +110,9 @@ export function ScansPage({ site }: { site: Site }) {
   const [showCustomUrl, setShowCustomUrl] = useState(false);
   const [manualLedgerScanId, setManualLedgerScanId] = useState("");
   const [manualLedgerSiteId, setManualLedgerSiteId] = useState("");
+  // The scan the user just started from this page. Kept so a new scan announces
+  // itself in a banner instead of silently replacing the report being read.
+  const [startedScanId, setStartedScanId] = useState("");
   async function load() {
     const [siteRows, ledgerRows] = await Promise.all([
       api.scans(site.id),
@@ -121,12 +127,17 @@ export function ScansPage({ site }: { site: Site }) {
     const manualScan = manualLedgerScanId && manualLedgerSiteId === site.id
       ? ledger.find((row) => row.id === manualLedgerScanId)
       : null;
+    const routeScan = routeScanId ? rows.find((row) => row.id === routeScanId) || null : null;
     const selectedScanId = getSelectedScanId(site.id);
     const selectedScan = selectedScanId ? rows.find((row) => row.id === selectedScanId) : null;
-    const nextDetail = manualScan || (currentDetailBelongsToSite ? currentDetail : null) || selectedScan || rows[0] || null;
+    const nextDetail = routeScan || manualScan || (currentDetailBelongsToSite ? currentDetail : null) || selectedScan || rows[0] || null;
     setDetail(nextDetail);
-    if (nextDetail?.id) setSelectedScanId(nextDetail.site_id || site.id, nextDetail.id);
-    else clearSelectedScanId(site.id);
+    if (nextDetail?.id) {
+      setSelectedScanId(nextDetail.site_id || site.id, nextDetail.id);
+      // Keep the URL pointed at the viewed scan so a scan report is always
+      // deep-linkable and its history/switcher stay on the same page.
+      if (nextDetail.id !== routeScanId) navigate(`/scans/${nextDetail.id}`, { replace: true });
+    } else clearSelectedScanId(site.id);
     if (manualLedgerScanId && !manualScan) {
       setManualLedgerScanId("");
       setManualLedgerSiteId("");
@@ -135,7 +146,7 @@ export function ScansPage({ site }: { site: Site }) {
   }
   useEffect(() => {
     load().catch(console.error);
-  }, [site.id]);
+  }, [site.id, routeScanId]);
   useEffect(() => {
     setUrl(preferredScanUrl(site));
     setError("");
@@ -181,10 +192,7 @@ export function ScansPage({ site }: { site: Site }) {
     setManualLedgerSiteId("");
     try {
       const scan = await api.startScan({ siteId: site.id, url });
-      setDetail(scan);
-      setScans((rows) => upsertScanRow(rows, scan));
-      setAllScans((rows) => upsertScanRow(rows, scan));
-      if (scan?.id) setSelectedScanId(site.id, scan.id);
+      openStartedScan(scan);
       setShowCustomUrl(false);
       load().catch(console.error);
     } catch (err) {
@@ -201,10 +209,7 @@ export function ScansPage({ site }: { site: Site }) {
     setManualLedgerSiteId("");
     try {
       const result = await api.scanSite(site.id);
-      setDetail(result.scan);
-      setScans((rows) => upsertScanRow(rows, result.scan));
-      setAllScans((rows) => upsertScanRow(rows, result.scan));
-      if (result.scan?.id) setSelectedScanId(site.id, result.scan.id);
+      openStartedScan(result.scan);
       load().catch(console.error);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start site scan");
@@ -212,11 +217,33 @@ export function ScansPage({ site }: { site: Site }) {
       setStarting(false);
     }
   }
-  async function inspect(id: string, row?: any) {
+  // A freshly started scan is added to the lists and tracked, but the open
+  // report is only replaced when nothing is being viewed yet — otherwise the
+  // new run is announced in a banner so the user keeps their place.
+  function openStartedScan(scan: any) {
+    if (!scan?.id) return;
+    setScans((rows) => upsertScanRow(rows, scan));
+    setAllScans((rows) => upsertScanRow(rows, scan));
+    setStartedScanId(scan.id);
+    // The user explicitly started this scan, so open it right away (running, on
+    // its default Progress tab) instead of stranding them on an older scan with
+    // a banner pointing elsewhere.
+    setDetail(scan);
+    setSelectedScanId(site.id, scan.id);
+    // Navigating (no query string) opens the new scan on its default Progress
+    // tab and puts its id in the URL.
+    navigate(`/scans/${scan.id}`);
+  }
+  function viewStartedScan() {
+    if (startedScanId) inspect(startedScanId);
+  }
+  function inspect(id: string, row?: any) {
+    const known = row || scans.find((scan) => scan.id === id) || allScans.find((scan) => scan.id === id) || null;
+    if (known) setDetail(known);
     setManualLedgerScanId(id);
     setManualLedgerSiteId(site.id);
-    setSelectedScanId(row?.site_id || site.id, id);
-    setDetail(await api.scan(id));
+    setSelectedScanId(known?.site_id || site.id, id);
+    navigate(`/scans/${id}`);
   }
   async function remove(id: string, row?: any) {
     const siteId = row?.site_id || site.id;
@@ -255,6 +282,20 @@ export function ScansPage({ site }: { site: Site }) {
       setClearingScans(false);
     }
   }
+  const runningOther = scans.find((row) => scanIsActive(row) && row.id !== detail?.id) || null;
+  const startedScan = startedScanId ? scans.find((row) => row.id === startedScanId) : null;
+  const startedFinished =
+    startedScan && !scanIsActive(startedScan) && startedScan.id !== detail?.id ? startedScan : null;
+  const viewedTime = detail ? new Date(detail.created_at || detail.updated_at || 0).getTime() : 0;
+  const newerCount = detail
+    ? scans.filter((row) => new Date(row.created_at || row.updated_at || 0).getTime() > viewedTime).length
+    : 0;
+  // Scan history lives on the Overview tab only — the context bar's switcher
+  // already moves between scans everywhere else, so repeating the full history
+  // under every tab was noise.
+  const tabParam = searchParams.get("tab");
+  const effectiveTab = tabParam && scanTabValues.has(tabParam) ? tabParam : defaultScanTab(detail);
+  const showHistory = !detail || effectiveTab === "overview";
   return (
     <>
       <PageHeader
@@ -301,15 +342,34 @@ export function ScansPage({ site }: { site: Site }) {
       ) : null}
       <div className="space-y-8">
         <section>
-          <div className="mb-4 flex flex-wrap items-baseline gap-2.5">
-            <h2 className="font-heading text-lg leading-tight">Scan report</h2>
-            {detail ? (
-              <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                <StatusDot tone={scanStatusTone(detail.status)} />
-                {scanStatusLabel(detail.status)} · {formatDate(detail.created_at || detail.updated_at)}
-              </span>
-            ) : null}
-          </div>
+          {runningOther ? (
+            <NewScanBanner
+              tone="running"
+              title="A newer scan is running"
+              detailText={`${runningOther.url} · ${scanPhaseLabel(runningOther)} · ${formatNumber(runningOther.pages_crawled || 0)} pages`}
+              onView={() => inspect(runningOther.id, runningOther)}
+            />
+          ) : startedFinished ? (
+            <NewScanBanner
+              tone="done"
+              title="Your new scan finished"
+              detailText={`${startedFinished.url} · score ${formatNumber(Number(startedFinished.score || 0))} · ${formatNumber(startedFinished.pages_crawled || 0)} pages`}
+              onView={viewStartedScan}
+              onDismiss={() => setStartedScanId("")}
+            />
+          ) : null}
+          {detail ? (
+            <ScanContextBar
+              scan={detail}
+              siteRows={scans}
+              newerCount={newerCount}
+              onSwitch={(id) => inspect(id, scans.find((row) => row.id === id))}
+            />
+          ) : (
+            <div className="mb-4">
+              <h2 className="font-heading text-lg leading-tight">Scan report</h2>
+            </div>
+          )}
           {detail ? <ScanDetail scan={detail} /> : (
             <TabCard>
               <EmptyState
@@ -330,6 +390,7 @@ export function ScansPage({ site }: { site: Site }) {
             </TabCard>
           )}
         </section>
+        {showHistory ? (
         <ReportSection
           title="Scan history"
           meta={`${formatNumber(scans.length)} for this site · ${formatNumber(allScans.length)} total in the local database`}
@@ -362,6 +423,7 @@ export function ScansPage({ site }: { site: Site }) {
             />
           )}
         </ReportSection>
+        ) : null}
       </div>
       <AlertDialog open={Boolean(deletingScan)} onOpenChange={(nextOpen) => !nextOpen && setDeletingScan(null)}>
         <AlertDialogContent>
@@ -397,6 +459,109 @@ export function ScansPage({ site }: { site: Site }) {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function ScanContextBar({
+  scan,
+  siteRows,
+  newerCount,
+  onSwitch,
+}: {
+  scan: any;
+  siteRows: any[];
+  newerCount: number;
+  onSwitch: (id: string) => void;
+}) {
+  const running = scanIsActive(scan);
+  const completed = scan.status === "completed";
+  const score = Number(scan.score || 0);
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-4 py-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Viewing scan
+          {newerCount > 0 ? (
+            <Badge variant="warn">{newerCount} newer {newerCount === 1 ? "scan" : "scans"}</Badge>
+          ) : (
+            <Badge variant="outline">Latest</Badge>
+          )}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+          <span className="min-w-0 max-w-full break-all font-medium">{scan.url}</span>
+          <span className="text-border">·</span>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
+            <StatusDot tone={scanStatusTone(scan.status)} />
+            {scanStatusLabel(scan.status)} · {formatDate(scan.created_at || scan.updated_at)}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {running ? (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+            <StatusDot tone="warn" /> {scanPhaseLabel(scan)}
+          </span>
+        ) : completed ? (
+          <span className="whitespace-nowrap text-sm text-muted-foreground">
+            <span className="metric text-lg leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
+            {" · "}{scoreVerdict(score)}
+          </span>
+        ) : null}
+        {siteRows.length > 1 ? (
+          <Select value={scan.id} onValueChange={onSwitch}>
+            <SelectTrigger className="h-8 w-auto min-w-[190px]" aria-label="Switch to another saved scan">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {siteRows.map((row) => (
+                <SelectItem key={row.id} value={row.id}>
+                  {formatDate(row.created_at || row.updated_at)} · {scanIsActive(row) ? scanStatusLabel(row.status) : formatNumber(Number(row.score || 0))}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function NewScanBanner({
+  tone,
+  title,
+  detailText,
+  onView,
+  onDismiss,
+}: {
+  tone: "running" | "done";
+  title: string;
+  detailText: string;
+  onView: () => void;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm",
+        tone === "done" ? "border-good/30 bg-good-soft" : "border-warn/30 bg-warn-soft",
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        {tone === "done" ? <CheckCircle2 className="size-4 shrink-0 text-good" /> : <StatusDot tone="warn" />}
+        <span className="min-w-0">
+          <span className="font-medium">{title}</span>
+          <span className="ml-2 break-all text-muted-foreground">{detailText}</span>
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button size="sm" variant={tone === "done" ? "default" : "outline"} onClick={onView}>
+          {tone === "done" ? "Open report" : "View progress"}
+        </Button>
+        {onDismiss ? (
+          <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -521,6 +686,7 @@ function defaultScanTab(scan: any) {
 
 const scanTabValues = new Set([
   "overview",
+  "changes",
   "progress",
   "issues",
   "checks",
@@ -534,20 +700,18 @@ const scanTabValues = new Set([
   "raw",
 ]);
 
-function scanTabFromSearch(value: string | null, scan: any) {
-  return value && scanTabValues.has(value) ? value : defaultScanTab(scan);
-}
-
 function ScanDetail({ scan: savedScan }: { scan: any }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = scanTabFromSearch(searchParams.get("tab"), savedScan);
-  const [activeTab, setActiveTab] = useState(requestedTab);
+  const urlTab = searchParams.get("tab");
+  const explicitTab = urlTab && scanTabValues.has(urlTab) ? urlTab : "";
+  const [activeTab, setActiveTab] = useState(explicitTab || defaultScanTab(savedScan));
   const [severityFilter, setSeverityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedCheckTypes, setSelectedCheckTypes] = useState<string[]>([]);
   const [selectedCheckLabel, setSelectedCheckLabel] = useState("");
   const [showIgnored, setShowIgnored] = useState(false);
+  const [issueGroupMode, setIssueGroupMode] = useState<"type" | "page">("type");
   const [pageFilter, setPageFilter] = useState("");
   const [ignoreRules, setIgnoreRules] = useState<any[]>([]);
   // Ignore rules are applied server-side at read time, so after a rule change
@@ -569,14 +733,25 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
   const assets = result.assets || [];
   const summary = result.summary || {};
   const issueGroups = result.issueGroups || [];
+  const comparison = result.comparison || {};
+  const comparisonSummary = comparison.summary || {};
+  const comparisonChangeCount = comparison.available
+    ? Number(comparisonSummary.newIssues || 0) +
+      Number(comparisonSummary.fixedIssues || 0) +
+      Number(comparisonSummary.severityChanges || 0) +
+      Number(comparisonSummary.pageChanges || 0)
+    : 0;
   const severityCounts = scanSeverityCounts(scan);
   const coverage = scanCoverageMetrics(scan, result, summary);
   const categories = Object.keys(summary.byCategory || {}).sort();
   const issueTypes = Array.from(new Set<string>(issues.map((issue: any) => String(issue.type || "")).filter(Boolean))).sort();
   const categoryCounts: Record<string, number> = summary.byCategory || {};
+  // Re-seed the tab only when a different scan opens or the URL explicitly names
+  // a tab — never on scan status — so a scan finishing does not yank the user
+  // off the Progress tab they are watching.
   useEffect(() => {
-    setActiveTab(requestedTab);
-  }, [scan.id, requestedTab]);
+    setActiveTab(explicitTab || defaultScanTab(savedScan));
+  }, [scan.id, explicitTab]);
   // Reset issue filters when a different scan is opened from the ledger, so a
   // filter from the previous scan doesn't hide the new scan's issues.
   useEffect(() => {
@@ -634,15 +809,22 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
       toast.error(err instanceof Error ? err.message : "Could not remove the ignore rule");
     }
   };
-  const restoreIssue = (issue: any) =>
-    restoreIgnoreRules(
+  const restoreIssue = (issue: any) => {
+    const issueKey = ignorePageKey(issue.url || "");
+    return restoreIgnoreRules(
       ignoreRules.filter(
-        (rule) => (!rule.issue_type || rule.issue_type === issue.type) && (!rule.url || rule.url === issue.url),
+        (rule) =>
+          (!rule.issue_type || rule.issue_type === issue.type) &&
+          (!rule.url || ignorePageKey(rule.url) === issueKey),
       ),
     );
-  const ignoredPageUrls = new Set(ignoreRules.filter((rule) => !rule.issue_type && rule.url).map((rule) => rule.url));
+  };
+  const ignoredPageKeys = new Set(
+    ignoreRules.filter((rule) => !rule.issue_type && rule.url).map((rule) => ignorePageKey(rule.url)),
+  );
   const togglePageIgnore = (page: any) => {
-    const rule = ignoreRules.find((item) => !item.issue_type && item.url === page.url);
+    const pageKey = ignorePageKey(page.url || "");
+    const rule = ignoreRules.find((item) => !item.issue_type && item.url && ignorePageKey(item.url) === pageKey);
     if (rule) return restoreIgnoreRules([rule]);
     return ignoreIssueType({ type: "", url: page.url }, "page-all");
   };
@@ -726,11 +908,25 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
     setPageFilter("");
     showIssues();
   };
+  // Entering/leaving the ignored view drops the other filters — a leftover page or
+  // check filter would silently hide most ignored issues ("Showing 1 of 59").
+  const toggleIgnoredView = () => {
+    resetIssueFilters();
+    setShowIgnored(!showIgnored);
+  };
   return (
     <div className="space-y-5">
       <Tabs value={activeTab} onValueChange={changeScanTab} className="space-y-4">
         <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="changes" className="gap-1.5">
+            Changes
+            {comparisonChangeCount ? (
+              <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-warn-soft px-1.5 text-[10px] font-semibold text-warn">
+                {formatNumber(comparisonChangeCount)}
+              </span>
+            ) : null}
+          </TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>
           <TabsTrigger value="issues">Issues</TabsTrigger>
           <TabsTrigger value="checks">Checks</TabsTrigger>
@@ -759,6 +955,9 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
             onSelectGroup={selectIssueGroup}
             onIgnoreGroup={(group) => ignoreIssueType(group, "site")}
           />
+        </TabsContent>
+        <TabsContent value="changes" className="space-y-4">
+          <ScanChangesReport scan={scan} comparison={comparison} />
         </TabsContent>
         <TabsContent value="progress">
           <ScanProgressPanel scan={scan} result={result} coverage={coverage} />
@@ -799,12 +998,24 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
               </SelectContent>
             </Select>
             {selectedCheckLabel ? <Badge variant="outline">Showing {selectedCheckLabel}</Badge> : null}
+            <ToggleGroup
+              type="single"
+              value={issueGroupMode}
+              onValueChange={(value) => value && setIssueGroupMode(value as "type" | "page")}
+            >
+              <ToggleGroupItem value="type" aria-label="Group issues by type" className="gap-1.5 text-xs">
+                <ListChecks /> By type
+              </ToggleGroupItem>
+              <ToggleGroupItem value="page" aria-label="Group issues by page" className="gap-1.5 text-xs">
+                <LayoutList /> By page
+              </ToggleGroupItem>
+            </ToggleGroup>
             {ignoredIssues.length || ignoreRules.length ? (
               <Button
                 size="sm"
                 variant={showIgnored ? "secondary" : "outline"}
                 className="h-8 text-xs"
-                onClick={() => setShowIgnored(!showIgnored)}
+                onClick={toggleIgnoredView}
               >
                 <EyeOff /> Ignored ({formatNumber(ignoredIssues.length)})
               </Button>
@@ -848,7 +1059,13 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
             </div>
           ) : null}
           {filteredIssues.length ? (
-            <ScanIssuesTable rows={filteredIssues} onIgnore={ignoreIssueType} onRestore={restoreIssue} />
+            <ScanGroupedIssues
+              issues={filteredIssues}
+              mode={issueGroupMode}
+              showingIgnored={showIgnored}
+              onIgnore={ignoreIssueType}
+              onRestore={restoreIssue}
+            />
           ) : (
             <EmptyState
               title={showIgnored ? "No ignored issues" : "No matching issues"}
@@ -882,7 +1099,7 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
                     rows={rows}
                     onShowIssues={selectPageIssues}
                     onTogglePageIgnore={togglePageIgnore}
-                    ignoredPageUrls={ignoredPageUrls}
+                    ignoredPageKeys={ignoredPageKeys}
                   />
                 )}
               </FilteredRows>
@@ -891,8 +1108,9 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
         </TabsContent>
         <TabsContent value="links">
           <div className="space-y-4">
+            <ScanRedirectImpact coverage={coverage} links={links} />
             {links.length ? (
-              <ScanSection title="Checked links" text="Every unique HTTP URL that the crawler verified. Broken and redirecting links are highlighted in the Status column.">
+              <ScanSection title="Checked links" text="Every unique HTTP URL the crawler verified, including source-page blast radius, reference count, redirect hops, and final response.">
                 <FilteredRows rows={links} placeholder="Filter links…">
                   {(rows) => <ScanLinksTable rows={rows} />}
                 </FilteredRows>
@@ -952,6 +1170,138 @@ function ScanDetail({ scan: savedScan }: { scan: any }) {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ScanChangesReport({ scan, comparison }: { scan: any; comparison: any }) {
+  if (scanIsActive(scan)) {
+    return <EmptyState title="Comparison pending" text="New, fixed, and regressed findings appear after this scan finishes." />;
+  }
+  if (!comparison.available) {
+    const emptyCopy = !scan.result?.scanVersion
+      ? {
+          title: "Comparison unavailable for this saved scan",
+          text: "This report predates versioned crawl comparisons. Fresh scans remain readable, and two new scans will establish a safe baseline.",
+        }
+      : comparison.reason === "incompatible-version"
+      ? {
+          title: "Comparison starts with this scan",
+          text: "The previous report uses older crawl semantics. Run one more scan to get an honest like-for-like comparison.",
+        }
+      : comparison.reason === "scope-changed"
+        ? {
+            title: "Crawl scope changed",
+            text: "The previous scan used a different page limit. Run the same scope again to compare like for like.",
+          }
+        : {
+            title: "First scan for this URL",
+            text: "Run another scan to compare issues, indexability, metadata, content, redirects, and sitemap membership.",
+          };
+    return <EmptyState title={emptyCopy.title} text={emptyCopy.text} />;
+  }
+
+  const summary = comparison.summary || {};
+  const issueChanges = [
+    ...(comparison.newIssues || []),
+    ...(comparison.fixedIssues || []),
+    ...(comparison.severityChanges || []),
+  ];
+  const pageChanges = comparison.pageChanges || [];
+  return (
+    <div className="space-y-4">
+      <ReportSection
+        title="Since the previous scan"
+        description="Saved crawl evidence compared by normalized page URL and stable issue identity."
+        meta={comparison.previousCreatedAt ? `Previous scan · ${formatDate(comparison.previousCreatedAt)}` : undefined}
+      >
+        <MetricTileGrid>
+          <MetricTile label="New issues" value={<CountUp value={summary.newIssues || 0} />} tone={summary.newIssues ? "warn" : "default"} hint="Issue identities not present in the previous scan" />
+          <MetricTile label="Fixed issues" value={<CountUp value={summary.fixedIssues || 0} />} hint="Previous findings absent from this scan" />
+          <MetricTile label="Regressions" value={<CountUp value={summary.regressions || 0} />} tone={summary.regressions ? "bad" : "default"} hint="Indexability, status, redirect, sitemap, or removed-page regressions" />
+          <MetricTile label="Page changes" value={<CountUp value={summary.pageChanges || 0} />} hint="Metadata, content, status, discovery, and sitemap changes" />
+        </MetricTileGrid>
+        {comparison.previousScanId ? (
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link to={`/scans/${comparison.previousScanId}`}><FileSearch /> Open previous scan</Link>
+          </Button>
+        ) : null}
+      </ReportSection>
+
+      <ScanSection title="Issue changes" text="New and fixed findings, plus issues whose severity changed.">
+        {issueChanges.length ? (
+          <FilteredRows rows={issueChanges} placeholder="Filter issue changes…">
+            {(rows) => <ScanIssueChangesTable rows={rows} />}
+          </FilteredRows>
+        ) : <EmptyState title="No issue changes" text="The saved issue identities match the previous scan." />}
+      </ScanSection>
+
+      <ScanSection title="Page changes" text="Indexability, HTTP status, redirect destination, title, description, H1, word count, sitemap, and crawl membership changes.">
+        {pageChanges.length ? (
+          <FilteredRows rows={pageChanges} placeholder="Filter page changes…">
+            {(rows) => <ScanPageChangesTable rows={rows} />}
+          </FilteredRows>
+        ) : <EmptyState title="No page changes" text="The crawled page evidence matches the previous scan." />}
+      </ScanSection>
+    </div>
+  );
+}
+
+function ScanIssueChangesTable({ rows }: { rows: any[] }) {
+  return (
+    <Table>
+      <TableHeader><TableRow><TableHead>Change</TableHead><TableHead>Severity</TableHead><TableHead>Issue</TableHead><TableHead>Page</TableHead><TableHead>Before → after</TableHead></TableRow></TableHeader>
+      <TableBody>
+        {rows.map((row, index) => (
+          <TableRow key={`${row.change}:${row.type}:${row.url}:${index}`}>
+            <TableCell><Badge variant={row.change === "fixed" ? "good" : row.change === "new" ? "warn" : "outline"}>{String(row.change || "changed").replaceAll("-", " ")}</Badge></TableCell>
+            <TableCell><Badge variant={severityVariant(row.severity)}>{row.severity || "low"}</Badge></TableCell>
+            <TableCell className="min-w-64"><div className="font-medium">{row.message}</div><div className="text-xs text-muted-foreground">{String(row.type || "").replaceAll("-", " ")}</div>{row.subject ? <div className="mt-1 max-w-md break-all text-xs text-muted-foreground">Target: {row.subject}</div> : null}</TableCell>
+            <TableCell className="max-w-sm break-all text-sm text-muted-foreground">{row.url || "-"}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">
+              {row.change === "severity-changed" ? `${row.previousSeverity || "-"} → ${row.currentSeverity || row.severity || "-"}` : "-"}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function ScanPageChangesTable({ rows }: { rows: any[] }) {
+  return (
+    <Table>
+      <TableHeader><TableRow><TableHead>Change</TableHead><TableHead>Page</TableHead><TableHead>Field</TableHead><TableHead>Before</TableHead><TableHead>After</TableHead></TableRow></TableHeader>
+      <TableBody>
+        {rows.map((row, index) => (
+          <TableRow key={`${row.type}:${row.url}:${row.field}:${index}`}>
+            <TableCell><Badge variant={row.regression ? "bad" : row.type === "became-indexable" || row.type === "page-added-to-sitemap" ? "good" : "outline"}>{row.label || String(row.type || "changed").replaceAll("-", " ")}</Badge></TableCell>
+            <TableCell className="max-w-sm break-all font-medium">{row.url}</TableCell>
+            <TableCell className="whitespace-nowrap text-muted-foreground">{row.field}</TableCell>
+            <TableCell className="max-w-md"><div className="line-clamp-3 break-words text-sm text-muted-foreground">{String(row.before ?? "-") || "-"}</div></TableCell>
+            <TableCell className="max-w-md"><div className="line-clamp-3 break-words text-sm">{String(row.after ?? "-") || "-"}</div></TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function ScanRedirectImpact({ coverage, links }: { coverage: ReturnType<typeof scanCoverageMetrics>; links: any[] }) {
+  const redirectingTargets = links.filter(
+    (link: any) => link.redirected || (link.finalUrl && link.finalUrl !== link.url),
+  );
+  const referenceHint = coverage.redirectImpactComplete
+    ? "All matching anchor occurrences, aggregated before inventory caps"
+    : "Matching occurrences retained by this older scan; rescan for a complete count";
+  return (
+    <ScanSection title="Redirect blast radius" text="Unique redirecting targets, affected source pages, and total link references are counted separately.">
+      <MetricTileGrid>
+        <MetricTile label="Redirecting targets" value={<CountUp value={coverage.redirectedLinkTargets} />} tone={coverage.redirectedLinkTargets ? "warn" : "default"} hint="Unique checked URLs that redirect" />
+        <MetricTile label="Affected pages" value={<CountUp value={coverage.redirectedLinkPages} />} tone={coverage.redirectedLinkPages ? "warn" : "default"} hint="Distinct crawled pages linking to those targets" />
+        <MetricTile label="Link references" value={<CountUp value={coverage.redirectedLinkReferences} />} tone={coverage.redirectedLinkReferences ? "warn" : "default"} hint={referenceHint} />
+        <MetricTile label="Longest chain" value={<CountUp value={redirectingTargets.reduce((max: number, link: any) => Math.max(max, Number(link.redirectChain?.length || 0)), 0)} />} hint="Maximum recorded HTTP redirect hops" />
+      </MetricTileGrid>
+    </ScanSection>
   );
 }
 
@@ -1168,17 +1518,17 @@ function ScanProgressPanel({
     {
       label: "Check links",
       detail: `${formatNumber(coverage.checkedLinks)} unique URLs checked`,
-      evidence: `${formatNumber(coverage.brokenLinks)} failing · ${formatNumber(coverage.redirectedLinks)} redirecting.`,
+      evidence: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.unverifiedLinks)} certificate-unverified · ${formatNumber(coverage.redirectedLinkTargets)} redirect targets affecting ${formatNumber(coverage.redirectedLinkPages)} pages.`,
     },
     {
       label: "Check images",
       detail: `${formatNumber(coverage.checkedImages)} image URLs checked`,
-      evidence: `${formatNumber(coverage.brokenImages)} failing · ${formatNumber(coverage.redirectedImages)} redirecting · ${formatNumber(coverage.largeImages)} large.`,
+      evidence: `${formatNumber(coverage.brokenImages)} failing · ${formatNumber(coverage.unverifiedImages)} certificate-unverified · ${formatNumber(coverage.redirectedImages)} redirecting · ${formatNumber(coverage.largeImages)} large.`,
     },
     {
       label: "Check CSS/JS",
       detail: `${formatNumber(coverage.checkedAssets)} assets checked`,
-      evidence: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(coverage.cssImageResources)} CSS image URLs found.`,
+      evidence: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(coverage.unverifiedAssets)} certificate-unverified · ${formatNumber(coverage.cssImageResources)} CSS image URLs found.`,
     },
     {
       label: "Build report",
@@ -1236,8 +1586,7 @@ function ScanReportOverview({
   const isCompleted = scan.status === "completed";
   const isFailed = scan.status === "failed";
   const finalScore = Number(scan.score || 0);
-  const progress = scanProgress(scan);
-  const dialColor = isFailed ? "var(--bad)" : isActive ? "var(--primary)" : undefined;
+  const dialColor = isFailed ? "var(--bad)" : undefined;
   const sourceUrl = result.startUrl || scan.url;
   const metaIssues = Number(summary.missingTitles || 0) + Number(summary.missingDescriptions || 0);
   const imageAltIssues = Number(summary.missingAlt || 0) + Number(summary.imagesMissingDimensions || 0);
@@ -1252,14 +1601,14 @@ function ScanReportOverview({
     {
       label: "Links checked",
       value: <CountUp value={coverage.checkedLinks} />,
-      tone: coverage.brokenLinks ? "bad" : "default",
-      hint: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.redirectedLinks)} redirecting`,
+      tone: coverage.brokenLinks ? "bad" : coverage.unverifiedLinks || coverage.redirectedLinkTargets ? "warn" : "default",
+      hint: `${formatNumber(coverage.brokenLinks)} broken · ${formatNumber(coverage.unverifiedLinks)} unverified · ${formatNumber(coverage.redirectedLinkTargets)} redirect targets affecting ${formatNumber(coverage.redirectedLinkPages)} pages`,
     },
     {
       label: "Images checked",
       value: <CountUp value={coverage.checkedImages} />,
-      tone: coverage.brokenImages ? "bad" : coverage.largeImages ? "warn" : "default",
-      hint: `${formatNumber(coverage.brokenImages)} broken · ${formatNumber(coverage.largeImages || 0)} large`,
+      tone: coverage.brokenImages ? "bad" : coverage.unverifiedImages || coverage.largeImages ? "warn" : "default",
+      hint: `${formatNumber(coverage.brokenImages)} broken · ${formatNumber(coverage.unverifiedImages)} unverified · ${formatNumber(coverage.largeImages || 0)} large`,
     },
     {
       label: "Avg response",
@@ -1285,29 +1634,29 @@ function ScanReportOverview({
 
   return (
     <ReportSection
-      title={isActive ? "Live scan progress" : "Scan health"}
-      description={
-        isActive
-          ? undefined
-          : "The percentage of crawled pages without high-severity issues. Medium and low findings are listed for review but never lower the score."
-      }
+      title="Scan health"
+      description="The percentage of crawled pages without high-severity issues. Medium and low findings are listed for review but never lower the score."
     >
       <div className="grid gap-6 xl:grid-cols-[248px_minmax(0,1fr)]">
         <div className="flex flex-col items-center gap-4 pb-6 text-center xl:pb-0 xl:pr-6">
-          <ScoreDial
-            score={isCompleted || isFailed ? finalScore : progress}
-            size={148}
-            color={dialColor}
-            suffix={isActive ? "%" : undefined}
-            label={isCompleted ? scoreVerdict(finalScore) : isFailed ? "score" : "progress"}
-          />
           {isActive ? (
-            <div className="w-full space-y-2">
-              <ProgressBar value={progress} />
-              <p className="text-xs leading-5 text-muted-foreground">The final health score appears after the crawl, resource checks, and report build finish.</p>
+            <div className="flex flex-col items-center justify-center gap-2.5 py-10 text-center">
+              <StatusDot tone="warn" />
+              <p className="text-sm font-medium">Scan in progress</p>
+              <p className="max-w-[210px] text-xs leading-5 text-muted-foreground">
+                Your health score appears here once the crawl, resource checks, and report build finish. Follow it live on the Progress tab.
+              </p>
             </div>
           ) : (
-            <div className="w-full space-y-3">
+            <div className="w-full space-y-4">
+              <div className="flex justify-center">
+                <ScoreDial
+                  score={finalScore}
+                  size={148}
+                  color={dialColor}
+                  label={isCompleted ? scoreVerdict(finalScore) : "score"}
+                />
+              </div>
               <div className="flex items-start justify-center gap-7">
                 {[
                   { key: "high", label: "High", count: severityCounts.high, labelClass: "text-bad" },
@@ -1354,7 +1703,9 @@ function ScanReportOverview({
           <p className="text-xs leading-5 text-muted-foreground">
             {resourceFailures
               ? `Resource failures detected — ${formatNumber(coverage.brokenLinks)} links, ${formatNumber(coverage.brokenImages)} images and ${formatNumber(coverage.brokenAssets)} assets need attention. `
-              : "All checked links, images and assets responded. "}
+              : coverage.unverifiedLinks || coverage.unverifiedImages || coverage.unverifiedAssets
+                ? `${formatNumber(coverage.unverifiedLinks)} link, ${formatNumber(coverage.unverifiedImages)} image and ${formatNumber(coverage.unverifiedAssets)} asset certificates could not be verified; these are not counted as broken resources. `
+                : "All checked links, images and assets responded. "}
             Crawl started at <span className="break-all font-medium">{sourceUrl}</span>.
           </p>
         </div>
@@ -1514,8 +1865,8 @@ function ScanSpeedReport({
             {
               title: "CSS/JS requests",
               status: formatNumber(coverage.checkedAssets),
-              tone: coverage.brokenAssets ? "bad" : coverage.checkedAssets ? "good" : "outline",
-              text: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(summary.largeAssets || 0)} large · ${formatNumber(summary.renderBlockingScripts || 0)} render-blocking scripts.`,
+              tone: coverage.brokenAssets ? "bad" : coverage.unverifiedAssets ? "warn" : coverage.checkedAssets ? "good" : "outline",
+              text: `${formatNumber(coverage.brokenAssets)} failing · ${formatNumber(coverage.unverifiedAssets)} certificate-unverified · ${formatNumber(summary.largeAssets || 0)} large · ${formatNumber(summary.renderBlockingScripts || 0)} render-blocking scripts.`,
             },
             {
               title: "Image loading",
@@ -1563,8 +1914,9 @@ function ScanSpeedPagesTable({ rows }: { rows: any[] }) {
           return (
             <TableRow key={page.url}>
               <TableCell className="min-w-96">
-                <div className="break-all font-medium">{page.finalUrl || page.url}</div>
+                <div className="break-all font-medium">{page.url}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{page.title || "Untitled page"}</div>
+                {page.requestedUrl && page.requestedUrl !== page.url ? <div className="mt-1 break-all text-xs text-warn">via {page.requestedUrl}</div> : null}
               </TableCell>
               <TableCell><Badge variant={page.status >= 400 ? "bad" : page.status >= 300 ? "warn" : "good"}>{page.status || "-"}</Badge></TableCell>
               <TableCell><Badge variant={speedVariant(page.loadMs) as any}>{formatMs(page.loadMs)}</Badge></TableCell>
@@ -1639,6 +1991,7 @@ function ScanCheckMatrix({
         { label: "Missing srcset", value: summary.imagesMissingSrcset, problem: true, severity: "warn", category: "images", types: ["image-srcset-missing"] },
         { label: "No lazy loading", value: summary.imagesMissingLazyLoading, problem: true, severity: "warn", category: "performance", types: ["image-lazy-loading-missing"] },
         { label: "Broken image URLs", value: coverage.brokenImages, problem: true, severity: "bad", category: "images", types: ["broken-image"] },
+        { label: "Unverified image certificates", value: coverage.unverifiedImages, problem: true, severity: "warn", category: "images", types: ["image-certificate-error"] },
         { label: "Redirecting image URLs", value: coverage.redirectedImages, problem: true, severity: "warn", category: "images", types: ["image-redirects"] },
         { label: "Large images", value: coverage.largeImages, problem: true, severity: "warn", category: "images", types: ["large-image"] },
         { label: "Wrong content type", value: issueTypeCount(issues, "image-invalid-content-type"), problem: true, severity: "bad", category: "images", types: ["image-invalid-content-type"] },
@@ -1652,8 +2005,9 @@ function ScanCheckMatrix({
       rows: [
         { label: "Links found", value: coverage.linkTags },
         { label: "Checked links", value: coverage.checkedLinks },
-        { label: "Broken links", value: coverage.brokenLinks, problem: true, severity: "bad", category: "links", types: ["broken-internal-link", "broken-external-link"] },
-        { label: "Redirecting links", value: coverage.redirectedLinks, problem: true, severity: "warn", category: "links", types: ["internal-link-redirects", "external-link-redirects"] },
+        { label: "Broken links", value: coverage.brokenLinks, problem: true, severity: "bad", category: "links", types: ["broken-internal-link", "broken-external-link", "link-redirect-loop"] },
+        { label: "Unverified certificates", value: coverage.unverifiedLinks, problem: true, severity: "warn", category: "links", types: ["internal-link-certificate-error", "external-link-certificate-error"] },
+        { label: "Pages linking to redirects", value: coverage.redirectedLinkPages, problem: true, severity: "warn", category: "links", types: ["internal-link-redirects", "external-link-redirects"] },
         { label: "Empty anchors", value: summary.emptyAnchorLinks, problem: true, severity: "warn", category: "links", types: ["empty-anchor-text"] },
         { label: "Internal nofollow", value: summary.internalNofollowLinks, problem: true, severity: "warn", category: "links", types: ["internal-nofollow"] },
         { label: "Tracked internal links", value: issueTypeCount(issues, "internal-links-with-tracking-parameters"), problem: true, severity: "warn", category: "links", types: ["internal-links-with-tracking-parameters"] },
@@ -1670,7 +2024,7 @@ function ScanCheckMatrix({
         { label: "Noindex pages", value: issueTypeCount(issues, "noindex"), problem: true, severity: "bad", category: "indexability", types: ["noindex"] },
         { label: "Page nofollow", value: issueTypeCount(issues, "meta-robots-nofollow"), problem: true, severity: "warn", category: "indexability", types: ["meta-robots-nofollow"] },
         { label: "Snippet restrictions", value: issueTypeCount(issues, "restrictive-snippet-directive"), problem: true, severity: "warn", category: "indexability", types: ["restrictive-snippet-directive"] },
-        { label: "Canonical issues", value: byCategory.canonicals, problem: true, severity: "warn", category: "canonicals", types: ["canonical-missing", "canonical-invalid", "canonical-multiple", "canonical-http-on-https", "canonical-cross-domain", "canonical-not-self"] },
+        { label: "Canonical issues", value: byCategory.canonicals, problem: true, severity: "warn", category: "canonicals", types: ["canonical-missing", "canonical-invalid", "canonical-multiple", "canonical-http-on-https", "canonical-cross-domain", "canonical-not-self", "canonical-points-to-redirect"] },
         { label: "HTTP pages", value: issueTypeCount(issues, "page-not-https"), problem: true, severity: "bad", category: "security", types: ["page-not-https"] },
         { label: "Lang or charset issues", value: issueTypesCount(issues, ["html-lang-missing", "html-lang-invalid", "charset-missing"]), problem: true, severity: "warn", category: "indexability", types: ["html-lang-missing", "html-lang-invalid", "charset-missing"] },
         { label: "Hreflang issues", value: byCategory.localization, problem: true, severity: "warn", category: "localization", types: ["hreflang-invalid", "hreflang-code-invalid", "hreflang-duplicate", "hreflang-x-default-missing"] },
@@ -1681,8 +2035,10 @@ function ScanCheckMatrix({
       text: "Sitemap, robots, discovery",
       rows: [
         { label: "Pages crawled", value: coverage.pages },
-        { label: "Page crawl failures", value: issueTypesCount(issues, ["crawl-failed", "page-http-error", "non-html-page"]), problem: true, severity: "bad", category: "crawl", types: ["crawl-failed", "page-http-error", "non-html-page"] },
-        { label: "Redirected pages", value: issueTypeCount(issues, "redirected-url"), problem: true, severity: "warn", category: "crawl", types: ["redirected-url"] },
+        { label: "Page crawl failures", value: issueTypesCount(issues, ["crawl-failed", "page-http-error", "non-html-page", "redirect-failed"]), problem: true, severity: "bad", category: "crawl", types: ["crawl-failed", "page-http-error", "non-html-page", "redirect-failed"] },
+        { label: "Redirected pages", value: issueTypesCount(issues, ["redirected-url", "temporary-redirect"]), problem: true, severity: "warn", category: "crawl", types: ["redirected-url", "temporary-redirect"] },
+        { label: "Redirect chains", value: issueTypeCount(issues, "redirect-chain"), problem: true, severity: "warn", category: "crawl", types: ["redirect-chain"] },
+        { label: "Redirect loops", value: issueTypeCount(issues, "redirect-loop"), problem: true, severity: "bad", category: "crawl", types: ["redirect-loop"] },
         { label: "Meta refresh", value: issueTypeCount(issues, "meta-refresh"), problem: true, severity: "warn", category: "crawl", types: ["meta-refresh"] },
         { label: "Long URLs", value: issueTypeCount(issues, "url-too-long"), problem: true, severity: "warn", category: "crawl", types: ["url-too-long"] },
         { label: "Tracked URLs", value: issueTypeCount(issues, "tracking-parameters-in-url"), problem: true, severity: "warn", category: "crawl", types: ["tracking-parameters-in-url"] },
@@ -1702,6 +2058,7 @@ function ScanCheckMatrix({
         { label: "Viewport issues", value: issueTypesCount(issues, ["viewport-missing", "viewport-not-responsive"]), problem: true, severity: "warn", category: "performance", types: ["viewport-missing", "viewport-not-responsive"] },
         { label: "Heavy HTML", value: issueTypesCount(issues, ["heavy-html", "html-compression-missing"]), problem: true, severity: "warn", category: "performance", types: ["heavy-html", "html-compression-missing"] },
         { label: "Broken CSS/JS", value: coverage.brokenAssets, problem: true, severity: "bad", category: "assets", types: ["broken-css", "broken-javascript"] },
+        { label: "Unverified asset certificates", value: coverage.unverifiedAssets, problem: true, severity: "warn", category: "assets", types: ["asset-certificate-error"] },
         { label: "Wrong CSS/JS type", value: issueTypesCount(issues, ["css-invalid-content-type", "javascript-invalid-content-type"]), problem: true, severity: "warn", category: "assets", types: ["css-invalid-content-type", "javascript-invalid-content-type"] },
         { label: "Large CSS/JS", value: summary.largeAssets, problem: true, severity: "warn", category: "assets", types: ["large-css", "large-javascript"] },
         { label: "Render-blocking JS", value: summary.renderBlockingScripts, problem: true, severity: "warn", category: "performance", types: ["render-blocking-javascript"] },
@@ -1807,6 +2164,169 @@ function ScanSection({ title, text, children }: { title: string; text: string; c
     <ReportSection title={title} description={text}>
       {children}
     </ReportSection>
+  );
+}
+
+const ISSUE_SEVERITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+function worseSeverity(a: string, b: string) {
+  return (ISSUE_SEVERITY_RANK[a] || 0) >= (ISSUE_SEVERITY_RANK[b] || 0) ? a : b;
+}
+
+function issueEvidenceText(issue: any) {
+  const ev = issue?.evidence || {};
+  const value = ev.linkedUrl || ev.image || ev.asset || ev.canonical || ev.finalUrl || ev.robotsMeta || "";
+  return typeof value === "string" ? value : "";
+}
+
+// Group the already-filtered issue list into collapsible sections — one row per
+// issue type ("fix this everywhere") or one row per page ("fix this page").
+function buildIssueGroups(issues: any[], mode: "type" | "page") {
+  const map = new Map<string, any>();
+  for (const issue of issues) {
+    const key = mode === "type" ? String(issue.type || "issue") : String(issue.url || "—");
+    const group = map.get(key) || {
+      key,
+      severity: "low",
+      title: mode === "type" ? issue.message || String(issue.type || "").replaceAll("-", " ") : issue.url || "—",
+      category: issue.category,
+      type: issue.type,
+      items: [] as any[],
+    };
+    if (worseSeverity(group.severity, issue.severity || "low") !== group.severity) {
+      group.severity = issue.severity || "low";
+      if (mode === "type") group.title = issue.message || group.title;
+    }
+    group.items.push(issue);
+    map.set(key, group);
+  }
+  return [...map.values()]
+    .map((group) => ({ ...group, count: group.items.length }))
+    .sort(
+      (a, b) =>
+        (ISSUE_SEVERITY_RANK[b.severity] || 0) - (ISSUE_SEVERITY_RANK[a.severity] || 0) || b.count - a.count,
+    );
+}
+
+function ScanGroupedIssues({
+  issues,
+  mode,
+  showingIgnored,
+  onIgnore,
+  onRestore,
+}: {
+  issues: any[];
+  mode: "type" | "page";
+  showingIgnored?: boolean;
+  onIgnore?: (issue: any, scope: "site" | "page" | "page-all") => void;
+  onRestore?: (issue: any) => void;
+}) {
+  const groups = useMemo(() => buildIssueGroups(issues, mode), [issues, mode]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  return (
+    <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60">
+      {groups.map((group) => {
+        const open = expanded.has(group.key);
+        const unit = mode === "type" ? (group.count === 1 ? "page" : "pages") : group.count === 1 ? "issue" : "issues";
+        return (
+          <div key={group.key}>
+            <div className="flex items-center gap-3 px-3.5 py-3 hover:bg-accent/40">
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                onClick={() => toggle(group.key)}
+                aria-expanded={open}
+              >
+                <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+                <Badge variant={severityVariant(group.severity) as any} className="shrink-0 text-[10.5px] font-semibold uppercase">
+                  {group.severity}
+                </Badge>
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{group.title}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {mode === "type"
+                      ? `${issueCategoryLabel(group.category)} · ${String(group.type || "").replaceAll("-", " ")}`
+                      : group.key}
+                  </div>
+                </div>
+              </button>
+              <span className="metric shrink-0 whitespace-nowrap text-sm text-muted-foreground">
+                {formatNumber(group.count)} {unit}
+              </span>
+              {!showingIgnored && onIgnore ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 shrink-0 px-2 text-xs"
+                  aria-label={mode === "type" ? "Ignore this issue type for the whole site" : "Ignore every issue on this page"}
+                  onClick={() =>
+                    mode === "type"
+                      ? onIgnore(group.items[0], "site")
+                      : onIgnore({ type: "", url: group.key }, "page-all")
+                  }
+                >
+                  <EyeOff /> Ignore
+                </Button>
+              ) : null}
+            </div>
+            {open ? (
+              <div className="divide-y divide-border/40 border-t border-border/50 bg-muted/20">
+                {group.items.map((item: any, index: number) => {
+                  const evidence = issueEvidenceText(item);
+                  return (
+                    <div key={`${group.key}:${index}`} className="flex items-center gap-3 px-3.5 py-2 pl-10 text-sm">
+                      <div className="min-w-0 flex-1">
+                        {mode === "type" ? (
+                          <>
+                            <div className="truncate text-muted-foreground">{item.url || "—"}</div>
+                            {evidence ? <div className="truncate text-xs text-muted-foreground/70">{evidence}</div> : null}
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={severityVariant(item.severity) as any} className="text-[10px] uppercase">{item.severity}</Badge>
+                              <span className="truncate font-medium">{item.message}</span>
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">{String(item.type || "").replaceAll("-", " ")}</div>
+                          </>
+                        )}
+                      </div>
+                      {item.url ? (
+                        <Button asChild size="icon" variant="ghost" className="size-7 shrink-0 text-muted-foreground hover:text-foreground">
+                          <a href={item.url} target="_blank" rel="noreferrer" aria-label={`Open ${item.url}`}><ExternalLink /></a>
+                        </Button>
+                      ) : null}
+                      {item.ignored && onRestore ? (
+                        <Button size="sm" variant="secondary" className="h-7 shrink-0 gap-1.5 px-2 text-xs" onClick={() => onRestore(item)}>
+                          <Eye /> Restore
+                        </Button>
+                      ) : !item.ignored && onIgnore ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 shrink-0 gap-1.5 px-2 text-xs text-muted-foreground"
+                          aria-label="Ignore this issue on this page"
+                          onClick={() => onIgnore(item, "page")}
+                        >
+                          <EyeOff /> Ignore
+                        </Button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -2000,12 +2520,12 @@ function ScanPagesTable({
   rows,
   onShowIssues,
   onTogglePageIgnore,
-  ignoredPageUrls,
+  ignoredPageKeys,
 }: {
   rows: any[];
   onShowIssues?: (page: any) => void;
   onTogglePageIgnore?: (page: any) => void;
-  ignoredPageUrls?: Set<string>;
+  ignoredPageKeys?: Set<string>;
 }) {
   return (
     <Table>
@@ -2028,10 +2548,18 @@ function ScanPagesTable({
             <TableCell className="max-w-sm">
               <div className="truncate font-medium">{page.title || page.url}</div>
               <div className="truncate text-xs text-muted-foreground">{page.url}</div>
+              {page.requestedUrl && page.requestedUrl !== page.url ? <div className="truncate text-xs text-warn">via {page.requestedUrl}</div> : null}
             </TableCell>
-            <TableCell><Badge variant={page.status >= 400 ? "bad" : page.status >= 300 ? "warn" : "good"}>{page.status}</Badge></TableCell>
-            <TableCell><IndexabilityBadge page={page} /></TableCell>
-            <TableCell><Badge variant={page.sitemapListed ? "good" : "warn"}>{page.sitemapListed ? "Listed" : "Missing"}</Badge></TableCell>
+            <TableCell><Badge variant={page.status >= 400 ? "bad" : page.sourceStatus >= 300 || page.status >= 300 ? "warn" : "good"}>{page.sourceStatus != null && page.sourceStatus !== page.status ? `${page.sourceStatus} → ${page.status}` : page.status}</Badge></TableCell>
+            <TableCell>
+              <IndexabilityBadge page={page} />
+              {page.indexabilityReason && page.indexabilityReason !== "indexable" ? <div className="mt-1 text-xs text-muted-foreground">{String(page.indexabilityReason).replaceAll("-", " ")}</div> : null}
+            </TableCell>
+            <TableCell>
+              <Badge variant={page.sitemapListed ? "good" : "warn"}>
+                {page.sitemapListed ? "Listed" : page.sitemapSourceListed ? "Redirect source listed" : "Missing"}
+              </Badge>
+            </TableCell>
             <TableCell className="text-right nums tabular-nums">{formatMs(page.loadMs)}</TableCell>
             <TableCell className="text-right nums tabular-nums">{formatNumber(page.wordCount)}</TableCell>
             <TableCell className="whitespace-nowrap text-right text-muted-foreground nums tabular-nums">
@@ -2053,23 +2581,26 @@ function ScanPagesTable({
             </TableCell>
             {onTogglePageIgnore ? (
               <TableCell className="text-right">
-                {ignoredPageUrls?.has(page.url) ? (
+                {ignoredPageKeys?.has(ignorePageKey(page.url)) ? (
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
+                    className="h-7 gap-1.5 text-xs"
+                    title="This page is ignored — click to restore its issues"
                     aria-label={`Restore ignored issues for ${page.url}`}
                     onClick={() => onTogglePageIgnore(page)}
                   >
-                    <Eye />
+                    <EyeOff /> Ignored
                   </Button>
                 ) : (page.issues || []).length ? (
                   <Button
                     size="sm"
                     variant="ghost"
+                    className="h-7 gap-1.5 text-xs text-muted-foreground"
                     aria-label={`Ignore all issues on ${page.url}`}
                     onClick={() => onTogglePageIgnore(page)}
                   >
-                    <EyeOff />
+                    <EyeOff /> Ignore
                   </Button>
                 ) : null}
               </TableCell>
@@ -2129,11 +2660,15 @@ function ScanAssetsTable({ rows }: { rows: any[] }) {
     <Table>
       <TableHeader><TableRow><TableHead>Asset</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Loading</TableHead><TableHead>Content type</TableHead><TableHead>Size</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
       <TableBody>
-        {rows.map((row, index) => (
-          <TableRow key={`${row.url}:${index}`}>
+        {rows.map((row, index) => {
+          const certificateFailure = row.failureKind === "tls-certificate";
+          const status = row.finalStatus != null && row.finalStatus !== row.status
+            ? `${row.status ?? "?"} → ${row.finalStatus}`
+            : row.status || row.error || "failed";
+          return <TableRow key={`${row.url}:${index}`}>
             <TableCell className="max-w-sm break-all font-medium">{row.url}</TableCell>
             <TableCell><Badge variant="outline">{row.type}</Badge></TableCell>
-            <TableCell><Badge variant={row.ok ? "good" : "bad"}>{row.status || row.error || "failed"}</Badge></TableCell>
+            <TableCell><Badge variant={certificateFailure ? "warn" : row.ok ? "good" : "bad"}>{status}</Badge></TableCell>
             <TableCell>
               <div className="flex flex-wrap gap-1">
                 {row.type === "js" && row.placement === "head" && !row.async && !row.defer && !row.module ? <Badge variant="warn">blocking</Badge> : null}
@@ -2146,8 +2681,8 @@ function ScanAssetsTable({ rows }: { rows: any[] }) {
             <TableCell className="text-muted-foreground">{row.contentType || "-"}</TableCell>
             <TableCell className="nums">{formatBytes(row.contentLength)}</TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
-          </TableRow>
-        ))}
+          </TableRow>;
+        })}
       </TableBody>
     </Table>
   );
@@ -2158,17 +2693,21 @@ function ScanImagesTable({ rows }: { rows: any[] }) {
     <Table>
       <TableHeader><TableRow><TableHead>Image</TableHead><TableHead>Status</TableHead><TableHead>Type</TableHead><TableHead>Size</TableHead><TableHead>Purpose</TableHead><TableHead>Final URL</TableHead><TableHead>From</TableHead></TableRow></TableHeader>
       <TableBody>
-        {rows.map((row, index) => (
-          <TableRow key={`${row.url}:${index}`}>
+        {rows.map((row, index) => {
+          const certificateFailure = row.failureKind === "tls-certificate";
+          const status = row.finalStatus != null && row.finalStatus !== row.status
+            ? `${row.status ?? "?"} → ${row.finalStatus}`
+            : row.status || row.error || "failed";
+          return <TableRow key={`${row.url}:${index}`}>
             <TableCell className="max-w-sm break-all font-medium">{row.url}</TableCell>
-            <TableCell><Badge variant={!row.ok ? "bad" : row.redirected || row.finalUrl !== row.url ? "warn" : "good"}>{row.status || row.error || "failed"}</Badge></TableCell>
+            <TableCell><Badge variant={certificateFailure ? "warn" : !row.ok ? "bad" : row.redirected || row.finalUrl !== row.url ? "warn" : "good"}>{status}</Badge></TableCell>
             <TableCell className="text-muted-foreground">{row.contentType || "-"}</TableCell>
             <TableCell className="nums">{formatBytes(row.contentLength)}</TableCell>
             <TableCell><Badge variant="outline">{row.purpose || "img"}</Badge></TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.finalUrl && row.finalUrl !== row.url ? row.finalUrl : "-"}</TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{row.from}</TableCell>
-          </TableRow>
-        ))}
+          </TableRow>;
+        })}
       </TableBody>
     </Table>
   );

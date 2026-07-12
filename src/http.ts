@@ -4,6 +4,99 @@ import { localFetchTls } from "./site-scan-url";
 // smaller; the cap stops a linked PDF/ZIP/video from being buffered into memory.
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 
+export type RedirectHop = {
+  url: string;
+  status: number;
+  location: string;
+  targetUrl: string;
+};
+
+const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+
+export async function fetchWithRedirectTrace(url: string, init: RequestInit = {}, maxRedirects = 128) {
+  let currentUrl = url;
+  const redirectChain: RedirectHop[] = [];
+  const seen = new Set([currentUrl]);
+
+  while (true) {
+    const response = await fetch(currentUrl, {
+      ...init,
+      redirect: "manual",
+      ...localFetchTls(currentUrl),
+    });
+    const location = response.headers.get("location") || "";
+    if (!redirectStatuses.has(response.status) || !location) {
+      return {
+        response,
+        finalUrl: response.url || currentUrl,
+        originalStatus: redirectChain[0]?.status ?? response.status,
+        finalStatus: response.status,
+        redirected: redirectChain.length > 0,
+        redirectChain,
+        redirectLoop: false,
+        redirectError: "",
+      };
+    }
+
+    let targetUrl = "";
+    try {
+      targetUrl = new URL(location, response.url || currentUrl).toString();
+    } catch {
+      redirectChain.push({
+        url: response.url || currentUrl,
+        status: response.status,
+        location,
+        targetUrl: "",
+      });
+      return {
+        response,
+        finalUrl: response.url || currentUrl,
+        originalStatus: redirectChain[0]?.status ?? response.status,
+        finalStatus: response.status,
+        redirected: true,
+        redirectChain,
+        redirectLoop: false,
+        redirectError: "Redirect location is invalid.",
+      };
+    }
+
+    redirectChain.push({
+      url: response.url || currentUrl,
+      status: response.status,
+      location,
+      targetUrl,
+    });
+    if (seen.has(targetUrl)) {
+      return {
+        response,
+        finalUrl: response.url || currentUrl,
+        originalStatus: redirectChain[0]?.status ?? response.status,
+        finalStatus: response.status,
+        redirected: true,
+        redirectChain,
+        redirectLoop: true,
+        redirectError: "Redirect loop detected.",
+      };
+    }
+    if (redirectChain.length > maxRedirects) {
+      return {
+        response,
+        finalUrl: response.url || currentUrl,
+        originalStatus: redirectChain[0]?.status ?? response.status,
+        finalStatus: response.status,
+        redirected: true,
+        redirectChain,
+        redirectLoop: false,
+        redirectError: `Redirect chain exceeds ${maxRedirects} hops.`,
+      };
+    }
+
+    await response.body?.cancel().catch(() => undefined);
+    seen.add(targetUrl);
+    currentUrl = targetUrl;
+  }
+}
+
 function charsetFromContentType(contentType: string) {
   const match = /charset=([^;]+)/i.exec(contentType || "");
   return match ? match[1].trim().replace(/["']/g, "").toLowerCase() : "";
@@ -60,21 +153,24 @@ export async function fetchText(url: string, timeoutMs = 15000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, {
-      redirect: "follow",
+    const trace = await fetchWithRedirectTrace(url, {
       signal: controller.signal,
       headers: {
         "User-Agent": "LocalSEO/0.1 (+https://localhost)",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
-      ...localFetchTls(url),
     });
+    const { response } = trace;
     const contentType = response.headers.get("content-type") || "";
     return {
-      ok: response.ok,
-      status: response.status,
-      url: response.url,
-      redirected: response.redirected,
+      ok: response.ok && !trace.redirectError,
+      status: trace.originalStatus,
+      finalStatus: trace.finalStatus,
+      url: trace.finalUrl,
+      redirected: trace.redirected,
+      redirectChain: trace.redirectChain,
+      redirectLoop: trace.redirectLoop,
+      redirectError: trace.redirectError,
       contentType,
       contentLength: Number(response.headers.get("content-length") || 0) || null,
       contentEncoding: response.headers.get("content-encoding") || "",
