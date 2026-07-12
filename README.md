@@ -4,6 +4,8 @@ Local SEO is a local-first React + SQLite SEO workstation. It runs as a single
 local app with SQLite storage, one local admin account, and optional external
 data connectors only when you configure them.
 
+![Local SEO site audit overview for waka.pt](docs/screenshots/local-seo-waka-audit-overview.jpg)
+
 ## Features
 
 - Single local admin login
