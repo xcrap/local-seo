@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Bot, FileSearch, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, type Site } from "../../api";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from "@/components/ui";
-import { CountUp, EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, crawlSpeedOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteDisplayName, sortScanRows } from "../shared";
+import { CountUp, EmptyState, Field, Hint, JobTable, cleanSiteDomain, KeywordToolDefaultsPanel, PageHeader, ProgressBar, ReportSection, ScanPlanPreview, ScanPlanSummary, StatusDot, crawlHostOptions, crawlPreferenceLabel, crawlProtocolOptions, crawlSpeedOptions, defaultCrawlHostFromConfig, defaultCrawlProtocolFromConfig, defaultKeywordLanguageCode, defaultKeywordLocationCode, defaultLanguageCodeFromConfig, defaultLocationCodeFromConfig, formatMs, formatNumber, keywordToolDefaultsLabel, preferredScanUrl, scanIsActive, scanPhaseLabel, scanProgress, scanSeverityCounts, scanSpeedMetrics, scanStatusLabel, scanUrlCountLabel, scanUrlShortDetail, scoreTone, setSelectedScanId, SiteAvatar, siteDisplayName, sortScanRows } from "../shared";
 import { cn } from "@/lib/utils";
 import { ScanTable } from "./scans";
 
@@ -682,11 +682,39 @@ export function SitesManager({
     };
   }, [variant, sites.length]);
 
+  const activeScanCount = allScans.filter(scanIsActive).length;
+  const hasActiveScans = activeScanCount > 0;
+
+  useEffect(() => {
+    if (variant !== "home" || !hasActiveScans) return;
+    let cancelled = false;
+    const interval = window.setInterval(() => {
+      api.allScans()
+        .then((rows) => {
+          if (!cancelled) setAllScans(Array.isArray(rows) ? rows : []);
+        })
+        .catch(() => undefined);
+    }, 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [variant, hasActiveScans]);
+
   const healthBySite = useMemo(() => {
     const map = new Map<string, any>();
     for (const scan of sortScanRows(allScans)) {
       const key = scan.site_id;
       if (key && !map.has(key)) map.set(key, scan);
+    }
+    return map;
+  }, [allScans]);
+
+  const activeScanBySite = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const scan of sortScanRows(allScans)) {
+      const key = scan.site_id;
+      if (key && scanIsActive(scan) && !map.has(key)) map.set(key, scan);
     }
     return map;
   }, [allScans]);
@@ -937,6 +965,7 @@ export function SitesManager({
 
   function renderSiteRow(site: Site) {
     const scan = healthBySite.get(site.id);
+    const activeScan = activeScanBySite.get(site.id);
     const scanned = Boolean(scan);
     const score = Number(scan?.score || 0);
     const isActive = activeSiteId === site.id;
@@ -944,6 +973,12 @@ export function SitesManager({
     const openWorkspace = () => {
       selectSite(site.id);
       navigate("/overview");
+    };
+    const openActiveScan = () => {
+      if (!activeScan?.id) return;
+      selectSite(site.id);
+      setSelectedScanId(site.id, activeScan.id);
+      navigate(`/scans/${activeScan.id}`);
     };
     return (
       <div
@@ -966,25 +1001,57 @@ export function SitesManager({
                 "No website address"
               )}
             </div>
+            {activeScan ? (
+              <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-warn md:hidden">
+                <StatusDot tone="warn" className="animate-pulse motion-reduce:animate-none" />
+                <span className="truncate">{scanPhaseLabel(activeScan)}</span>
+                <span className="shrink-0 text-muted-foreground">· {formatNumber(activeScan.pages_crawled || 0)} pages</span>
+              </div>
+            ) : null}
           </div>
         </button>
 
-        <div className="hidden items-baseline gap-3 md:flex">
-          {scanned ? (
-            <>
+        <div className="hidden w-[15.25rem] shrink-0 md:block">
+          {activeScan ? (
+            <button
+              type="button"
+              className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              aria-label={`${scanPhaseLabel(activeScan)} for ${site.name}, ${formatNumber(activeScan.pages_crawled || 0)} pages scanned. Open scan report.`}
+              onClick={openActiveScan}
+            >
+              <span className="flex items-center justify-between gap-3 text-xs">
+                <span className="flex min-w-0 items-center gap-1.5 font-medium text-warn">
+                  <StatusDot tone="warn" className="animate-pulse motion-reduce:animate-none" />
+                  <span className="truncate">{scanPhaseLabel(activeScan)}</span>
+                </span>
+                <span className="shrink-0 text-muted-foreground">{formatNumber(activeScan.pages_crawled || 0)} pages</span>
+              </span>
+              <div className="mt-1.5"><ProgressBar value={scanProgress(activeScan)} /></div>
+            </button>
+          ) : scanned ? (
+            <div className="flex items-baseline gap-3">
               <span className="metric w-14 shrink-0 text-right text-2xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
               <span className="w-44 shrink-0 truncate whitespace-nowrap text-xs text-muted-foreground">
                 <span className={sev.high ? "font-medium text-bad" : ""}>{formatNumber(sev.high)}</span> high ·{" "}
                 <span className={sev.medium ? "font-medium text-warn" : ""}>{formatNumber(sev.medium)}</span> med · {formatNumber(scan.pages_crawled)} pages
               </span>
-            </>
+            </div>
           ) : (
-            <span className="w-[15.25rem] text-right text-xs text-muted-foreground">Not scanned</span>
+            <div className="text-right text-xs text-muted-foreground">Not scanned</div>
           )}
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {site.domain ? (
+          {activeScan ? (
+            <>
+              <Button size="icon" variant="secondary" className="size-8 sm:hidden" aria-label={`Open running scan for ${site.name}`} onClick={openActiveScan}>
+                <FileSearch />
+              </Button>
+              <Button size="sm" variant="secondary" className="hidden sm:inline-flex" onClick={openActiveScan}>
+                <FileSearch /> View scan
+              </Button>
+            </>
+          ) : site.domain ? (
             <Button size="sm" variant="outline" className="hidden sm:inline-flex" disabled={scanningSiteId === site.id} onClick={() => scanSite(site)}>
               <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan"}
             </Button>
@@ -1161,7 +1228,7 @@ export function SitesManager({
       <>
         <PageHeader
           title="Your sites"
-          meta={`${formatNumber(sites.length)} ${sites.length === 1 ? "site" : "sites"} · open one to enter its workspace`}
+          meta={`${formatNumber(sites.length)} ${sites.length === 1 ? "site" : "sites"}${activeScanCount ? ` · ${formatNumber(activeScanCount)} ${activeScanCount === 1 ? "scan" : "scans"} running` : ""} · open one to enter its workspace`}
           action={
             sites.length ? (
               <Button onClick={() => setOpen(true)}>
