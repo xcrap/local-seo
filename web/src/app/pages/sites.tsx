@@ -983,7 +983,7 @@ export function SitesManager({
     return (
       <div
         key={site.id}
-        className={cn("group flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-accent/35", isActive ? "bg-primary/[0.045]" : "")}
+        className={cn("group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-accent/35 sm:px-4 sm:py-3.5", isActive ? "bg-primary/[0.045]" : "")}
       >
         <button type="button" onClick={openWorkspace} className="flex min-w-0 flex-1 items-center gap-3 text-left" title={`Open ${site.name}`}>
           <SiteAvatar site={site} className="size-10 text-sm" />
@@ -1011,7 +1011,7 @@ export function SitesManager({
           </div>
         </button>
 
-        <div className="hidden w-[15.25rem] shrink-0 md:block">
+        <div className="hidden w-64 shrink-0 md:block xl:w-80">
           {activeScan ? (
             <button
               type="button"
@@ -1030,36 +1030,38 @@ export function SitesManager({
             </button>
           ) : scanned ? (
             <div className="flex items-baseline gap-3">
-              <span className="metric w-14 shrink-0 text-right text-2xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
-              <span className="w-44 shrink-0 truncate whitespace-nowrap text-xs text-muted-foreground">
+              <span className="metric w-14 shrink-0 text-2xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
+              <span className="min-w-0 flex-1 truncate whitespace-nowrap text-xs text-muted-foreground">
                 <span className={sev.high ? "font-medium text-bad" : ""}>{formatNumber(sev.high)}</span> high ·{" "}
                 <span className={sev.medium ? "font-medium text-warn" : ""}>{formatNumber(sev.medium)}</span> med · {formatNumber(scan.pages_crawled)} pages
               </span>
             </div>
           ) : (
-            <div className="text-right text-xs text-muted-foreground">Not scanned</div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <StatusDot /> Not scanned
+            </div>
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           {activeScan ? (
             <>
-              <Button size="icon" variant="secondary" className="size-8 sm:hidden" aria-label={`Open running scan for ${site.name}`} onClick={openActiveScan}>
+              <Button size="icon" variant="secondary" className="size-11 sm:hidden" aria-label={`Open running scan for ${site.name}`} onClick={openActiveScan}>
                 <FileSearch />
               </Button>
-              <Button size="sm" variant="secondary" className="hidden sm:inline-flex" onClick={openActiveScan}>
+              <Button size="sm" variant="secondary" className="hidden w-28 justify-center sm:inline-flex" onClick={openActiveScan}>
                 <FileSearch /> View scan
               </Button>
             </>
           ) : site.domain ? (
-            <Button size="sm" variant="outline" className="hidden sm:inline-flex" disabled={scanningSiteId === site.id} onClick={() => scanSite(site)}>
+            <Button size="sm" variant="outline" className="hidden w-28 justify-center sm:inline-flex" disabled={scanningSiteId === site.id} onClick={() => scanSite(site)}>
               <FileSearch /> {scanningSiteId === site.id ? "Starting" : "Scan"}
             </Button>
           ) : null}
-          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground/70 hover:text-foreground" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
+          <Button size="icon" variant="ghost" className="size-11 text-muted-foreground/70 hover:text-foreground sm:size-8" aria-label={`Edit ${site.name}`} onClick={() => startEdit(site)}>
             <Pencil />
           </Button>
-          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground/70 hover:text-destructive" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
+          <Button size="icon" variant="ghost" className="size-11 text-muted-foreground/70 hover:text-destructive sm:size-8" aria-label={`Delete ${site.name}`} onClick={() => setDeleting(site)}>
             <Trash2 />
           </Button>
         </div>
