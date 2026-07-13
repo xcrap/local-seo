@@ -342,7 +342,6 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 									variant="home"
 									sites={sites}
 									reloadSites={loadSites}
-									activeSiteId={activeSite?.id || ""}
 									selectSite={selectSite}
 								/>
 							}
@@ -354,7 +353,6 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 									variant="home"
 									sites={sites}
 									reloadSites={loadSites}
-									activeSiteId={activeSite?.id || ""}
 									selectSite={selectSite}
 								/>
 							}

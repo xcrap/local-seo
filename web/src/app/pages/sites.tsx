@@ -599,19 +599,22 @@ export function EditSiteDialog({
   );
 }
 
+type SitesManagerProps = {
+  sites: Site[];
+  reloadSites: () => Promise<void>;
+  selectSite: (id: string) => void;
+} & (
+  | { variant: "home"; activeSiteId?: never }
+  | { variant: "settings"; activeSiteId: string }
+);
+
 export function SitesManager({
   variant,
   sites,
   reloadSites,
   activeSiteId,
   selectSite,
-}: {
-  variant: "home" | "settings";
-  sites: Site[];
-  reloadSites: () => Promise<void>;
-  activeSiteId: string;
-  selectSite: (id: string) => void;
-}) {
+}: SitesManagerProps) {
   type SiteForm = {
     name: string;
     domain: string;
@@ -968,7 +971,6 @@ export function SitesManager({
     const activeScan = activeScanBySite.get(site.id);
     const scanned = Boolean(scan);
     const score = Number(scan?.score || 0);
-    const isActive = activeSiteId === site.id;
     const sev = scanned ? scanSeverityCounts(scan) : { high: 0, medium: 0, low: 0 };
     const openWorkspace = () => {
       selectSite(site.id);
@@ -983,14 +985,13 @@ export function SitesManager({
     return (
       <div
         key={site.id}
-        className={cn("group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-accent/35 sm:px-4 sm:py-3.5", isActive ? "bg-primary/[0.045]" : "")}
+        className="group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-accent/35 sm:px-4 sm:py-3.5"
       >
         <button type="button" onClick={openWorkspace} className="flex min-w-0 flex-1 items-center gap-3 text-left" title={`Open ${site.name}`}>
           <SiteAvatar site={site} className="size-10 text-sm" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-heading truncate text-[17px] transition-colors group-hover:text-primary">{site.name}</span>
-              {isActive ? <span className="inline-flex items-center gap-1.5 text-xs font-medium text-good"><StatusDot tone="good" /> Active</span> : null}
             </div>
             <div className="mt-0.5 truncate text-sm text-muted-foreground">
               {site.domain ? (
@@ -1029,11 +1030,21 @@ export function SitesManager({
               <div className="mt-1.5"><ProgressBar value={scanProgress(activeScan)} /></div>
             </button>
           ) : scanned ? (
-            <div className="flex items-baseline gap-3">
-              <span className="metric w-14 shrink-0 text-2xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
-              <span className="min-w-0 flex-1 truncate whitespace-nowrap text-xs text-muted-foreground">
-                <span className={sev.high ? "font-medium text-bad" : ""}>{formatNumber(sev.high)}</span> high ·{" "}
-                <span className={sev.medium ? "font-medium text-warn" : ""}>{formatNumber(sev.medium)}</span> med · {formatNumber(scan.pages_crawled)} pages
+            <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-baseline gap-3 xl:grid-cols-[4rem_minmax(0,1fr)] xl:gap-4">
+              <span className="metric text-right text-2xl leading-none" style={{ color: scoreTone(score) }}>{formatNumber(score)}</span>
+              <span className="grid min-w-0 grid-cols-3 text-xs text-muted-foreground">
+                <span className="grid grid-cols-[2rem_auto] items-baseline gap-1 whitespace-nowrap">
+                  <span className={cn("nums text-right font-medium", sev.high ? "text-bad" : "")}>{formatNumber(sev.high)}</span>
+                  <span><span className="sr-only"> high</span><span aria-hidden>high</span></span>
+                </span>
+                <span className="grid grid-cols-[2rem_auto] items-baseline gap-1 whitespace-nowrap">
+                  <span className={cn("nums text-right font-medium", sev.medium ? "text-warn" : "")}>{formatNumber(sev.medium)}</span>
+                  <span><span className="sr-only"> medium</span><span aria-hidden>med</span></span>
+                </span>
+                <span className="grid grid-cols-[2rem_auto] items-baseline gap-1 whitespace-nowrap">
+                  <span className="nums text-right">{formatNumber(scan.pages_crawled)}</span>
+                  <span><span className="sr-only"> pages</span><span aria-hidden>pages</span></span>
+                </span>
               </span>
             </div>
           ) : (
