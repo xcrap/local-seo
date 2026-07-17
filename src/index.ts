@@ -295,7 +295,7 @@ function mcpOriginAllowed(origin?: string) {
   return mcpAllowedOrigins.has(origin);
 }
 
-app.post("/mcp", (c) => {
+app.post("/mcp", async (c) => {
   if (!mcpOriginAllowed(c.req.header("origin"))) {
     return c.json({ error: "Forbidden" }, 403);
   }
